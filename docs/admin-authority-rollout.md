@@ -1,6 +1,6 @@
 # Admin authority fix (migration 48): rollout plan
 
-**Status, 2026-10-27:** prepared and tested offline on branch `fix/require-admin-staff`. **Nothing is
+**Status, 2026-10-27:** prepared and tested offline on branch `fix/security-2026-10-27`. **Nothing is
 applied to production and the branch is not pushed** (the repository is public). Every production
 step below needs the owner's approval.
 
@@ -92,7 +92,7 @@ the admin screens stop working.
 **Option A, through the pull request (simplest; minutes between the public fix and the patched
 database):**
 
-1. Push `fix/require-admin-staff` and open its PR into `main`. It sits on top of the documentation
+1. Push `fix/security-2026-10-27` and open its PR into `main`. It sits on top of the documentation
    PR (`docs/claude-structure`): merge that one first, or both together. Keep the PR text generic
    ("tighten admin authority for the business portal") until step 3 is done.
 2. Merge and wait for Vercel. Check that the portal's admin screens still open for you as before
