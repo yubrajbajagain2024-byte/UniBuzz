@@ -24,6 +24,22 @@ import { isMissingInDatabase, isMissingRelation } from "./profile-page";
 export const BUSINESS_SUMMARY_SELECT = "id, name, logo_url, verified_partner";
 const DEAL_SELECT = `*, business:businesses!deals_business_id_fkey(${BUSINESS_SUMMARY_SELECT}), sponsored:deal_sponsored`;
 
+export type AdminStanding = "admin" | "mfa_required" | null;
+
+/**
+ * May the signed-in person use the admin screens? The database decides (admin_standing(), migration 48): with
+ * CampConnect Admin's staff list, a staff owner or admin, not suspended, whose session passed two-factor sign-in
+ * ("mfa_required" until it has). On a database before migration 48, whoever has the admin role, as before.
+ */
+export async function getAdminStanding(supabase: Client, role: UserRole): Promise<AdminStanding> {
+  const { data, error } = await supabase.rpc("admin_standing");
+  if (error) {
+    if (isMissingInDatabase(error)) return role === "admin" ? "admin" : null;
+    throw error;
+  }
+  return data === "admin" || data === "mfa_required" ? data : null;
+}
+
 /** The signed-in person's role; 'student' on a database before migration 39. */
 export async function getMyRole(supabase: Client): Promise<UserRole> {
   const { data, error } = await supabase.rpc("my_role");
