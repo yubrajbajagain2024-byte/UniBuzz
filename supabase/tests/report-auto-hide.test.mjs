@@ -1,21 +1,27 @@
 // The report auto-hide backstop (20261110000000_report_auto_hide.sql) on production's schema: content 10 different
 // legitimate people report is hidden for everyone but its owner, flagged for CampConnect Admin, its owner told and the
-// hide audited; duplicates and people who do not count are left out, and the author cannot cancel reports by blocking;
-// Buzz stays anonymous and Trust & Safety's own thresholds still work; a restore needs 10 new people to hide it again;
-// keep hidden, delete and the website console's approve settle the flag; the new table and helpers are closed. Then
-// the same core on production as it is today (the migrations not live yet left out, since this one may be applied
-// alone), and on this repo's schema alone, where it changes nothing.
+// hide audited (never naming a Buzz author or an anonymous poster); duplicates and people who do not count are left
+// out, and the author cannot cancel reports by blocking; Buzz stays anonymous, Trust & Safety's own hide at 3 still
+// comes first and is flagged as its own, and what staff approved is never hidden again; a restore needs 10 new people
+// to hide it again; keep hidden, delete and the website console's approve settle the flag; a review never closes a
+// self-harm report, a wellbeing item or a legal hold, nobody reviews what they wrote or reported, and moderators leave
+// escalated items to admins; the console never un-hides a hide staff made by hand; the new table and helpers are
+// closed, and the rollback keeps to its caller's transaction. Then the same core on production as it is today (the
+// migrations not live yet left out, since this one may be applied alone), and on this repo's schema alone, where it
+// changes nothing.
 // Usage: node supabase/tests/report-auto-hide.test.mjs
 import { boot, read, expectOk, expectError, done } from "./harness.mjs";
 import { BUZZ_GUIDELINES_VERSION } from "../../packages/shared/src/buzz/constants.ts";
 
 const MIGRATION = "migrations/20261110000000_report_auto_hide.sql";
+const ROLLBACK = "rollbacks/20261110000000_report_auto_hide.down.sql";
 const MFA = { aal: "aal2" };
 const THRESHOLD = 10;
 const check = (cond, message) => { if (!cond) throw new Error(message); };
-// Production's migrations as of 2026-10-28: these are in this repo but not live yet (docs/migrations.md).
+// Production's migrations as of 2026-10-28: these are in this repo but not live yet (docs/migrations.md; 47, the
+// anonymous listings, has been live since 2026-10-27).
 const NOT_LIVE = [
-  "20261103000300_discover.sql", "20261104000100_discover_audience.sql", "20261105000000_anonymous_listings.sql",
+  "20261103000300_discover.sql", "20261104000100_discover_audience.sql",
   "20261107000000_business_teams.sql", "20261107000100_business_ads.sql", "20261108000000_buzz_reply_tree.sql",
   "20261108000100_buzz_top_reply.sql", "20261108000200_buzz_prompt_threads.sql", "20261108000300_buzz_categories.sql",
   "20261109000000_media_server_fields.sql", "20261109000100_business_hardening.sql",
@@ -119,11 +125,12 @@ const targets = {
   buzz: await make.buzz(AUTHOR),
 };
 targets.buzz_comment = await make.reply(AUTHOR, await make.buzz(VIEWER, "Is the library open late tonight"));
-// Trust & Safety hides Buzz at a weighted 3 on its own; staff approval makes an item immune to that, never to this.
-await db.query("select public.buzz_v2_set_status('buzz', $1, 'active', true), public.buzz_v2_set_status('buzz_reply', $2, 'active', true)", [targets.buzz, targets.buzz_comment]);
 const FLAG_TYPE = (kind) => (kind === "reel" ? "post" : kind);
+// Buzz never reaches 10 here: Trust & Safety hides it at a weighted 3 first, and what staff approved is never hidden
+// again by either (checked below), so the 10th report is checked on public content.
+const ANON = new Set(["buzz", "buzz_comment"]);
 
-for (const [kind, id] of Object.entries(targets)) {
+for (const [kind, id] of Object.entries(targets).filter(([k]) => !ANON.has(k))) {
   await expectOk(`${kind}: 9 people reporting it change nothing`, async () => {
     await reportAll(first9, kind, id, kind === "item" ? "scam" : "harassment");
     check(await sees(VIEWER, kind, id), "already hidden");
@@ -151,6 +158,45 @@ for (const [kind, id] of Object.entries(targets)) {
     await expectOk(`${kind}: its owner still sees it`, async () => check(await sees(AUTHOR, kind, id), "owner lost it"));
   }
 }
+await expectOk("buzz and replies: Trust & Safety's own hide at 3 still works, and is flagged as its own, with no author", async () => {
+  for (const kind of ANON) {
+    const id = targets[kind];
+    await reportAll(R.slice(0, 3), kind, id);
+    check((await statusOf(kind, id)).status === "hidden", `${kind}: ${JSON.stringify(await statusOf(kind, id))}`);
+    const f = await flags(kind, id);
+    check(f.length === 1 && f[0].source === "trust_safety" && f[0].status === "pending", `${kind}: ${JSON.stringify(f)}`);
+    const a = await audits("content.auto_hide", id);
+    check(a.length === 1 && a[0].details.source === "trust_safety" && !("author_id" in a[0].details), JSON.stringify(a));
+  }
+});
+await expectOk("buzz and replies staff approved are never hidden by reports, at 10 or more (Trust & Safety's rule)", async () => {
+  const b = await make.buzz(AUTHOR, "The approved buzz about the bus schedule");
+  const c = await make.reply(AUTHOR, await make.buzz(VIEWER, "Anyone know the bus schedule"));
+  await db.query("select public.buzz_v2_set_status('buzz', $1, 'active', true), public.buzz_v2_set_status('buzz_reply', $2, 'active', true)", [b, c]);
+  for (const [kind, id] of [["buzz", b], ["buzz_comment", c]]) {
+    await reportAll(R.slice(0, 12), kind, id);
+    check((await statusOf(kind, id)).status === "active", `${kind} hidden`);
+    check((await flags(kind, id)).length === 0, `${kind} flagged`);
+  }
+});
+await expectOk("buzz hidden any other way is not flagged as Trust & Safety's: by community votes, by hand in CampConnect Admin, or both", async () => {
+  // What buzz_v2_vote does at a score of -10 with 12 eligible votes: the status alone, no hidden_at.
+  const voteDown = (id) => db.query("update public.buzz_posts set status = 'hidden' where id = $1", [id]);
+  const voted = await make.buzz(AUTHOR, "A buzz the community voted down");
+  await voteDown(voted);
+  const byHand = await make.buzz(AUTHOR, "A buzz staff hid by hand");
+  await call(MOD, "public.admin_content_hide('buzz', $1, 'Doxxing, held for review')", [byHand]);
+  // Voted down, then hidden by hand as well: it stays 'hidden' and now has a hidden_at, with staff's reason.
+  const both = await make.buzz(AUTHOR, "A buzz voted down and then hidden by hand");
+  await voteDown(both);
+  await call(MOD, "public.admin_content_hide('buzz', $1, 'Doxxing, held for review')", [both]);
+  const s = await statusOf("buzz", both);
+  check(s.status === "hidden" && s.hidden_at !== null && s.hidden_reason === "Doxxing, held for review", JSON.stringify(s));
+  for (const id of [voted, byHand, both]) {
+    await report(R[29], "buzz", id);
+    check((await flags("buzz", id)).length === 0, `${id}: ${JSON.stringify(await flags("buzz", id))}`);
+  }
+});
 await expectOk("reel: gone from reels_feed too", async () => {
   const feed = await rowsAs(VIEWER, "select source_id from public.reels_feed(null, 100, 0)", [], {});
   check(!feed.some((r) => r.source_id === targets.reel), "still in reels_feed");
@@ -222,19 +268,9 @@ await expectError("the daily report limit still applies", async () => {
 }, "a lot of reports");
 
 // --- Buzz -----------------------------------------------------------------------------------------------------------
-await expectOk("Buzz: Trust & Safety's own hide at 3 still works, and is flagged as its own", async () => {
-  const b = await make.buzz(AUTHOR, "Who keeps leaving carts in the stairwell");
-  await reportAll(R.slice(0, 3), "buzz", b);
-  check((await statusOf("buzz", b)).status === "hidden", JSON.stringify(await statusOf("buzz", b)));
-  const f = await flags("buzz", b);
-  check(f.length === 1 && f[0].source === "trust_safety" && f[0].status === "pending", JSON.stringify(f));
-  const a = await audits("content.auto_hide", b);
-  check(a.length === 1 && a[0].details.source === "trust_safety" && !("author_id" in a[0].details), JSON.stringify(a));
-});
 await expectOk("Buzz: a reporter is told the same thing whether or not their report hid it", async () => {
   const b = await make.buzz(AUTHOR, "Parking tickets on Sunday again");
-  await db.query("select public.buzz_v2_set_status('buzz', $1, 'active', true)", [b]);
-  const answers = await reportAll(R.slice(0, THRESHOLD), "buzz", b);
+  const answers = await reportAll(R.slice(3, 6), "buzz", b);
   check((await statusOf("buzz", b)).status === "hidden", "not hidden");
   check(new Set(answers.map((x) => JSON.stringify(x))).size === 1, JSON.stringify(answers));
 });
@@ -289,13 +325,68 @@ await expectOk("keep hidden: stays hidden, flag upheld, reports actioned, owner 
   check((await audits("content.auto_hide_upheld", targets.post)).length === 1, "not audited");
 });
 await expectError("keep hidden: only once", async () => call(MOD, "public.admin_auto_hide_uphold($1)", [(await flags("post", targets.post))[1].id]), "already reviewed");
-await expectOk("restore of a Buzz item: it comes back as it was, and needs 10 new people too", async () => {
+await expectOk("restore of a Buzz item: it comes back as it was, and the same reports cannot hide it again", async () => {
   await call(MOD, "public.admin_content_restore('buzz', $1)", [targets.buzz]);
   const s = await statusOf("buzz", targets.buzz);
   check(s.status === "active" && s.hidden_at === null, JSON.stringify(s));
   check((await flags("buzz", targets.buzz))[0].status === "restored", "flag not settled");
-  await reportAll(R.slice(0, THRESHOLD), "buzz", targets.buzz);
+  await reportAll(R.slice(0, 3), "buzz", targets.buzz);
   check((await statusOf("buzz", targets.buzz)).status === "active", "re-hidden by the same reports");
+});
+
+// --- Who reviews what (Trust & Safety's console rules) -----------------------------------------------------------------
+const queueOf = async (id) => (await db.query("select * from public.mod_queue where entity_id = $1 order by created_at desc limit 1", [id])).rows[0];
+/** A post AUTHOR (or someone else) wrote, hidden by 10 people nobody else in this file uses. */
+const hiddenPost = async (body, { author = AUTHOR, before = async () => {} } = {}) => {
+  const id = await make.post(author, body);
+  await before(id);
+  await reportAll(await people(THRESHOLD, body.split(" ")[0]), "post", id);
+  check(!(await sees(VIEWER, "post", id)), `not hidden at 10: ${body}`);
+  return id;
+};
+const WELL = await hiddenPost("Wellbeing post for the review rules", { before: (id) => report(VIEWER, "post", id, "self_harm") });
+await expectOk("restore leaves a self-harm report and its wellbeing item open, and never counts against that reporter", async () => {
+  check((await queueOf(WELL)).label === "wellbeing", JSON.stringify(await queueOf(WELL)));
+  await call(MOD, "public.admin_content_restore('post', $1)", [WELL]);
+  check(await sees(VIEWER, "post", WELL), "not restored");
+  const reps = (await db.query("select reason, status from public.reports where target_id = $1", [WELL])).rows;
+  check(reps.filter((r) => r.reason === "self_harm").every((r) => r.status === "open"), `self-harm report closed: ${JSON.stringify(reps)}`);
+  check(reps.filter((r) => r.reason !== "self_harm").length === THRESHOLD && reps.filter((r) => r.reason !== "self_harm").every((r) => r.status === "dismissed"), JSON.stringify(reps));
+  check((await queueOf(WELL)).status !== "closed", "the wellbeing item was closed");
+});
+const ESC = await hiddenPost("Escalated post for the review rules");
+await db.query("update public.mod_queue set status = 'escalated' where entity_id = $1 and status <> 'closed'", [ESC]);
+await expectError("a moderator cannot restore an item escalated to admins", () => call(MOD, "public.admin_content_restore('post', $1)", [ESC]), "An admin reviews this item");
+await expectOk("... an admin can, and that closes the escalated item", async () => {
+  await call(ADMIN, "public.admin_content_restore('post', $1)", [ESC]);
+  check(await sees(VIEWER, "post", ESC), "not restored");
+  check((await queueOf(ESC)).status === "closed", JSON.stringify(await queueOf(ESC)));
+});
+const HOLD = await hiddenPost("Legal hold post for the review rules");
+await db.query("update public.mod_queue set legal_hold = true where entity_id = $1 and status <> 'closed'", [HOLD]);
+await expectError("a moderator cannot keep hidden an item on legal hold", async () => call(MOD, "public.admin_auto_hide_uphold($1)", [(await flags("post", HOLD))[0].id]), "An admin reviews this item");
+await expectOk("... an admin can, and the legal hold stays open", async () => {
+  await call(ADMIN, "public.admin_auto_hide_uphold($1, 'Preserved for the hold')", [(await flags("post", HOLD))[0].id]);
+  const q = await queueOf(HOLD);
+  check(q.status !== "closed" && q.legal_hold === true, JSON.stringify(q));
+});
+const OWN = await hiddenPost("Own post the moderator wrote", { author: MOD });
+await expectError("nobody restores content they wrote", () => call(MOD, "public.admin_content_restore('post', $1)", [OWN]), "you wrote it or reported it");
+const REP = await hiddenPost("Reported post the moderator reported", { before: (id) => report(MOD, "post", id) });
+await expectError("nobody keeps hidden content they reported", async () => call(MOD, "public.admin_auto_hide_uphold($1)", [(await flags("post", REP))[0].id]), "you wrote it or reported it");
+await expectError("... nor restores it", () => call(MOD, "public.admin_content_restore('post', $1)", [REP]), "you wrote it or reported it");
+await expectOk("another member of the team can review both", async () => {
+  await call(ADMIN, "public.admin_content_restore('post', $1)", [OWN]);
+  await call(ADMIN, "public.admin_content_restore('post', $1)", [REP]);
+  check((await sees(VIEWER, "post", OWN)) && (await sees(VIEWER, "post", REP)), "not restored");
+});
+await expectOk("an anonymous listing's poster is not named in CampConnect Admin's auto-hide log", async () => {
+  await as(AUTHOR, () => db.query("insert into public.items (seller_id, title, description, price, category, is_anonymous) values ($1, 'Anonymous mini fridge', 'Works fine, pick up only', 40, 'furniture', true)", [AUTHOR]));
+  const id = (await db.query("select id from public.items where title = 'Anonymous mini fridge'")).rows[0].id;
+  await reportAll(await people(THRESHOLD, "Anonlisting"), "item", id, "scam");
+  check((await hiddenAt("item", id)) !== null, "not hidden");
+  const a = await audits("content.auto_hide", id);
+  check(a.length === 1 && a[0].details.author_id === null, JSON.stringify(a[0]?.details));
 });
 await expectOk("people whose reports staff keep dismissing stop counting (Trust & Safety's reporter trust)", async () => {
   const brigade = await people(THRESHOLD, "Brigade");
@@ -362,6 +453,18 @@ await expectOk("console: approving it brings it back, settles the flag, tells th
   check(await sees(VIEWER, "comment", targets.comment), "still hidden");
   check((await flags("comment", targets.comment))[0].status === "restored", "flag not settled");
   check((await notices(AUTHOR, "content_restored")).length === before + 1, "owner not told");
+  const a = await audits("content.restore", targets.comment);
+  check(a.length === 1 && a[0].actor_id === MOD && a[0].details.via === "trust_safety", `CampConnect Admin's log: ${JSON.stringify(a)}`);
+});
+await expectOk("console: approving a report never un-hides what staff hid by hand", async () => {
+  const id = await make.post(AUTHOR, "A post staff hid by hand");
+  await call(MOD, "public.admin_content_hide('post', $1, 'Doxxing, held for legal review')", [id]);
+  await report(R[28], "post", id);
+  const qid = (await db.query("select id from public.mod_queue where entity_type = 'post' and entity_id = $1 and status <> 'closed'", [id])).rows[0].id;
+  await call(ADMIN, "public.console_act($1, 'approve', 'harassment_bullying', 'Report not upheld')", [qid]);
+  const s = await statusOf("post", id);
+  check(s.hidden_at !== null && s.hidden_reason === "Doxxing, held for legal review", JSON.stringify(s));
+  check((await audits("content.restore", id)).length === 0, "a restore was logged");
 });
 
 // --- Permissions ------------------------------------------------------------------------------------------------------
@@ -373,6 +476,8 @@ for (const fn of [
   "public.moderation_content_restore('post', gen_random_uuid())", "public.report_hidden_at('post', gen_random_uuid())",
   "public.report_auto_hide_tell_owner('post', gen_random_uuid(), '{}'::jsonb, 'content_restored')",
   "public.report_auto_hide_close('post', gen_random_uuid(), 'dismissed', 'dismissed', null, null, 'approved')",
+  "public.report_hidden_reason('post', gen_random_uuid())", "public.report_auto_hide_close_reports('post', gen_random_uuid(), 'dismissed')",
+  "public.report_auto_hide_assert_reviewer('post', gen_random_uuid(), gen_random_uuid(), 'admin')",
 ]) {
   await expectError(`students cannot call ${fn.split("(")[0]}`, () => call(VIEWER, fn, [], {}), "permission denied");
 }
@@ -382,6 +487,26 @@ for (const fn of ["public.admin_auto_hidden_list()", "public.admin_auto_hidden_l
   await expectError(`${fn.split("(")[0]} needs two-factor sign-in`, () => call(MOD, fn, [], {}), "Two-factor authentication required");
 }
 await expectError("an unknown status is refused", () => call(MOD, "public.admin_auto_hidden_list('nope')"), "Invalid status");
+await expectOk("on production's schema the staff functions exist under the signatures the repo-schema check looks for", async () => {
+  const r = (await db.query("select to_regprocedure('public.admin_auto_hidden_list(text,int,timestamptz,text,uuid)') as a, to_regprocedure('public.moderation_content_hide(text,uuid,text)') as m")).rows[0];
+  check(r.a !== null && r.m !== null, JSON.stringify(r));
+});
+
+// --- The rollback ---------------------------------------------------------------------------------------------------
+await expectOk("the rollback keeps to its caller's transaction: rolled back with it, it commits nothing on its own", async () => {
+  await db.exec("begin");
+  await db.exec(read(ROLLBACK));
+  await db.exec("rollback");
+  check((await db.query("select to_regclass('public.report_auto_hides') as t")).rows[0].t !== null, "the rollback committed by itself");
+});
+await expectOk("the rollback removes the backstop and its helpers; the migration applies again after it", async () => {
+  await db.exec(read(ROLLBACK));
+  const gone = (await db.query(`select to_regclass('public.report_auto_hides') as t, to_regprocedure('public.report_hidden_reason(text,uuid)') as r,
+    to_regprocedure('public.report_auto_hide_close_reports(text,uuid,text)') as c, to_regprocedure('public.report_auto_hide_assert_reviewer(text,uuid,uuid,text)') as a`)).rows[0];
+  check(Object.values(gone).every((v) => v === null), JSON.stringify(gone));
+  await db.exec(read(MIGRATION));
+  check((await db.query("select to_regclass('public.report_auto_hides') as t")).rows[0].t !== null, "not applied again");
+});
 
 // =====================================================================================================================
 // Production as it is today: this migration applied alone, ahead of the ones not live yet
@@ -391,12 +516,21 @@ await expectError("an unknown status is refused", () => call(MOD, "public.admin_
   await expectOk("today's production: the migration applies and re-runs", () => T.db.exec(read(MIGRATION)));
   const author = await T.person("Tara Today");
   const viewer = await T.person("Vic Today");
-  for (const kind of ["post", "comment", "roommate", "buzz"]) {
+  await expectOk("today's production: Trust & Safety hides a buzz at 3, it is flagged as its own, and a restore holds", async () => {
+    const rs = await T.people(3, "Today buzz Reporter");
+    const id = await T.make.buzz(author);
+    await T.reportAll(rs, "buzz", id);
+    check((await T.statusOf("buzz", id)).status === "hidden", "not hidden");
+    check((await T.flags("buzz", id))[0]?.source === "trust_safety", JSON.stringify(await T.flags("buzz", id)));
+    await T.call(T.MOD, "public.admin_content_restore('buzz', $1)", [id]);
+    await T.reportAll(rs, "buzz", id);
+    check((await T.statusOf("buzz", id)).status === "active", "re-hidden by the same reports");
+  });
+  for (const kind of ["post", "comment", "roommate", "item"]) {
     // New people for each kind: three dismissed reports would make anyone low-trust (checked above).
     const rs = await T.people(THRESHOLD, `Today ${kind} Reporter`);
     await expectOk(`today's production: ${kind} hides at 10, restores, and the same reports cannot hide it again`, async () => {
       const id = kind === "comment" ? await T.make.comment(author, await T.make.post(author)) : await T.make[kind](author);
-      if (kind === "buzz") await T.db.query("select public.buzz_v2_set_status('buzz', $1, 'active', true)", [id]);
       await T.reportAll(rs.slice(0, 9), kind, id);
       check(await T.sees(viewer, kind, id), "hidden at 9");
       await T.report(rs[9], kind, id);
@@ -416,7 +550,7 @@ await expectError("an unknown status is refused", () => call(MOD, "public.admin_
   const { db: rdb, mk, as: ras } = await boot();
   await expectOk("repo schema: the migration re-runs, and the CampConnect Admin parts are not created", async () => {
     await rdb.exec(read(MIGRATION));
-    const r = (await rdb.query("select to_regprocedure('public.admin_auto_hidden_list(text,int,timestamptz)') as a, to_regprocedure('public.moderation_content_hide(text,uuid,text)') as m")).rows[0];
+    const r = (await rdb.query("select to_regprocedure('public.admin_auto_hidden_list(text,int,timestamptz,text,uuid)') as a, to_regprocedure('public.moderation_content_hide(text,uuid,text)') as m")).rows[0];
     check(r.a === null && r.m === null, JSON.stringify(r));
   });
   await expectOk("repo schema: 10 reports raise no error and flag nothing", async () => {

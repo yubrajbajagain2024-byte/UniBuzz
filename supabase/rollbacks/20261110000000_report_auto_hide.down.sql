@@ -3,7 +3,7 @@
 -- admin_content_hide/restore/delete and admin_reports_list (supabase/applied-outside-repo/20261024000000_moderation_support.sql).
 -- Content hidden automatically stays hidden (restore it in CampConnect Admin first if it should come back); reports
 -- closed by a restore or a deletion stay closed. The flags table and its history are dropped.
-begin;
+-- No begin/commit of its own: run it with its delete from public._migrations in one transaction (supabase/CLAUDE.md).
 
 drop trigger if exists reports_auto_hide on public.reports;
 drop trigger if exists reports_auto_hide_reopen on public.reports;
@@ -311,12 +311,13 @@ drop function if exists public.report_auto_hide_target_gone();
 drop function if exists public.report_auto_hide_evaluate(text, uuid);
 drop function if exists public.report_auto_hide_tell_owner(text, uuid, jsonb, text);
 drop function if exists public.report_auto_hide_close(text, uuid, text, text, uuid, text, text);
+drop function if exists public.report_auto_hide_close_reports(text, uuid, text);
+drop function if exists public.report_auto_hide_assert_reviewer(text, uuid, uuid, text);
 drop function if exists public.report_auto_hide_settle(text, uuid, text, uuid, text);
 drop function if exists public.report_hidden_at(text, uuid);
+drop function if exists public.report_hidden_reason(text, uuid);
 drop function if exists public.report_target_table(text);
 drop function if exists public.report_auto_hide_threshold();
 drop table if exists public.report_auto_hides;
-
-commit;
 
 notify pgrst, 'reload schema';

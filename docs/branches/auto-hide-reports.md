@@ -22,14 +22,29 @@
   - this repo's schema alone, where nothing changes.
 - `harness.mjs` gained `boot({ skip })`.
 - The console's limitation note U1 is updated.
+- **Fixes from an independent review (2026-10-28, local commit, not pushed):**
+  - A review closes only the reports that count: never a self-harm report, nor a queue item on legal hold or about
+    someone's wellbeing; an escalated item only when an admin acts (`report_auto_hide_close`, new
+    `report_auto_hide_close_reports`).
+  - Restore and keep hidden follow the console's reviewer rule: not by someone who wrote or reported the content, and
+    not by a moderator on an escalated or legal-hold item (new `report_auto_hide_assert_reviewer`).
+  - The console's approve, restore and granted appeals un-hide public content only where reports hid it, never a hide
+    staff made by hand, and write CampConnect Admin's audit log (`ts_set_content_status`, new `report_hidden_reason`).
+  - Staff-approved content (`autoHideImmune`) is never auto-hidden; only a Buzz Trust & Safety hid is flagged as
+    its own; the auto-hide log takes the author from CampConnect Admin's snapshot, so it never names an anonymous
+    listing's poster; the reporter count runs only when it is needed.
+  - The rollback has no `begin`/`commit` of its own; the repo-schema check uses the real five-argument signature.
+  - Not done (the review's info notes): the schema guard still checks only `staff_audit_log`; the delete log still
+    names a Buzz author (CampConnect Admin's existing behaviour); an owner is not told when upheld content is later
+    restored.
 
 ## Tests (2026-10-28)
 
-- `npm run db:test`: 42 suites, 1607 checks, 0 failures, after merging `main` at `f77d796` (1583 at `0d8e459`).
+- `npm run db:test`: 42 suites, 1623 checks, 0 failures, with the review's fixes (1607 before them, after merging `main` at `f77d796`; 1583 at `0d8e459`).
   The production rollout rehearsal now applies, rolls back and re-applies 57 with the other pending migrations. That includes Trust & Safety, Buzz v2 and
   CampConnect Admin + Buzz, unchanged.
-- `report-auto-hide`: 83 checks.
-- `npm run check`: 6/6. `test:shared` 184/184, `test:moderation` 429/429 (after merging `f77d796`).
+- `report-auto-hide`: 99 checks (83 before the review's fixes). Each fix has a check that fails on the earlier migration (run against it on 2026-10-28).
+- `npm run check`: 6/6 (again with the review's fixes). `test:shared` 184/184, `test:moderation` 429/429 (after merging `f77d796`).
 - 57 shares no function, policy, trigger or view with 49 to 56, so running after Business v2 changes none of it.
 - Not run: anything against a real Supabase project. step-admin's own admin suites do not run on
   `main`'s schema: they predate Trust & Safety, whose report trigger refuses some of their fixtures.

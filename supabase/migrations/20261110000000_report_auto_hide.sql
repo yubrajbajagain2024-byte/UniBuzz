@@ -20,16 +20,22 @@
 --      Blocks are deliberately not re-checked here: an author could otherwise block reporters to cancel their reports.
 --      At 10 it hides the item through Trust & Safety's own path (ts_apply_content_status: Buzz through its adapter,
 --      public content through the bridge in 3), which also sends the owner the usual "hidden while our team reviews it"
---      notice with no actor. A Buzz item Trust & Safety itself just hid is flagged too, so the review list is complete.
---      Every flag writes CampConnect Admin's audit log (actor null = System; Buzz rows never carry an author) and Trust &
---      Safety's (actor_role system). Advisory locks per item make concurrent reports count once each.
+--      notice with no actor. Content staff approved (autoHideImmune) is never hidden this way, as Trust & Safety's own
+--      rule says. A Buzz item Trust & Safety itself hid is flagged too, so the review list is complete; a Buzz item hidden
+--      any other way (by votes, or by hand in CampConnect Admin) is not. Every flag writes CampConnect Admin's audit log
+--      (actor null = System; the author only as CampConnect Admin's own snapshot names it, so never for Buzz or for an
+--      anonymous listing) and Trust & Safety's (actor_role system). Advisory locks make concurrent reports count once.
 --   3. Trust & Safety's console and CampConnect Admin agree on public content: ts_snapshot() reports a hidden post as
---      'hidden' (so the console's auto-hidden view lists it), and ts_set_content_status() hides and restores it through
---      CampConnect Admin's hidden_at instead of doing nothing.
---   4. CampConnect Admin's restore closes the item's open reports as dismissed (feeding reporter trust) and its queue
---      item: each person can report a thing once, so it takes 10 new people to hide restored content again. Delete
---      closes them as actioned. Both settle the flag and, for flagged content, tell the owner. New staff functions:
---      admin_auto_hidden_list, admin_auto_hidden_counts and admin_auto_hide_uphold ("keep hidden").
+--      'hidden' (so the console's auto-hidden view lists it), and ts_set_content_status() hides it through CampConnect
+--      Admin's hidden_at, and restores it only when reports hid it (a pending flag, or the reports' hidden_reason), never
+--      a hide staff made by hand; a restore there is written to CampConnect Admin's audit log too.
+--   4. CampConnect Admin's restore closes the item's open reports that count (never a self-harm one) as dismissed
+--      (feeding reporter trust) and its queue item: each person can report a thing once, so it takes 10 new people to
+--      hide restored content again. Delete closes them as actioned. A queue item on legal hold or about someone's
+--      wellbeing stays open, and an escalated one stays open unless an admin acts. Both settle the flag and, for flagged
+--      content, tell the owner. As in Trust & Safety's console, nobody reviews content they wrote or reported, and a
+--      moderator cannot act on an escalated item or one on legal hold. New staff functions: admin_auto_hidden_list,
+--      admin_auto_hidden_counts and admin_auto_hide_uphold ("keep hidden").
 --
 -- Without CampConnect Admin's schema (this repo's own boot(), no public.staff_audit_log) there is nothing to hide public
 -- content with: the CampConnect Admin parts are not created and the evaluation returns at once. Safe to run twice.
@@ -108,6 +114,26 @@ begin
 end;
 $$;
 
+-- Why the item is hidden, or null; read the same way. It tells a hide reports made from one staff made by hand.
+create or replace function public.report_hidden_reason(p_type text, p_id uuid)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_table text := public.report_target_table(p_type);
+  v text;
+begin
+  if v_table is null or p_id is null then
+    return null;
+  end if;
+  execute format('select to_jsonb(x) ->> ''hidden_reason'' from public.%I x where x.id = $1', v_table) into v using p_id;
+  return v;
+end;
+$$;
+
 -- Migration 41's ts_snapshot(), unchanged for Buzz; public content says 'hidden' while CampConnect Admin hides it, so
 -- Trust & Safety's auto-hide skips it, its console lists it under auto-hidden, and a restore there tells the owner.
 create or replace function public.ts_snapshot(p_type text, p_id uuid)
@@ -160,8 +186,45 @@ begin
 end;
 $$;
 
--- Close the item's open reports (each reporter told the outcome by migration 41's ts_close_reports, never what happened
--- to whom), record CampConnect Admin's review on them, and close Trust & Safety's queue item.
+-- Migration 41's ts_close_reports() for the reports that count here only: a self-harm report is about someone's
+-- wellbeing, not about the content, so a review of the content never closes it (nor counts it against its reporter's
+-- trust). Each reporter is told the outcome in 41's words, never what happened to whom.
+create or replace function public.report_auto_hide_close_reports(p_entity_type text, p_entity_id uuid, p_outcome text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  r record;
+  v_anon boolean := public.ts_is_anon(p_entity_type);
+begin
+  if p_entity_id is null then
+    return;
+  end if;
+  for r in
+    update public.reports set status = p_outcome, closed_at = now(), bad_faith = false
+    where target_type in (p_entity_type, case when p_entity_type = 'buzz_reply' then 'buzz_comment' end) and target_id = p_entity_id
+      and status = 'open' and reason <> 'self_harm'
+    returning id, reporter_id
+  loop
+    perform public.ts_notify(
+      r.reporter_id, 'moderation',
+      case when p_outcome = 'actioned' then 'Thanks — we reviewed your report and took action.'
+           else 'Thanks — we reviewed your report and didn''t find a violation.' end,
+      case when p_outcome = 'actioned' then null
+           when v_anon then 'You can still hide it. Reports help us spot patterns.'
+           else 'You can still block or hide it. Reports help us spot patterns.' end,
+      '/guidelines',
+      jsonb_build_object('event', 'report_resolved', 'outcome', case when p_outcome = 'actioned' then 'actioned' else 'no_violation' end));
+  end loop;
+end;
+$$;
+
+-- Close the item's open reports that count, record CampConnect Admin's review on them, and close Trust & Safety's
+-- queue item. A queue item on legal hold or about someone's wellbeing (a self-harm report) is never closed by a review
+-- of the content: it stays for Trust & Safety's console. An escalated one is closed only when an admin acts, as only
+-- admins see escalated items there (ts_queue_visible).
 create or replace function public.report_auto_hide_close(
   p_type text, p_id uuid, p_outcome text, p_decision text, p_actor uuid, p_note text, p_resolution text
 )
@@ -172,16 +235,50 @@ set search_path = public
 as $$
 declare
   v_ts_type text := case when p_type = 'buzz_comment' then 'buzz_reply' else p_type end;
+  v_admin boolean := coalesce(public.ts_role_of(p_actor) = 'admin', false);
 begin
   if to_regclass('public.staff_audit_log') is not null then
     update public.reports r
     set reviewed_by = p_actor, reviewed_at = now(), decision = p_decision, notes = coalesce(left(nullif(btrim(p_note), ''), 2000), r.notes)
-    where r.target_type in (p_type, v_ts_type, case when v_ts_type = 'buzz_reply' then 'buzz_comment' end) and r.target_id = p_id and r.status = 'open';
+    where r.target_type in (p_type, v_ts_type, case when v_ts_type = 'buzz_reply' then 'buzz_comment' end) and r.target_id = p_id
+      and r.status = 'open' and r.reason <> 'self_harm';
   end if;
-  perform public.ts_close_reports(v_ts_type, p_id, p_outcome);
+  perform public.report_auto_hide_close_reports(v_ts_type, p_id, p_outcome);
   update public.mod_queue q
   set status = 'closed', closed_at = now(), resolution = p_resolution, claimed_by = null, claimed_at = null
-  where q.entity_type = v_ts_type and q.entity_id = p_id and q.status <> 'closed';
+  where q.entity_type = v_ts_type and q.entity_id = p_id and q.status <> 'closed'
+    and not q.legal_hold
+    and coalesce(q.label, '') <> 'wellbeing' and coalesce(q.category, '') <> 'self_harm'
+    and (q.status <> 'escalated' or v_admin);
+end;
+$$;
+
+-- Trust & Safety's console rule for a reviewer (ts_queue_visible), for CampConnect Admin's restore and keep hidden:
+-- nobody reviews content they wrote or reported (a restore would also dismiss the reports against them, and a keep
+-- hidden would raise their own trust), and a moderator does not act on an item escalated to admins or on legal hold.
+create or replace function public.report_auto_hide_assert_reviewer(p_type text, p_id uuid, p_caller uuid, p_caller_role text)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_ts_type text := case when p_type = 'buzz_comment' then 'buzz_reply' else p_type end;
+begin
+  if public.ts_author_of(p_type, p_id) = p_caller or exists (
+    select 1 from public.reports r
+    where r.reporter_id = p_caller and r.target_id = p_id
+      and r.target_type in (p_type, v_ts_type, case when v_ts_type = 'buzz_reply' then 'buzz_comment' end)
+  ) then
+    raise exception 'Someone else on the team reviews this: you wrote it or reported it';
+  end if;
+  if coalesce(p_caller_role, '') not in ('owner', 'admin') and exists (
+    select 1 from public.mod_queue q
+    where q.entity_type = v_ts_type and q.entity_id = p_id and q.status <> 'closed' and (q.status = 'escalated' or q.legal_hold)
+  ) then
+    raise exception 'An admin reviews this item: it is escalated or on legal hold';
+  end if;
 end;
 $$;
 
@@ -245,15 +342,22 @@ begin
   if s is null then
     return;
   end if;
-  select c.reporters, c.reasons into v_count, v_reasons from public.report_auto_hide_count(v_type, p_id) c;
   select * into v_queue from public.mod_queue q where q.entity_type = v_ts_type and q.entity_id = p_id and q.status <> 'closed';
   if s ->> 'status' = 'active' then
+    -- Content staff approved is never hidden automatically again (Trust & Safety's rule, migration 41).
+    if coalesce((s ->> 'autoHideImmune')::boolean, false) then
+      return;
+    end if;
+    -- The count joins every reporter's account and trust, so it runs only for content that could still be hidden.
+    select c.reporters, c.reasons into v_count, v_reasons from public.report_auto_hide_count(v_type, p_id) c;
     if coalesce(v_count, 0) < public.report_auto_hide_threshold() then
       return;
     end if;
     perform public.ts_apply_content_status(v_type, p_id, 'hidden', null, v_queue.category, null, s);
     v_source := 'report_threshold';
-  elsif v_anon and s ->> 'status' = 'hidden' then
+  elsif v_anon and s ->> 'status' = 'hidden'
+        and public.report_hidden_reason(v_type, p_id) is not distinct from public.buzz_v2_hidden_reason('hidden') then
+    -- Only a hide Trust & Safety made (its reason, migration 42): not one by community votes, nor one staff made by hand.
     v_source := 'trust_safety';
   else
     return;
@@ -265,6 +369,9 @@ begin
   ) then
     return;
   end if;
+  if v_source = 'trust_safety' then
+    select c.reporters, c.reasons into v_count, v_reasons from public.report_auto_hide_count(v_type, p_id) c;
+  end if;
   insert into public.report_auto_hides (target_type, target_id, source, reporter_count, reasons, hidden_at)
   values (v_type, p_id, v_source, coalesce(v_count, 0), coalesce(v_reasons, '{}'::jsonb), v_hidden_at)
   returning id into v_flag;
@@ -273,8 +380,10 @@ begin
   end if;
   v_details := jsonb_build_object('target_type', v_type, 'target_id', p_id, 'flag_id', v_flag, 'source', v_source,
     'reporter_count', coalesce(v_count, 0), 'reasons', coalesce(v_reasons, '{}'::jsonb), 'threshold', public.report_auto_hide_threshold());
+  -- The author as CampConnect Admin's own snapshot names them: null for an anonymous listing, whose poster even this
+  -- log must not name (ts_author_of would). Buzz rows carry none at all.
   if not v_anon then
-    v_details := v_details || jsonb_build_object('author_id', public.ts_author_of(v_type, p_id));
+    v_details := v_details || jsonb_build_object('author_id', public.admin_content_snapshot(v_type, p_id) -> 'author_id');
   end if;
   insert into public.staff_audit_log (actor_id, actor_email, action, target_type, target_id, details)
   values (null, null, 'content.auto_hide', v_type, p_id::text, v_details);
@@ -338,7 +447,9 @@ create trigger buzz_comments_auto_hide_gone after delete on public.buzz_comments
 
 -- Migration 41's ts_set_content_status(), unchanged for Buzz and for removals. Where CampConnect Admin's schema exists,
 -- public content is hidden and restored through its hidden_at (its media queued as for a staff hide), so the console's
--- approve, restore and granted appeals bring back what reports hid. Either way a pending flag is settled.
+-- approve, restore and granted appeals bring back what reports hid, and only that: a hide CampConnect Admin's staff made
+-- by hand (another reason, no pending flag) stays until they restore it. A restore here is written to CampConnect Admin's
+-- audit log as one there would be. Either way a pending flag is settled.
 create or replace function public.ts_set_content_status(p_type text, p_id uuid, p_status text, p_immune boolean default null)
 returns void
 language plpgsql
@@ -357,8 +468,11 @@ begin
     v_hidden := public.report_hidden_at(p_type, p_id);
     if p_status = 'hidden' and v_hidden is null then
       perform public.moderation_content_hide(p_type, p_id, 'Hidden by reports, waiting for review');
-    elsif p_status = 'active' and v_hidden is not null then
-      perform public.moderation_content_restore(p_type, p_id);
+    elsif p_status = 'active' and v_hidden is not null
+          and (exists (select 1 from public.report_auto_hides f where f.target_type = p_type and f.target_id = p_id and f.status = 'pending')
+               or public.report_hidden_reason(p_type, p_id) = 'Hidden by reports, waiting for review') then
+      perform public.staff_log('content.restore', p_type, p_id::text,
+        public.moderation_content_restore(p_type, p_id) || jsonb_build_object('via', 'trust_safety'));
     end if;
   end if;
   if p_status = 'active' then
@@ -371,6 +485,8 @@ $$;
 
 revoke all on function
   public.report_auto_hide_threshold(), public.report_target_table(text), public.report_hidden_at(text, uuid),
+  public.report_hidden_reason(text, uuid), public.report_auto_hide_close_reports(text, uuid, text),
+  public.report_auto_hide_assert_reviewer(text, uuid, uuid, text),
   public.ts_snapshot(text, uuid), public.ts_set_content_status(text, uuid, text, boolean),
   public.report_auto_hide_settle(text, uuid, text, uuid, text), public.report_auto_hide_close(text, uuid, text, text, uuid, text, text),
   public.report_auto_hide_tell_owner(text, uuid, jsonb, text), public.report_auto_hide_evaluate(text, uuid),
@@ -610,6 +726,7 @@ begin
   if public.admin_content_table(p_target_type) is null then
     raise exception 'Invalid content type';
   end if;
+  perform public.report_auto_hide_assert_reviewer(p_target_type, p_target_id, v_caller.user_id, v_caller.role);
   v_before := public.ts_snapshot(p_target_type, p_target_id);
   perform public.staff_log('content.restore', p_target_type, p_target_id::text, public.moderation_content_restore(p_target_type, p_target_id));
   v_flag := public.report_auto_hide_settle(p_target_type, p_target_id, 'restored', v_caller.user_id);
@@ -834,6 +951,7 @@ begin
   if public.report_hidden_at(v_flag.target_type, v_flag.target_id) is null then
     raise exception 'Content is not hidden';
   end if;
+  perform public.report_auto_hide_assert_reviewer(v_flag.target_type, v_flag.target_id, v_caller.user_id, v_caller.role);
   v_before := public.ts_snapshot(v_flag.target_type, v_flag.target_id);
   update public.report_auto_hides f
   set status = 'upheld', reviewed_by = v_caller.user_id, reviewed_at = now(), review_note = v_note
