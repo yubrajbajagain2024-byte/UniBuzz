@@ -48,16 +48,15 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 - **Events** (PR #74, merged and deployed 2026-10-31 03:43 UTC; [branches/events.md](branches/events.md)): the bar is
   Home, Explore, Messages, Events, Profile; the Events tab (For you | All events, date and category pills, search,
   saved), event pages, organizations that students create and staff verify, the university's ICS and RSS feeds synced by
-  the website, the console's Events section; migration 61, written, rehearsed offline and applied on staging, **not on
-  production**: until it is, the website's Events pages show empty states and the console's Events tab shows an error
-  (the apps are unchanged until an EAS update). Reviewed on 2026-10-31 through a staging-backed preview with Texas
-  State's real calendar synced. Still to do, each with the owner's approval: a full backup and 61 alone (as 58 to 60
-  went), `CRON_SECRET` in Vercel's Production environment, Texas State's calendar feed added in `/admin/events`, an EAS
-  update. As of 2026-11-01 the app, which reads production, fails every Events write there (saving interests answered
-  "Could not find the table 'public.event_interests' in the schema cache"): none of 61's eight tables exists on
-  production. On `discovery-redesign` the app says "Events need the latest server update" instead (`EVENTS_NOT_READY`),
-  and `tests/staging/events.mjs` now saves interests and reads them back from a fresh session; the probe is to run on
-  staging, then 61 goes to production alone (backup first), all with the owner's approval.
+  the website, the console's Events section; migration 61, rehearsed offline and on staging, **on production since
+  2026-11-01 23:31 UTC**, alone, after a full backup ([migrations.md](migrations.md)): the Events tables exist there, so
+  saving interests no longer fails with "Could not find the table 'public.event_interests' in the schema cache".
+  Checked through the API and, as a student, inside a transaction rolled back afterwards (interests picked, read back,
+  replaced; another student reads none); **not yet checked in the app on a real iPhone** (save interests, close the
+  app, reopen it). Reviewed on 2026-10-31 through a staging-backed preview with Texas State's real calendar synced.
+  Still to do, each with the owner's approval: `CRON_SECRET` in Vercel's Production environment, Texas State's
+  calendar feed added in `/admin/events`, an EAS update so testers get the tab (and PR #81's filters and readable
+  Events error).
 - **Apply the pending migrations.** One run of `db:setup` from `main` in database-URL mode
   ([supabase/CLAUDE.md](../supabase/CLAUDE.md)), after a backup, applies them in file order: 44 and
   46 together, 49 and 50 (Business v2), 51 to 54 (Buzz), 55 and 56 (Business v2, PR #51), once
@@ -111,7 +110,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   Website button are live on the website; the hours need **migration 57** on production (with the release above) and
   the app's part an EAS update, both the owner's approval. Until 57, the website shows and offers no hours. See
   [branches/business-hours.md](branches/business-hours.md).
-- **Explore and Events, simplified** (`discovery-redesign`, 2026-11-01, committed, not pushed): three levels (the
+- **Explore and Events, simplified** (`discovery-redesign`, PR #81, merged 2026-11-01 23:18 UTC): three levels (the
   section labels; one search field with a filter button counting the filters on; one row of chips: each page's few quick
   filters, a removable chip for every other choice in force, Clear), the rest in the filter sheets (Marketplace
   categories and roommate post types moved there, a dot by each group in force); For you's interests panel is one
