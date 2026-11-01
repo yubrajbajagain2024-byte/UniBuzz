@@ -193,12 +193,17 @@ does a swipe pull the page back. The viewer is a modal screen, outside the view 
 Native's touches, so the page's taps check `swipedJustNow` themselves: a touch that ended a swipe never pauses, likes or
 opens anything. Feed and viewer videos skip Live Text on a paused frame (`allowsVideoFrameAnalysis={false}`): its button
 would sit over the play control, and its scan was what crashed Expo Go in the simulator. Screens opened from the viewer (a profile, a chat) come up as cards over it. Pictures are laid out
-TikTok style (`src/components/home/reel-item.tsx`). A video fills the screen (`placeVideo`): a vertical one edge to edge,
-trimmed a little at the sides on a phone taller than 9:16; a square or landscape one whole, as wide as a 9:16 canvas, over
-a subtle, dimmed blur of itself. A photo is never stretched or cropped (`photoLayout`): it sits whole and as wide as the
-screen at the top, under the top row, on the theme's own colour (white in light, black in dark), which stays free below it
-for the name and the words, all in the theme's ink; a photo too tall to leave that space (9:16, a phone
-screenshot) is shown full screen on black like a video instead. Over every page, one top row with Back at the left and the
+TikTok style (`src/components/home/reel-item.tsx`), edge to edge from the screen's very top: nothing is pushed down by
+the safe area, and the status bar and the top row float over every picture on a soft shade (gone while the page zooms).
+A vertical video fills the screen (`placeVideo`), trimmed a little at the sides on a phone taller than 9:16; a square or
+landscape one stays whole, as wide as a 9:16 canvas, at the top (in the middle on the Reels tab, where Home's bar covers
+the top). A photo is never stretched or cropped (`photoLayout`): whole, as wide as the screen (or as tall, for one taller
+than it), from the top edge. Whatever of the screen a picture leaves shows a blurred, dimmed copy of the same picture,
+never black or a flat colour (`BlurredBackdrop` in `src/components/blurred-backdrop.tsx`: loaded only 48 pixels wide,
+then blurred and stretched, since a blur on a full-size photo barely shows once scaled to the screen). A video uploaded
+without its size takes its poster's shape once that loads. The chat's photo and video viewer
+(`src/components/messages/media-viewer.tsx`) and a Snap's (`src/app/snap/[id].tsx`) lay out the same way, a video's
+shape and blurred frame read from its own player; Stories already fill the screen. Over every page, one top row with Back at the left and the
 Campus | Global toggle in the middle (for reels and For you, while the toggle is shown); the creator's name, the words and the heart, comments, share,
 save and "…" rail sit at the bottom (as on the Reels page, the rail a little nearer the right edge: `railRight`), over a
 video's shades (gradients only, as Instagram's: a blur under the words was re-drawn every frame the video played or the
@@ -208,14 +213,11 @@ closes it like Back, another switches tabs at once. Opened from a profile, a cha
 is no comment bar: the rail's Comments (a tour's Inbox) opens the comments or the chat. Share opens the same share sheet
 as the feeds (send to friends, or "Share to…" the system share sheet with the page's link: `/posts/<id>` for posts and
 posted reels, `/apartments/<id>` or `/roommates/<id>` for listing tours); the viewer mounts its own `ShareSheetProvider`,
-since iOS presents a sheet from the screen on top and the root layout's one cannot appear over this modal screen. On a photo's page each button of
-the rail is white where it sits over the photo (a crisp dark edge on its strokes, no shading behind it, keeps it readable on
-a white wall) and in the
-theme's ink where it sits on the page below; the top row and the status bar follow the page under them,
-switching as a page's edge passes, and an opened description brings the page's colour up behind it. A tap pauses a video: a play button appears in the middle with the sound
+since iOS presents a sheet from the screen on top and the root layout's one cannot appear over this modal screen. The
+rail's buttons, the words, the top row and the status bar are white on every page (a crisp dark edge on the rail's
+strokes keeps it readable on a white wall). A tap pauses a video: a play button appears in the middle with the sound
 button just above it, both fading away again the moment it plays (the sound button keeps it paused). A post with several
-photos or videos swipes sideways on its page, with dots on a line of their own under the top row (its colours changing
-halfway through a swipe), and opens on the one that was showing in the feed; a video plays while its page and slide are on screen, and a double tap anywhere likes. On iOS a video tapped while it plays in the feed is played on in the viewer by the
+photos or videos swipes sideways on its page, with dots just under the top row, over the picture on a small dark pill, and opens on the one that was showing in the feed; a video plays while its page and slide are on screen, and a double tap anywhere likes. On iOS a video tapped while it plays in the feed is played on in the viewer by the
 feed's own player (`src/lib/video-handoff.ts`: lent as the viewer opens, in `openViewer`, so a tap that opens something
 else never lends it; counted, so the page showing it borrows it too, for as long as that page is in reach; given back as
 the viewer goes), so it opens on the very frame that was showing and never pauses, reloads or jumps, there or back. Neither

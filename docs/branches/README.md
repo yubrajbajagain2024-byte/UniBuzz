@@ -40,6 +40,7 @@ current", rules 2 and 3).
 | `business-performance` | Sunil | The business portal made instant: local token verification, parallel and deduplicated reads, prefetch on intent, delayed skeletons, filters without a request, one live channel, a self-updating Inbox list (no migration) | merged (PR #73, 2026-10-30); browser timings await a staging run | [business-performance.md](business-performance.md) |
 | `events` | Sunil | Home, Explore, Messages, Events, Profile; the Events tab, event pages, organizations that students create and staff verify, the university's ICS and RSS feeds synced by the website, the console's Events section (migration 61: on staging since 2026-10-31, not on production) | merged (PR #74, 2026-10-31 03:43 UTC); 61 not on production | [events.md](events.md) |
 | `claude/claude-md-documentation-0b8750` | — | leftover worktree branch of a 2026-10-26 AI session | no commits of its own; left untouched until the owner says otherwise | — |
+| `viewer-full-bleed` | Sunil | Every full-screen photo and video viewer in the app: the picture from the screen's top edge under the status bar, a blurred copy of it around it (no migration) | pushed, no PR yet; base `main` | this table and docs/status.md (one PR) |
 
 **Safe to delete once their owner agrees**, because `main` has all their work (what is left on them
 is an old `CLAUDE.md` copy or, on `business-portal-prelaunch`, the stray `app.json`):
