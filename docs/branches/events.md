@@ -1,7 +1,7 @@
 # events
 
 - **Owner:** Sunil. **As of 2026-10-31:** branched from `main` at PR #73 (`05ac276`); merged with PR #74 (https://github.com/yubrajbajagain2024-byte/UniBuzz/pull/74) on
-  2026-10-31 at 03:43 UTC, which deployed the website; migration 61 is not on production. Written by an AI session with two forked sessions (one
+  2026-10-31 at 03:43 UTC, which deployed the website; migration 61 on production since 2026-11-01 23:31 UTC. Written by an AI session with two forked sessions (one
   for the app, one for the website).
 - **Purpose:** the owner's brief: the bottom bar becomes Home, Explore, Messages, Events, Profile (Discover's search
   moves to a magnifier beside the bell; Housing, Roommates and the Marketplace stay in Explore; Orbit, Buzz and Reels in
@@ -11,8 +11,8 @@
   university events synced from ICS and RSS feeds without duplicates and with cancellations; verified clubs,
   organizations and departments publishing their own; a backend for many campuses with staff monitoring and
   moderation. Fast, minimal, in UniBuzz's existing design.
-- **Migration:** 61, `20261113000000_events.sql` (rollback in `supabase/rollbacks/`). Not on production; applied on
-  staging by `supabase/tests/staging/events.mjs` on 2026-10-31 (it stays, as 58 to 60 do). It needs only what production
+- **Migration:** 61, `20261113000000_events.sql` (rollback in `supabase/rollbacks/`). On production since 2026-11-01
+  23:31 UTC, alone, after a full backup ([../migrations.md](../migrations.md)); applied on staging by `supabase/tests/staging/events.mjs` on 2026-10-31 (it stays, as 58 to 60 do). It needs only what production
   has (41, 39, 60), so it goes live on its own ahead of the Business v2 release, with the owner's approval, like 58 to 60
   ([../migrations.md](../migrations.md)).
 
@@ -39,17 +39,18 @@ See "Events" in [../../README.md](../../README.md#events) for how it works. In s
 ## Tests
 
 - `supabase/tests/events.test.mjs` (50 checks) and `events-rollout.test.mjs` (61 alone on production's state, the
-  release after it, its rollback): in `db:test`. The other rollout rehearsals skip 61 (`AHEAD`) so they still model
-  production as it is.
+  release after it, its rollback): in `db:test`. Since 61 went live, `production-rollout` and `story-actions-rollout`
+  start from a production that has it; `stories-rollout` and `events-rollout` still model production before it.
 - `packages/shared/tests/events.test.mjs` and `events-feeds.test.mjs`: the ranking, the date helpers, the parsers, the
   plan.
-- `supabase/tests/staging/events.mjs`: 12/12 on staging on 2026-10-31 (Auth, the REST API, Storage, the sync's own code
+- `supabase/tests/staging/events.mjs`: 13/13 on staging on 2026-11-01, before 61 went to production; 12/12 on 2026-10-31 (Auth, the REST API, Storage, the sync's own code
   on an inline calendar, twice); every row it made deleted.
 
 ## Previews (2026-10-31)
 
 - **Vercel's branch preview** (`apartment-book-git-events-vyass.vercel.app`, behind Vercel's login) reads production,
-  where 61 is not applied: its Events pages are empty and the console's Events tab errors until 61 goes live.
+  where 61 was not applied then: its Events pages were empty and the console's Events tab errored until 61 went live
+  (2026-11-01).
 - **A staging-backed preview** was run from the owner's Mac for review: a production build of the website on the local
   network (port 3060) and a second Expo server (port 8082, its own Metro cache), both given staging's address and keys
   per process, so no env file changed; their bundles were checked to name staging alone. Staging holds a demo student
@@ -77,8 +78,8 @@ See "Events" in [../../README.md](../../README.md#events) for how it works. In s
 
 1. The owner reviews PR #74; `npm run check` (6/6), `npm run test:shared` (238/238) and `npm run db:test` (48 suites,
    1721 checks) results are in [../testing.md](../testing.md).
-2. Production, each with the owner's approval: a full backup, migration 61 alone (the procedure in
-   `supabase/CLAUDE.md`), `CRON_SECRET` set in Vercel's Production environment, the merge (which deploys the website),
+2. Production, each with the owner's approval (the merge was PR #74; the full backup and 61 alone were done on
+   2026-11-01): `CRON_SECRET` set in Vercel's Production environment,
    the first feed added in `/admin/events` (Texas State's calendar, below), an EAS update so testers get the tab.
 3. The Hobby plan allows one cron run a day; "Sync now" in the console covers the rest.
 4. `apps/web/vercel.json` is in the right place: the Vercel project's Root Directory is `apps/web` (checked 2026-10-31).

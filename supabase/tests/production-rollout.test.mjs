@@ -1,6 +1,6 @@
-// The production rollout, rehearsed offline: a database in production's state as of 2026-10-30 (production's migration
+// The production rollout, rehearsed offline: a database in production's state as of 2026-11-01 (production's migration
 // order, the migrations applied outside this repo, 47 applied on 2026-10-27 although 44 and 46 were not, 58 applied on
-// its own on 2026-10-30, and 59 after it, alone too), with v1 business data in it; then what `npm run db:setup` would apply (44, 46, 49, 50, Buzz's
+// its own on 2026-10-30, 59 and 60 after it, alone too, and 61 alone on 2026-11-01), with v1 business data in it; then what `npm run db:setup` would apply (44, 46, 49, 50, Buzz's
 // 51 to 54, 55, 56, 57: 44 and 46 after 47 and 58, as production will), with checks after.
 // Then the release's own rollback, the business migrations only (57, 56, 55, 50, 49): every Buzz object and Buzz row stays
 // exactly as it was, Buzz still works, and the schema matches a database that never had the business migrations. Then
@@ -10,10 +10,9 @@ import { boot, read, expectOk, done } from "./harness.mjs";
 import { BUZZ_GUIDELINES_VERSION, BUZZ_CATEGORIES } from "../../packages/shared/src/buzz/constants.ts";
 import { catalog, diffCatalogs, isBuzz, BUZZ_DATA_SQL, DATA_HELPER_SQL, DROP_DATA_HELPER_SQL } from "./catalog.mjs";
 
-// 61 (Events) and 62 (story actions) go to production on their own, ahead of this release, like 58 to 60 did
-// (events-rollout.test.mjs, story-actions-rollout.test.mjs): they are left out here so the database starts in
-// production's state as it is.
-const AHEAD = ["20261113000000_events.sql", "20261114000000_story_actions.sql"];
+// 62 (story actions) goes to production on its own, ahead of this release, like 58 to 61 did
+// (story-actions-rollout.test.mjs): it is left out here so the database starts in production's state as it is.
+const AHEAD = ["20261114000000_story_actions.sql"];
 const PENDING = [
   "20261103000300_discover.sql",
   "20261104000100_discover_audience.sql",

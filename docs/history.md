@@ -50,6 +50,8 @@ open work is in [status.md](status.md).
   (Events) is written and applied on staging, not on production. PR #74 merges it at 03:43 UTC
   (deployed; 61 still not applied). Sunil and Ankur may merge their own pull requests from then on
   ([decisions.md](decisions.md)).
+- **2026-11-01:** PRs #77 to #81 merge (the app's viewers, bottom bar, Home's top edge, Settings, Explore's and Events'
+  filters); migration 61 (Events) reaches production on its own, ahead of the Business v2 release (23:31 UTC).
 
 ## The AI documentation
 
@@ -72,6 +74,15 @@ open work is in [status.md](status.md).
 - 2026-10-28 19:03 UTC: PR #52 (`business-v2`'s third and fourth rounds: the fixes to 50, 55 and 56,
   the staging rehearsal and backup tooling, the production checklist) merged into `main`. None of
   49 to 56 is on production.
+
+- 2026-11-01 23:31 UTC: migration 61 (Events) applied to production on its own, with the owner's approval, after its
+  staging probe (13/13) and a full backup checked against the live project (`before-migration-61`); one transaction
+  through the Management API, its `_migrations` row with it; every check after passed ([migrations.md](migrations.md)).
+  From then on the app's Events writes (interests, saves, follows) work against production.
+
+- 2026-11-01 23:18 UTC: PR #81 (`discovery-redesign`) merged into `main` by the owner: Explore's and Events' search and
+  filters in three levels, Events' readable error before 61, a steady Profile grid. App only; the website redeployed
+  without a change of its own; testers get it with an EAS update (owner's approval).
 
 - 2026-11-01 20:18 UTC: PR #80 (`settings-redesign`, the owner's commit "Update UniBuzz features and UI") merged into
   `main` by the owner: the app's Settings as a menu of sections, each its own screen. App only; the website redeployed

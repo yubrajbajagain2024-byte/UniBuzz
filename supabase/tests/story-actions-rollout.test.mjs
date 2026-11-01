@@ -1,8 +1,8 @@
-// Migration 62 (story likes, mutes, reports and cards) applied to production on its own, ahead of 61 and the Business
-// v2 release, rehearsed offline the way 58 to 61 were: a database in production's state (production's migration order,
-// the migrations applied outside this repo, 47 and 58 to 60 applied although 44, 46 and 49 to 57 are not, 61 not yet);
-// 62 alone, as the next migration; a like, a mute, a story card and a story report through the API roles; then 61 and
-// the rest of the release (44, 46, 49 to 57) applied after it, in file order, as `npm run db:setup` will, with the same
+// Migration 62 (story likes, mutes, reports and cards) applied to production on its own, ahead of the Business v2
+// release, rehearsed offline the way 58 to 61 were: a database in production's state (production's migration order,
+// the migrations applied outside this repo, 47 and 58 to 61 applied although 44, 46 and 49 to 57 are not; 61 went live
+// on 2026-11-01); 62 alone, as the next migration; a like, a mute, a story card and a story report through the API
+// roles; then the release (44, 46, 49 to 57) applied after it, in file order, as `npm run db:setup` will, with the same
 // still working (none of them redefines what 62 replaces); then 62's own rollback, which must leave exactly the schema
 // of a database that never had it; then 62 again.
 import { boot, read, expectOk, done } from "./harness.mjs";
@@ -10,8 +10,7 @@ import { catalog, diffCatalogs } from "./catalog.mjs";
 
 const ACTIONS = "20261114000000_story_actions.sql";
 const ROLLBACK = "rollbacks/20261114000000_story_actions.down.sql";
-const EVENTS = "20261113000000_events.sql";
-// What 62 goes ahead of, in file order: the release, then 61.
+// What 62 goes ahead of, in file order: the release.
 const REST = [
   "20261103000300_discover.sql",
   "20261104000100_discover_audience.sql",
@@ -24,7 +23,6 @@ const REST = [
   "20261109000000_media_server_fields.sql",
   "20261109000100_business_hardening.sql",
   "20261110000000_business_hours.sql",
-  EVENTS,
 ];
 const check = (cond, message) => { if (!cond) throw new Error(message); };
 
@@ -34,9 +32,9 @@ const rows = async (p) => (await p).rows;
 const val = async (q, params = []) => { const r = await one(db.query(q, params)); return r[Object.keys(r)[0]]; };
 const has = async (sql) => Boolean((await one(db.query(sql))).ok);
 
-await expectOk("before: production's state (58 to 60 applied; 44, 46, 49 to 57 and 61 not); what 62 builds on is there", async () => {
+await expectOk("before: production's state (58 to 61 applied; 44, 46 and 49 to 57 not); what 62 builds on is there", async () => {
   check(await has("select to_regprocedure('public.can_see_story_as(uuid, uuid, uuid, text, uuid)') is not null and to_regprocedure('public.ts_snapshot(text, uuid)') is not null and to_regprocedure('public.message_reply_snapshot(uuid, uuid)') is not null and to_regprocedure('public.story_photo_ok(text, uuid)') is not null as ok"), "a dependency is missing");
-  check(await has("select to_regclass('public.events') is null and to_regclass('public.ads') is null and to_regclass('public.story_likes') is null as ok"), "not production's state");
+  check(await has("select to_regclass('public.events') is not null and to_regclass('public.ads') is null and to_regclass('public.story_likes') is null as ok"), "not production's state");
 });
 await expectOk("62 applies alone, as the next migration, and re-runs cleanly", async () => { await db.exec(read(`migrations/${ACTIONS}`)); await db.exec(read(`migrations/${ACTIONS}`)); });
 
@@ -66,7 +64,7 @@ async function actionsWork(label) {
 }
 await actionsWork("62 alone");
 
-await expectOk("61 and the release (44, 46, 49 to 57) apply after 62, in file order, as db:setup will", async () => { for (const f of REST) await db.exec(read(`migrations/${f}`)); });
+await expectOk("the release (44, 46, 49 to 57) applies after 62, in file order, as db:setup will", async () => { for (const f of REST) await db.exec(read(`migrations/${f}`)); });
 await expectOk("after them: what 62 replaced is still 62's (no later migration redefined it)", async () => {
   check(await has("select to_regclass('public.events') is not null and to_regclass('public.ads') is not null as ok"), "the release is missing");
   check(await has("select pg_get_functiondef('public.ts_snapshot(text, uuid)'::regprocedure) like '%ts_story_snapshot%' and pg_get_functiondef('public.message_reply_snapshot(uuid, uuid)'::regprocedure) like '%''story''%' as ok"), "a later migration replaced 62's functions");
@@ -85,4 +83,4 @@ await expectOk("62's rollback (story cards and reports deleted first) leaves exa
 await expectOk("62 applies again afterwards", async () => { await db.exec(read(`migrations/${ACTIONS}`)); });
 await actionsWork("62 re-applied");
 
-done("STORY ACTIONS AHEAD OF THE RELEASE (62 AFTER 60, THEN 61, 44, 46, 49 TO 57)");
+done("STORY ACTIONS AHEAD OF THE RELEASE (62 AFTER 61, THEN 44, 46, 49 TO 57)");
