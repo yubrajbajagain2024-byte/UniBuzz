@@ -44,6 +44,10 @@ function ThemedStack() {
   const contentUnderHeader = Platform.OS === "android" && isDark ? { ...content, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : content;
   // Buzz's screens draw their own Phosphor header; behind them (a push, a swipe back) the screen is Phosphor too, in both themes.
   const buzzContent = { backgroundColor: phosphor.canvas };
+  // Settings' screens sit on iOS's grouped background (see components/settings/settings-ui.tsx), their header on the same
+  // colour with no line under it, so header and page read as one surface.
+  const grouped = isDark ? colors.bg : colors.panel;
+  const settings = { headerStyle: { backgroundColor: grouped }, headerShadowVisible: false, contentStyle: { backgroundColor: grouped } };
   return (
     <>
       <StatusBar style={isDark ? "light" : "dark"} />
@@ -94,7 +98,18 @@ function ThemedStack() {
         <Stack.Screen name="profile/[id]" options={{ headerShown: false, contentStyle: content }} />
         <Stack.Screen name="follows/[id]" options={{ title: "Followers" }} />
         <Stack.Screen name="saved" options={{ title: "Saved" }} />
-        <Stack.Screen name="settings" options={{ title: "Settings" }} />
+        <Stack.Screen name="settings" options={{ title: "Settings", ...settings }} />
+        <Stack.Screen name="settings/account" options={{ title: "Account & Profile", ...settings }} />
+        <Stack.Screen name="settings/edit-profile" options={{ title: "Edit profile", ...settings }} />
+        <Stack.Screen name="settings/study" options={{ title: "Major & class year", ...settings }} />
+        <Stack.Screen name="settings/university" options={{ title: "University", ...settings }} />
+        <Stack.Screen name="settings/account-management" options={{ title: "Account Management", ...settings }} />
+        <Stack.Screen name="settings/privacy" options={{ title: "Privacy", ...settings }} />
+        <Stack.Screen name="settings/notifications" options={{ title: "Notifications", ...settings }} />
+        <Stack.Screen name="settings/safety" options={{ title: "Safety & Security", ...settings }} />
+        <Stack.Screen name="settings/blocked" options={{ title: "Blocked accounts", ...settings }} />
+        <Stack.Screen name="settings/appearance" options={{ title: "Appearance", ...settings }} />
+        <Stack.Screen name="settings/about" options={{ title: "About & Support", ...settings }} />
         <Stack.Screen name="settings/account-status" options={{ title: "Account status" }} />
         <Stack.Screen name="settings/buzz-anonymity" options={{ title: "How Buzz anonymity works" }} />
         <Stack.Screen name="create/apartment" options={{ title: "List an apartment" }} />

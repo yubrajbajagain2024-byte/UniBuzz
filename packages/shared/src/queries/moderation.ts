@@ -62,6 +62,19 @@ export async function listBlockedIds(supabase: Client, userId: string): Promise<
   return (data ?? []).map((r) => r.blocked_id);
 }
 
+/** The people I have blocked, for Settings → Blocked accounts: their names and photos, newest block first. */
+export async function listBlockedPeople(supabase: Client, userId: string): Promise<{ id: string; full_name: string; avatar_url: string | null; username: string | null }[]> {
+  const { data, error } = await supabase.from("blocks").select("blocked_id, created_at").eq("blocker_id", userId).order("created_at", { ascending: false });
+  if (error) throw error;
+  const ids = (data ?? []).map((r) => r.blocked_id);
+  if (ids.length === 0) return [];
+  const { data: people, error: peopleError } = await supabase.from("profiles").select("id, full_name, avatar_url, username").in("id", ids);
+  if (peopleError) throw peopleError;
+  const byId = new Map((people ?? []).map((p) => [p.id, p as { id: string; full_name: string; avatar_url: string | null; username: string | null }]));
+  // Someone whose profile cannot be read any more (a deleted account) is left out: there is nothing to unblock.
+  return ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+}
+
 export async function isBlocked(supabase: Client, userId: string, otherId: string): Promise<boolean> {
   const { data, error } = await supabase.from("blocks").select("blocked_id").eq("blocker_id", userId).eq("blocked_id", otherId).maybeSingle();
   if (error) throw error;

@@ -24,3 +24,4 @@ export * from "./types/models";
 export * from "./schemas";
 export * from "./queries";
 export * from "./scroll-collapse";
+export * from "./settings";

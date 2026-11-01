@@ -1023,7 +1023,7 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
   const onOpenFollows = useStableCallback((kind: "followers" | "following") => router.push({ pathname: "/follows/[id]", params: { id: userId, kind, name } }));
   const onShare = useStableCallback(() => setSharing(true));
   const onChangePhoto = useStableCallback(() => void changePhoto());
-  const onEditProfile = useStableCallback(() => router.push("/settings"));
+  const onEditProfile = useStableCallback(() => router.push("/settings/edit-profile"));
   const onFindFriends = useStableCallback(() => router.push("/find-people"));
   const onMessage = useStableCallback(() => void message());
   const onMore = useStableCallback(more);

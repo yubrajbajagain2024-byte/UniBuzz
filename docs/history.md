@@ -73,6 +73,11 @@ open work is in [status.md](status.md).
   the staging rehearsal and backup tooling, the production checklist) merged into `main`. None of
   49 to 56 is on production.
 
+- 2026-11-01 19:52 – 19:53 UTC: PRs #77 (`viewer-full-bleed`), #78 (`nav-velocity-collapse`) and #79
+  (`home-full-bleed-top`) merged into `main` in that order by the owner: the app's viewers from the top edge over a
+  blurred copy, the bottom bar collapsing by the speed of a scroll, and Home's feeds under the status bar. App only; the
+  website redeployed without a change of its own; testers get them with an EAS update (owner's approval).
+
 - 2026-10-30 21:46 UTC: **migration 60 (every upload folder its owner's to list; a post's photos from and with the
   post) applied to production on its own**, after 58 and 59, with the owner's approval: the first full backup
   (`2026-10-30-before-migration-60`: rows, accounts with their password hashes, 101 files, restorable with

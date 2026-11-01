@@ -320,8 +320,9 @@ The Profile tab is your profile (`src/components/profile/`, one `ProfileView` fo
 top kept as the owner chose it (2026-10-31): the cover band with Find friends and the menu (Settings and privacy, Saved,
 the legal pages, Log out) as round buttons over it; your photo in its aurora ring with a "+" to change it, Share profile
 (a sheet with the profile's QR code and Share) and Edit profile beside it; your full name (the account sheet, Log out),
-@username (made from your name at sign-up, changed in Settings) with a QR icon, the university in a small pill with the
-major and class year beside it ("Computer Science · '28", from Settings → Major and Graduation year), the bio, and the
+@username (made from your name at sign-up, changed in Settings → Account & Profile → Edit profile, which Edit profile
+opens too) with a QR icon, the university in a small pill with the major and class year beside it ("Computer Science ·
+'28", from Settings → Account & Profile → Major & class year), the bio, and the
 card with Posts | Followers | Following | Likes (every like on your posts, reels and listings); then the tabs
 Posts | Classes | Reels | Saved | Liked | Listings as icons (the open one filled, with an underline as wide as the tab
 and a small mark of who can see that section: a lock for Only me, two people for Friends, a globe for
@@ -330,6 +331,21 @@ wait for the pager to settle), over Instagram's grid: three 3:4 tiles to a row (
 hairline between them and square corners, a play count on videos only (Listings: your live
 apartments, roommate posts and items for sale, each tile with its kind and title). A stacked profile has Back at the top
 left instead of Find friends. The Classes tab lists classes by semester, this one first (up to 12 each; add your own there with the subject and course number as two boxes, "CS" and "3358", kept as the one code "CS 3358" the database checks, the section, the days and times it meets and the room; a hold on a class card offers Edit (the same form, filled in; Save moves you between course chats when the section changes) and Delete, which asks first, and there is no other way to change or remove one; once a class is in or changed, the form closes and a line under "Add class" says so, the button bringing it back). Listing a section puts you in that section's course chat, a group in Messages shared by everyone at your campus taking it this semester: the first classmate's listing creates it, removing the class leaves it, a notification tells you about both, it cannot be renamed or hand-filled, and it goes with the semester after a week's notice (migration 24).
+Settings (`src/app/settings.tsx` and `src/app/settings/`, Apple's Settings in UniBuzz's colours: inset grouped sections,
+compact rows, SF Symbols, native switches, small aurora icon tiles, all from `src/components/settings/settings-ui.tsx`)
+keeps your photo with Change photo at the top, then a short menu whose sections each open their own screen with the
+system's push: **Account & Profile** (Edit profile: name, @username and bio, with Save; University; Major & class year,
+with Save; your sign-in email; and Account Management, where Delete account sits alone at the very bottom as quiet red
+text, asks first, and deletes everything), **Privacy** (who can see Classes, Saved, Liked and Listings, each picked from
+a sheet; My buzzes and How Buzz anonymity works), **Safety & Security** (Blocked accounts, with Unblock; Activity
+status; Account status; the Community Guidelines; how to report), **Notifications** (new places near campus; whether
+the phone allows UniBuzz's notifications, with a row into the phone's Settings), **Appearance** (Light, Dark, System)
+and **About & Support** (help, the Privacy Policy and Terms on the website, the version). Switches and choices save at
+once, with a tick, and go back if the save fails; the two forms save with Save in their header and ask before
+discarding changes. Each saves only what it changed (`updateProfileSettings` in `packages/shared`, which never writes a
+column it was not given). The university picker searches by name, city or email domain (`matchUniversities`) and lets
+you choose only the university your confirmed sign-in email proves (`verifiedCampus`, `universityChoice`), sealed at
+the top; every other says which address it needs; an account no university verifies chooses freely, as before.
 Classes, Saved, Liked and Listings each have a setting (Everyone, Friends, Only me; friends are people you follow who
 follow you back), changed from the line at the top of the tab or in Settings → Privacy; by default Classes is Friends and
 Saved, Liked and Listings are Only me (migration 37). A visitor without access gets no tab for that section at all (the
@@ -443,10 +459,10 @@ chats keep "N members". Presence (`src/lib/presence.tsx`) runs only while you sh
 the background it stamps your last-active time and stops showing you online at once, while it still can (a phone runs no
 timer in the background; a glance at Notification Center is not leaving); back in front it stamps first and shows you
 again once that stamp confirms your status is still shown; it stamps the time and reads the block list every minute in
-front, leaves out people blocked either way, and stops at once when you log out. Settings → "Show your activity status"
-turns it off, and then you see nobody's either and your app stops marking messages "Delivered" (people see "Seen" once you
-read something new); Settings reads your profile again whenever it opens, and sends that switch
-(`set_show_active_status()`, the only way to turn it back on) only when you change it. It needs migration 22
+front, leaves out people blocked either way, and stops at once when you log out. Settings → Safety & Security → Activity
+status turns it off, and then you see nobody's either and your app stops marking messages "Delivered" (people see "Seen"
+once you read something new); Settings reads your profile again whenever it opens, and the switch is sent
+(`set_show_active_status()`, the only way to turn it back on) only when you flip it. It needs migration 22
 (`supabase/migrations/20261011000000_activity_status.sql`); without it no green dots show and chat headers have no
 activity line. Builds from before it meet on the old public presence channel, so once it is live they and this version no
 longer see each other online and they show no last-seen times, and their Settings can no longer turn activity status back
@@ -600,8 +616,9 @@ Buzz, so nothing on the Buzz page shows who is looking) and the Buzz label carri
   reasons, a note for "Something else"; the item then leaves your lists) · Delete (your own). Never Block, never a
   profile, never a handle.
 - **Search, My buzzes, Settings, Notifications.** Search Buzz (Newest | Top, Campus | Global, suggestions); My buzzes
-  (Threads | Replies, your private karma) is reached from Settings → Buzz, never from Home, next to "How Buzz anonymity
-  works"; Settings → Safety → Account status lists warnings, removals and restrictions with "Got it" and appeals. Buzz
+  (Threads | Replies, your private karma) is reached from Settings → Privacy → Buzz, never from Home, next to "How Buzz
+  anonymity works"; Settings → Safety & Security → Account status lists warnings, removals and restrictions with "Got it"
+  and appeals. Buzz
   notifications carry the mask, never a photo.
 - **Memory only.** Drafts, folds, the search and every loaded item live in memory (`src/lib/buzz-store.ts`), never in
   AsyncStorage or SecureStore, and are wiped the moment the session ends.
@@ -624,7 +641,7 @@ feel native:
   headings carry a short Aurora bar and its fact icons the Aurora's ink (`auroraInk`); the words keep the theme's own
   colours, so the contrast is the same as anywhere else. A "No longer looking" status keeps its amber.
 
-- **Dark by default.** Until someone picks a theme in Settings → Theme the app is Dark, on iOS and Android alike
+- **Dark by default.** Until someone picks a theme in Settings → Appearance the app is Dark, on iOS and Android alike
   (`DEFAULT_THEME_PREFERENCE` in `src/lib/palette.ts`); Light and System Default stay there, and a choice is remembered.
   Anyone who already picked one keeps it.
 
@@ -669,7 +686,7 @@ Haptics and tap-to-top are covered with the comments above.
 - Build profiles: `eas.json` (`production` auto-increments build numbers on EAS)
 - Workflow: `.eas/workflows/create-production-builds.yml` builds both platforms on push to `main`
   once the GitHub repo is linked on expo.dev (set base directory to `apps/mobile`).
-- Backend features the stores require are live: account deletion (Settings), report and
+- Backend features the stores require are live: account deletion (Settings → Account & Profile → Account Management), report and
   block (••• menu on posts, More on profiles), privacy policy and terms (website `/privacy`, `/terms`).
 
 ## Ship to the App Store (first time, needs Xcode + Apple Developer account)
