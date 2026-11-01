@@ -42,6 +42,7 @@ current", rules 2 and 3).
 | `claude/claude-md-documentation-0b8750` | — | leftover worktree branch of a 2026-10-26 AI session | no commits of its own; left untouched until the owner says otherwise | — |
 | `viewer-full-bleed` | Sunil | Every full-screen photo and video viewer in the app: the picture from the screen's top edge under the status bar, a blurred copy of it around it (no migration) | pushed, no PR yet; base `main` | this table and docs/status.md (one PR) |
 | `nav-velocity-collapse` | Sunil | The app's bottom bar collapses by the speed of a scroll, on every tab (no migration) | pushed, no PR yet; stacked on `viewer-full-bleed` | this table and docs/status.md (one PR) |
+| `home-full-bleed-top` | Sunil | Home's feeds scroll on under the status bar to the top edge, a faint tint behind the clock (no migration) | pushed, no PR yet; stacked on `nav-velocity-collapse` | this table and docs/status.md (one PR) |
 
 **Safe to delete once their owner agrees**, because `main` has all their work (what is left on them
 is an old `CLAUDE.md` copy or, on `business-portal-prelaunch`, the stray `app.json`):

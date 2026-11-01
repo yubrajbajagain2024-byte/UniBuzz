@@ -279,7 +279,9 @@ what you like, save or comment there shows on the row when you come back (`emitP
 a post deleted there leaves the feeds too.
 The bar scrolls like Instagram's (`src/lib/collapsing-header.ts`): it slides up out of the way as the page on screen
 scrolls down, by as much as the page moved, and slides back the moment the page scrolls up, however far down it is; a
-swipe or a tap between pages brings it back too, and Reels never moves it. The same goes for the Housing | Roommate | Marketplace
+swipe or a tap between pages brings it back too, and Reels never moves it. On Buzz the filter bar slides under it first,
+then rides away with it (both from Buzz's one scroll value, `scrollValue` in the collapsing header), so Buzz's feed
+reaches the top edge too. The same goes for the Housing | Roommate | Marketplace
 row on Explore and the pills under it (the bar with its title and Search stays put): they slide up under the fixed bar
 as the list under them scrolls down, and back as soon as it
 scrolls up. The bottom bar never moves. The choice lives in
@@ -646,7 +648,10 @@ feel native:
 - **Scrolling.** The For you, Buzz, Housing and Roommate feeds draw each row through a memoised component with stable
   handlers, so a scroll only redraws the rows whose content changed, and they keep about four screens of rows mounted
   instead of ten. Photos show the tiny blurred preview saved at upload at once and fade the full photo in over it. On
-  Home, a strip in the bar's colour stays under the status bar while the bar slides away, so nothing passes under the clock.
+  Home (For you and Buzz), the feed runs on under the status bar to the screen's top edge once the bar has slid away, as
+  Reddit's does, clearly visible: nothing opaque stays there, only a faint tint of the bar's colour behind the icons (a
+  fifth of its strength at the top, gone by the status bar's bottom edge; Phosphor on Buzz, none over Reels), fading in
+  as the bar's own background leaves the status bar (`statusShade` in `src/lib/theme.ts`).
 - **Motion.** Buttons and glass controls dip under the finger on a spring, the blue thumb of a segmented control slides
   to the chosen option, and the rows of every feed and list fade in once as they first arrive. Reduce Motion turns the
   scaling, sliding, fading and bouncing off, and sheets then fade instead of sliding (`src/lib/accessibility.ts`).

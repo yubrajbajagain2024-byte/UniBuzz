@@ -116,19 +116,19 @@ export default function HomeScreen() {
   const [onPosts] = useState(() => createOverVideoStore(START === POSTS));
   const [barHeight, setBarHeight] = useState(insets.top + HOME_TOP_BAR_HEIGHT);
   /**
-   * The bottom bar collapses to its Home button while For you (or Posts) scrolls on and comes back as it scrolls back,
-   * like Reddit's (lib/tab-bar-collapse.ts). Buzz feeds the same collapse from its own list (it never moves the top bar);
-   * Reels keeps the whole bar. Another section, or leaving Home, brings the whole bar back.
+   * The bottom bar collapses to its Home button on a flick down For you, Buzz or Posts and comes back as it scrolls back,
+   * like Reddit's (lib/tab-bar-collapse.ts); Reels keeps the whole bar. Another section, or leaving Home, brings the whole
+   * bar back.
    */
-  const feedOn = focused && (ORDER[index] === "foryou" || ORDER[index] === "posts");
+  const feedOn = focused && (ORDER[index] === "foryou" || ORDER[index] === "buzz" || ORDER[index] === "posts");
   const trackTabBar = useCollapseOnScroll(feedOn);
   /** The bar slides away as the page on screen scrolls down and back as soon as it scrolls up (Instagram): For you, Buzz and Posts each feed it their scroll; Reels (full-screen video) never moves it. */
-  const { translateY: barShift, select: followPage, reveal: revealBar, onScroll: onPageScroll, hidden: barHidden } = useCollapsingHeader(ORDER.length, barHeight, START === REELS ? -1 : START, trackTabBar);
+  const { translateY: barShift, select: followPage, reveal: revealBar, onScroll: onPageScroll, scrollValue, hidden: barHidden } = useCollapsingHeader(ORDER.length, barHeight, START === REELS ? -1 : START, trackTabBar);
   /**
-   * Between the top bar (as far as it has slid away) and the floating tab bar: what a tapped picture zooms open from. Never
-   * above the status bar's strip, which stays drawn over the feed when the bar has slid away.
+   * Between the top bar (as far as it has slid away) and the floating tab bar: what a tapped picture zooms open from. Up
+   * to the screen's top edge once the bar has gone: nothing but a soft shade is drawn over the feed under the status bar.
    */
-  const openingBand = useCallback(() => ({ top: Math.max(insets.top, barHeight - barHidden()), bottom: windowHeight - tabBarInset(insets) }), [barHeight, barHidden, windowHeight, insets]);
+  const openingBand = useCallback(() => ({ top: Math.max(0, barHeight - barHidden()), bottom: windowHeight - tabBarInset(insets) }), [barHeight, barHidden, windowHeight, insets]);
   const [pageHeight, setPageHeight] = useState(0);
 
   const section: HomeSection = ORDER[index] ?? DEFAULT_HOME_SECTION;
@@ -384,7 +384,8 @@ export default function HomeScreen() {
   // Each page keeps its element while its own props stay the same, so a settle re-renders the section that was left and
   // the one that was reached, not all four lists.
   const forYou = useMemo(() => <ForYouSection active={forYouOn} topInset={barHeight} onScroll={onPageScroll(FOR_YOU)} />, [forYouOn, barHeight, onPageScroll]);
-  const buzz = useMemo(() => <BuzzSection active={buzzOn} topInset={barHeight} onScroll={onPageScroll(BUZZ)} />, [buzzOn, barHeight, onPageScroll]);
+  const buzzScroll = useMemo(() => ({ onScroll: onPageScroll(BUZZ), scrollY: scrollValue(BUZZ), barShift }), [onPageScroll, scrollValue, barShift]);
+  const buzz = useMemo(() => <BuzzSection active={buzzOn} topInset={barHeight} scroll={buzzScroll} />, [buzzOn, barHeight, buzzScroll]);
   const posts = useMemo(() => (POSTS >= 0 ? <PostsSection active={postsOn} topInset={barHeight} onScroll={onPageScroll(POSTS)} /> : null), [postsOn, barHeight, onPageScroll]);
   const reels = useMemo(() => (REELS >= 0 && pageHeight > 0 ? <ReelsSection active={reelsOn} preload={reelsPreload} topInset={barHeight} height={pageHeight} /> : null), [reelsOn, reelsPreload, barHeight, pageHeight]);
   const content: Record<HomeSection, ReactNode> = { foryou: forYou, buzz, posts, reels };
