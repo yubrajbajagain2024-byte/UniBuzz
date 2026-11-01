@@ -120,6 +120,23 @@ function withPages(pages: ReadonlySet<number>, from: number, to: number, count: 
 }
 
 /**
+ * A swipe between tabs counts only when it is meant: dragged at least this share of the page (and never under
+ * INTENT_MIN_DISTANCE), or flicked at INTENT_SPEED (points a millisecond, UIKit's own unit; 0.5 is 500 points a second)
+ * over at least INTENT_FLICK_DISTANCE. A shorter, slower release that iOS's paging would still turn into another tab
+ * springs back, so a nudge, a slight drift of the finger or a tap that slides never changes tab.
+ */
+const INTENT_SHARE = 0.18;
+const INTENT_MIN_DISTANCE = 56;
+const INTENT_SPEED = 0.5;
+const INTENT_FLICK_DISTANCE = 24;
+
+/** Whether a release `dx` points from its page at speed `speed` (either sign) was a deliberate swipe to another tab. */
+function intendedSwipe(dx: number, speed: number, pageWidth: number): boolean {
+  const distance = Math.abs(dx);
+  return distance >= Math.max(INTENT_MIN_DISTANCE, pageWidth * INTENT_SHARE) || (Math.abs(speed) >= INTENT_SPEED && distance >= INTENT_FLICK_DISTANCE);
+}
+
+/**
  * The page a released swipe takes the pager to. iOS says where it will stop; Android gives no target, only the finger's
  * speed (the other way round from the offset), so there a flick goes on to the next page its way and a slow release to
  * the nearest one.
@@ -386,13 +403,21 @@ function useProfilePager({ pageWidth, tuck, barHeight, count, onRefresh, onHeade
   );
   const onPagerDragEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { contentOffset, targetContentOffset } = e.nativeEvent;
+      const { contentOffset, targetContentOffset, velocity } = e.nativeEvent;
       const width = latest.current.pageWidth;
       // Let go right on a page: no momentum follows (so no onMomentumScrollEnd), the pager has settled already.
       const onPage = width > 0 && Math.abs(contentOffset.x - Math.round(contentOffset.x / width) * width) < 1;
       if (onPage && targetContentOffset && Math.abs(targetContentOffset.x - contentOffset.x) < 1) return commit(pageAt(contentOffset.x, width, latest.current.count));
+      const from = activeRef.current;
+      const landing = landingPage(e.nativeEvent, width, latest.current.count);
+      // A release the paging would take to another tab that was not meant (see intendedSwipe): back to the open tab.
+      if (landing !== from && !intendedSwipe(contentOffset.x - from * width, velocity?.x ?? 0, width)) {
+        heading.current = from;
+        pager.current?.scrollTo({ x: from * width, animated: true });
+        return;
+      }
       // It glides on to a page and commits when it gets there; until then the open tab is not at rest (see `select`).
-      heading.current = landingPage(e.nativeEvent, width, latest.current.count);
+      heading.current = landing;
     },
     [commit],
   );
@@ -711,10 +736,9 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
   const viewerId = user?.id ?? null;
   const own = viewerId === userId;
   const needLogin = useCallback(() => router.push("/(auth)/login"), [router]);
-  // On the Profile tab (not a profile pushed over a screen, which has no bar) the bottom bar collapses to its Profile
-  // button on a flick down the open page and comes back as it scrolls back (lib/tab-bar-collapse.ts).
   const focused = useIsFocused();
-  const trackTabBar = useCollapseOnScroll(topBar && focused);
+  // Read through a ref: the tracker is made below, once the open page is known, and starts over on each tab.
+  const trackTabBarRef = useRef<(fromTop: number, e: NativeScrollEvent) => void>(() => {});
 
   // Your own profile follows the session's copy, which Settings and the photo button refresh.
   const profileQ = useQuery(() => getProfile(supabase, userId), [userId]);
@@ -761,8 +785,12 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
     count: tabs.length,
     onRefresh: (index) => void refreshAll(index),
     onHeaderHeight: (height) => setHeaderHeight((h) => (h === height ? h : height)),
-    onPageScroll: (e) => trackTabBar(Math.max(0, e.contentOffset.y), e),
+    onPageScroll: (e) => trackTabBarRef.current(Math.max(0, e.contentOffset.y), e),
   });
+  // On the Profile tab (not a profile pushed over a screen, which has no bar) the bottom bar collapses to its Profile
+  // button on a flick down the open page and comes back as it scrolls back (lib/tab-bar-collapse.ts). Each tab starts
+  // over (`active`): one page's position against another's is never read as a flick.
+  trackTabBarRef.current = useCollapseOnScroll(topBar && focused, active);
   // For the one render after the tabs change (the pager is moved right after it), the index may point past the end.
   const tab = tabs[Math.min(active, tabs.length - 1)]?.key ?? "posts";
 

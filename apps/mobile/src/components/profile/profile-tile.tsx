@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef } from "react";
-import { Pressable, StyleSheet, Text, View, type ViewInstance } from "react-native";
+import { Pressable, StyleSheet, Text, View, type GestureResponderEvent, type ViewInstance } from "react-native";
 import { Image } from "expo-image";
 import type { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -23,6 +23,36 @@ const LISTING_ICONS: Record<ListingType, keyof typeof Ionicons.glyphMap> = { apa
 const LISTING_KINDS: Record<ListingType, string> = { apartment: "Apartment", roommate: "Roommate post", item: "For sale" };
 
 const isListing = (type: ProfileTileType): type is ListingType => type === "apartment" || type === "roommate" || type === "item";
+
+/**
+ * How far a finger may move between touching a square and letting go for it still to be a tap, UIKit's own allowance. A
+ * square sits inside a vertical list inside the profile's sideways pager: a slide that moves neither (a sideways drag on
+ * the first or last tab, a nudge) would otherwise end as a tap that opens the post, since a press is only cancelled when
+ * the finger leaves the square.
+ */
+const TAP_SLOP = 10;
+
+/**
+ * A square's taps, held to TAP_SLOP: where the finger came down, and whether the release is near enough to it. Nothing
+ * is drawn differently while a finger is down (no dimming): a touch that turns into a scroll or a swipe between tabs
+ * would otherwise flash every square it starts on, as it dims and comes back.
+ */
+function useTap(onTap: () => void) {
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const onPressIn = useCallback((e: GestureResponderEvent) => {
+    start.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+  }, []);
+  const onPress = useCallback(
+    (e: GestureResponderEvent) => {
+      const from = start.current;
+      start.current = null;
+      if (from && Math.hypot(e.nativeEvent.pageX - from.x, e.nativeEvent.pageY - from.y) > TAP_SLOP) return;
+      onTap();
+    },
+    [onTap],
+  );
+  return { onPressIn, onPress };
+}
 
 /** "Reel: Move-in day…, pinned, 1.2k views": the words, the pin and the view count the square shows. */
 export function tileLabel(tile: ProfileTile): string {
@@ -75,20 +105,24 @@ export const ProfileGridTile = memo(function ProfileGridTile({ tile, width, aspe
   // The marks are white with a shadow on a picture; a words-only or blank square has the soft grey fill, so there they are grey.
   const ink = tile.imageUrl ? colors.onMedia : colors.muted;
   const inkShadow = tile.imageUrl ? styles.iconShadow : null;
+  const tap = useTap(() => void measureOrigin(self.current, radius).then((origin) => onOpen(tile, origin)));
   return (
     <Pressable
       ref={self}
-      onPress={() => void measureOrigin(self.current, radius).then((origin) => onOpen(tile, origin))}
+      onPressIn={tap.onPressIn}
+      onPress={tap.onPress}
       onLongPress={onLongPress ? () => onLongPress(tile) : undefined}
       delayLongPress={350}
       accessibilityRole="button"
       accessibilityLabel={tileLabel(tile)}
       accessibilityActions={onLongPress ? [{ name: "longpress", label: pinLabel }] : undefined}
       onAccessibilityAction={onLongPress ? (e) => e.nativeEvent.actionName === "longpress" && onLongPress(tile) : undefined}
-      style={({ pressed }) => [styles.tile, { width, height: width * aspect, borderRadius: radius }, pressed && { opacity: 0.85 }]}
+      style={[styles.tile, { width, height: width * aspect, borderRadius: radius }]}
     >
       {tile.imageUrl ? (
-        <Image source={{ uri: tile.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} recyclingKey={tile.key} />
+        // Kept decoded in memory as well as on disk, so a square drawn again (a page of the grid scrolled back to, another
+        // tab) shows its picture at once instead of fading it in again.
+        <Image source={{ uri: tile.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} recyclingKey={tile.key} cachePolicy="memory-disk" />
       ) : tile.text ? (
         <View style={styles.words}>
           <Text style={styles.wordsText} numberOfLines={7}>
@@ -134,11 +168,12 @@ export const ListingGridTile = memo(function ListingGridTile({ tile, width, aspe
   // White with a shadow over a picture; on the soft fill of a listing without photos, the theme's own text colours.
   const ink = picture ? colors.onMedia : colors.muted;
   const inkShadow = picture ? styles.iconShadow : null;
+  const tap = useTap(() => onOpen(tile));
   return (
-    <Pressable onPress={() => onOpen(tile)} accessibilityRole="button" accessibilityLabel={tileLabel(tile)} style={({ pressed }) => [styles.tile, { width, height: width * aspect, borderRadius: radius }, pressed && { opacity: 0.85 }]}>
+    <Pressable onPressIn={tap.onPressIn} onPress={tap.onPress} accessibilityRole="button" accessibilityLabel={tileLabel(tile)} style={[styles.tile, { width, height: width * aspect, borderRadius: radius }]}>
       {tile.imageUrl ? (
         <>
-          <Image source={{ uri: tile.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} recyclingKey={tile.key} />
+          <Image source={{ uri: tile.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} recyclingKey={tile.key} cachePolicy="memory-disk" />
           <View style={styles.listingShade} pointerEvents="none" />
         </>
       ) : (
