@@ -107,16 +107,24 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   Website button are live on the website; the hours need **migration 57** on production (with the release above) and
   the app's part an EAS update, both the owner's approval. Until 57, the website shows and offers no hours. See
   [branches/business-hours.md](branches/business-hours.md).
-- **Home's feeds reach the top edge** (`home-full-bleed-top`, 2026-11-01, pushed, no PR yet): the opaque strip under the
+- **Settings, redesigned** (`settings-redesign`, 2026-11-01, not committed yet): the long single screen becomes a menu
+  of sections, each its own screen (Account & Profile, Privacy, Safety & Security, Notifications, Appearance, About &
+  Support) on Apple-style grouped rows; switches and choices save at once, the two forms with Save; each saves only what
+  it changed (`updateProfileSettings`); a searchable university picker that allows only the university the sign-in email
+  proves; Blocked accounts with Unblock (new); Delete account as quiet text at the bottom of Account → Account
+  Management. Seen on the iOS Simulator (iPhone 17 Pro, dark theme): every screen. Nothing was saved there (the
+  simulator is signed in to a live account); **saving, the light theme and a real iPhone not tried**. App only; reaches
+  testers with an EAS update (owner's approval).
+- **Home's feeds reach the top edge** (`home-full-bleed-top`, PR #79, merged 2026-11-01): the opaque strip under the
   status bar is gone; For you and Buzz scroll on to the screen's top edge once the top bar has slid away, clearly
   visible, with only a faint tint behind the clock (20% at the top, none below the status bar) that fades in only then;
   on Buzz the top bar now slides away too, the filter bar with it. Seen on the iOS Simulator (iPhone 17 Pro, dark theme,
   For you): a photo runs behind the clock and the Dynamic Island. **Not tried on a real iPhone**; the light theme and
   Buzz (its first-buzz notice) not seen on screen.
-- **The bottom bar collapses by the speed of a scroll** (`nav-velocity-collapse`, 2026-11-01, pushed, no PR yet):
-  reading at any pace keeps the whole bar; a flick of 700 points a second or more, over at least 32 points, collapses it
-  to the tab's icon at the bottom left with the "+" as its twin; 24 points back, or the top, restores it. On every tab's
-  lists, Messages and Profile now included (`packages/shared/src/scroll-collapse.ts`, offline tests). Checked on the iOS
+- **The bottom bar collapses by the speed of a scroll** (`nav-velocity-collapse`, PR #78, merged 2026-11-01): reading at
+  any pace keeps the whole bar; a flick of 700 points a second or more, over at least 32 points, collapses it to the
+  tab's icon at the bottom left with the "+" as its twin; 24 points back, or the top, restores it. On every tab's lists,
+  Messages and Profile now included (`packages/shared/src/scroll-collapse.ts`, offline tests). Checked on the iOS
   Simulator (iPhone 17 Pro) with scripted drags on Orbit, Marketplace, Events, Messages and Profile: 278 to 625 points a
   second kept the bar, 1,643 to 1,786 collapsed it, small turns were ignored, one change per gesture, sideways photo
   swipes at over 2,000 never counted, short lists never flicker. **Not tried on a real iPhone**; Buzz (its first-buzz
@@ -126,9 +134,10 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   (PR #61); closing from a later reel shrinks into the post it was opened from (PR #62); the zoom at Instagram's speed
   and no blur under the words (PR #63); Buzz's photos and video in the same viewer, anonymously (PR #64); swiping up and
   down through the Buzz list's buzzes with media (PR #65); every picture whole from the screen's top edge, a blurred
-  copy of it filling the rest, in the post viewer, chat media and Snaps (`viewer-full-bleed`, 2026-11-01: seen on the
-  iOS Simulator (iPhone 17 Pro) for photos; **not yet confirmed on a real iPhone**; videos, chat media and Snaps not
-  seen on screen). All reach testers only with an EAS update (owner's approval); none has been timed on a device.
+  copy of it filling the rest, in the post viewer, chat media and Snaps (`viewer-full-bleed`, PR #77, merged 2026-11-01:
+  seen on the iOS Simulator (iPhone 17 Pro) for photos; **not yet confirmed on a real iPhone**; videos, chat media and
+  Snaps not seen on screen). All reach testers only with an EAS update (owner's approval); none has been timed on a
+  device.
 - **The Buzz thread, laid out like Reddit's** (PR #66): larger replies with their actions at the right, subtle thread
   lines that fold their branch when tapped, a band between conversations, a button to the next one. App only; reaches
   testers with an EAS update (owner's approval). Not seen on a device.
