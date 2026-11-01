@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
-import { VideoView, useVideoPlayer } from "expo-video";
+import { VideoView, useVideoPlayer, type VideoThumbnail } from "expo-video";
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming, type SharedValue } from "react-native-reanimated";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SNAP_LIFETIME_DAYS, closeSnap, openSnap, reportSnapCapture, shortAge, snapErrorState, snapMediaUrl, type OpenedSnap } from "@apartment-book/shared";
 import { Avatar } from "@/components/avatar";
+import { BACKDROP_PIXELS, BlurredBackdrop } from "@/components/blurred-backdrop";
 import { GlassIconButton } from "@/components/glass";
 import { Icon, type IconName } from "@/components/icon";
 import { useReduceMotion } from "@/lib/accessibility";
@@ -227,6 +228,7 @@ export default function SnapViewerScreen() {
                 cachePolicy="memory"
                 style={StyleSheet.absoluteFill}
                 contentFit="contain"
+                contentPosition="top"
                 transition={150}
                 onLoad={() => setLoaded(true)}
                 onError={() => setPhase({ phase: "error", icon: "cloud-offline-outline", title: "Couldn't load this Snap", body: "Check your connection and try again.", retry: true })}
@@ -338,6 +340,32 @@ function SnapVideo({
   });
   const handlers = useRef({ onReady, onEnd, onError });
   handlers.current = { onReady, onEnd, onError };
+  // Its shape, from its own track, puts it whole at the top of the screen; a small frame of it, blurred, fills the rest
+  // (made in memory only, as the Snap itself is never kept).
+  const [aspect, setAspect] = useState<number | null>(null);
+  const [frame, setFrame] = useState<VideoThumbnail | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const shape = (size: { width: number; height: number } | undefined) => {
+      if (alive && size && size.width > 0 && size.height > 0) setAspect(size.width / size.height);
+    };
+    shape(player.videoTrack?.size);
+    const track = player.addListener("videoTrackChange", ({ videoTrack }) => shape(videoTrack?.size));
+    const loaded = player.addListener("sourceLoad", ({ duration: length }) => {
+      player
+        .generateThumbnailsAsync([Math.min(1, (length || 0) / 2)], { maxWidth: BACKDROP_PIXELS })
+        .then(([thumb]) => alive && thumb && setFrame(thumb))
+        .catch(() => {});
+    });
+    return () => {
+      alive = false;
+      track.remove();
+      loaded.remove();
+    };
+  }, [player]);
+  const { width, height } = useWindowDimensions();
+  const across = aspect ? Math.min(width, height * aspect) : width;
+  const box = aspect ? { left: (width - across) / 2, top: 0, width: across, height: across / aspect } : { left: 0, top: 0, width, height };
   useEffect(() => {
     const subscriptions = [
       player.addListener("statusChange", ({ status }) => {
@@ -355,7 +383,12 @@ function SnapVideo({
     ];
     return () => subscriptions.forEach((s) => s.remove());
   }, [player, duration, progress]);
-  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} allowsPictureInPicture={false} fullscreenOptions={{ enable: false }} />;
+  return (
+    <>
+      <BlurredBackdrop small={frame} />
+      <VideoView player={player} style={[{ position: "absolute" }, box]} contentFit="contain" nativeControls={false} allowsPictureInPicture={false} fullscreenOptions={{ enable: false }} />
+    </>
+  );
 }
 
 const useStyles = makeStyles((colors) => ({

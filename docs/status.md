@@ -107,11 +107,13 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   Website button are live on the website; the hours need **migration 57** on production (with the release above) and
   the app's part an EAS update, both the owner's approval. Until 57, the website shows and offers no hours. See
   [branches/business-hours.md](branches/business-hours.md).
-- **The full-screen viewer in the app**: no "Add comment…" bar, the tab bar kept in view, the rail nearer the right
-  edge (PR #61); closing from a later reel shrinks into the post it was opened from (PR #62); the zoom at Instagram's
-  speed and no blur under the words (PR #63); Buzz's photos and video in the same viewer, anonymously (PR #64); swiping
-  up and down through the Buzz list's buzzes with media (PR #65). All reach testers only with an EAS update (owner's
-  approval); none has been timed on a device.
+- **The full-screen viewer in the app**: no "Add comment…" bar, the tab bar kept in view, the rail nearer the right edge
+  (PR #61); closing from a later reel shrinks into the post it was opened from (PR #62); the zoom at Instagram's speed
+  and no blur under the words (PR #63); Buzz's photos and video in the same viewer, anonymously (PR #64); swiping up and
+  down through the Buzz list's buzzes with media (PR #65); every picture whole from the screen's top edge, a blurred
+  copy of it filling the rest, in the post viewer, chat media and Snaps (`viewer-full-bleed`, 2026-11-01: seen on the
+  iOS Simulator (iPhone 17 Pro) for photos; **not yet confirmed on a real iPhone**; videos, chat media and Snaps not
+  seen on screen). All reach testers only with an EAS update (owner's approval); none has been timed on a device.
 - **The Buzz thread, laid out like Reddit's** (PR #66): larger replies with their actions at the right, subtle thread
   lines that fold their branch when tapped, a band between conversations, a button to the next one. App only; reaches
   testers with an EAS update (owner's approval). Not seen on a device.

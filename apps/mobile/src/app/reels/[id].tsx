@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, PixelRatio, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent, type ListViewToken } from "react-native";
+import { ActivityIndicator, FlatList, PixelRatio, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View, type ListViewToken } from "react-native";
 import { Image } from "expo-image";
 import { useIsFocused, useLocalSearchParams, useNavigation, usePreventRemove, useRouter } from "expo-router";
 import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
@@ -10,7 +10,7 @@ import { getFeedPost, getPostEngagement, isSaved, listReels, REELS_PAGE_SIZE, ty
 import { campusSegments, ScopeToggle, type ScopeSegment } from "@/components/home/home-top-tabs";
 import { ReelCommentsSheet } from "@/components/home/reel-comments-sheet";
 import { ShareSheetProvider } from "@/components/share-sheet";
-import { aspectOf, photoFloor, photoLayout, photoTop, ReelItem, surfaceOf, wholeVideo, type ViewerSurface } from "@/components/home/reel-item";
+import { aspectOf, photoLayout, ReelItem, wholeVideo } from "@/components/home/reel-item";
 import { markReelsStale } from "@/components/home/reels-section";
 import { hapticTap } from "@/lib/haptics";
 import { SCOPE_TOGGLE_SHOWN, useHomeScope } from "@/lib/home-scope";
@@ -25,7 +25,7 @@ import { usePageSwipe, ViewerSwipeContext, type ViewerSwipe } from "@/lib/viewer
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { auroraGradient, textStyle } from "@/lib/theme";
-import { makeStyles, useAppTheme, useColors } from "@/lib/theme-provider";
+import { makeStyles, useColors } from "@/lib/theme-provider";
 import { Icon } from "@/components/icon";
 import { GlassIconButton } from "@/components/glass";
 import { FloatingTabBar, useTabBarMirror } from "@/components/floating-tab-bar";
@@ -125,9 +125,9 @@ function splitKey(key: string): [string, string] {
 
 /**
  * The full-screen viewer, TikTok style, for every reel and every post with photos or videos: a video fills the screen
- * edge to edge, a photo sits whole at the top on the theme's own colour with its words below it (see ReelItem), and a
- * swipe up moves on. A reel goes on into the Reels feed (listReels: posted reels and
- * listing tours, page by page, behind the one that was opened); a post from a list (For you, a profile grid, Saved) goes
+ * edge to edge, a photo sits whole at the top over a blurred copy of itself with its words below it (see ReelItem), and
+ * a swipe up moves on. Every picture starts at the screen's very top edge, the status bar and the top row over it. A reel
+ * goes on into the Reels feed (listReels: posted reels and listing tours, page by page, behind the one that was opened); a post from a list (For you, a profile grid, Saved) goes
  * on through that list, as the source hands it over (see openViewer). A post's photos and videos swipe sideways on
  * their page. Over every page, one row at the top: Back at the left, the Campus | Global toggle in the middle while the
  * Reels feed is running (the same choice as Home's, see useHomeScope: picking the other one keeps the page on screen and
@@ -148,7 +148,6 @@ export default function ReelViewerScreen() {
   const { width, height: windowHeight } = useWindowDimensions();
   const { user, profile } = useSession();
   const colors = useColors();
-  const { isDark } = useAppTheme();
   const styles = useStyles();
   const [scope, setScope] = useHomeScope();
   // Your own university or every one, as on Home; someone without a university sees everything.
@@ -199,12 +198,9 @@ export default function ReelViewerScreen() {
   const onStartPage = useSharedValue(1);
   const [commentsKey, setCommentsKey] = useState<string | null>(null);
   const listRef = useRef<FlatList<ViewerEntry>>(null);
-  /** The slide each page is on (a post's photos and videos) and what it sits on, as its page reports them. */
-  const [shown, setShown] = useState<Record<string, { slide: number; surface: ViewerSurface }>>({});
-  const onSlideChange = useCallback(
-    (key: string, slide: number, surface: ViewerSurface) => setShown((prev) => (prev[key]?.slide === slide && prev[key]?.surface === surface ? prev : { ...prev, [key]: { slide, surface } })),
-    [],
-  );
+  /** The slide each page is on (a post's photos and videos), as its page reports it. */
+  const [shown, setShown] = useState<Record<string, number>>({});
+  const onSlideChange = useCallback((key: string, slide: number) => setShown((prev) => (prev[key] === slide ? prev : { ...prev, [key]: slide })), []);
   /** Bumped when the feed starts over (another campus choice): answers to older requests are dropped. */
   const seq = useRef(0);
   const offset = useRef(0);
@@ -391,7 +387,8 @@ export default function ReelViewerScreen() {
     [onOpenComments, handed, leave, router],
   );
 
-  // The top row: Back and the toggle, under the status bar. A page's own content (a photo) starts below it.
+  // The top row: Back and the toggle, under the status bar. Both float over the page: its photos and videos start at the
+  // screen's top edge, never pushed down by the safe area (see photoLayout, placeVideo).
   const rowTop = insets.top + TOP_GAP;
   const contentTop = rowTop + ROW;
   /**
@@ -416,37 +413,11 @@ export default function ReelViewerScreen() {
   // The name and the rail sit this far up from the screen's bottom edge, where they always have (see BOTTOM_ROOM), and
   // clear of the tab bar when it is drawn.
   const barHeight = Math.max(Math.max(insets.bottom, BOTTOM_MIN) + BOTTOM_ROOM, tabBar ? tabBarInset(insets) + BAR_CLEAR : 0);
-  /**
-   * What a page shows now: a photo on the theme's own colour ("page"), or a video, a photo as tall as the screen or a
-   * page still loading ("media"). As its page reports it, or, before it has, as its slide's recorded shape says.
-   */
-  const surfaceAt = (index: number): ViewerSurface => {
-    const entry = entries?.[index];
-    const item = entry?.item;
-    if (!entry || !item) return "media";
-    const reported = shown[entry.key];
-    if (reported) return reported.surface;
-    const m = item.media[Math.max(0, Math.min(item.media.length - 1, entry.slide ?? 0))];
-    return surfaceOf(m, m ? aspectOf(m) : null, width, height, photoTop(contentTop, item.media.length), photoFloor(height, barHeight, item));
-  };
-  /**
-   * The page under the top row and the status bar: their colours follow it (dark over a video, the theme's over a
-   * photo), changing as a page's edge passes under them rather than when the swipe ends.
-   */
-  const [under, setUnder] = useState(startIndex);
-  const onScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const i = Math.max(0, Math.floor((e.nativeEvent.contentOffset.y + rowTop + ROW / 2) / Math.max(height, 1)));
-      setUnder((prev) => (prev === i ? prev : i));
-    },
-    [rowTop, height],
-  );
 
   /*
    * The zoom: the page grows out of the picture that was tapped (its frame on screen, `origin`) to fill the screen, the
-   * screen behind fading to the page's colour as it goes (black behind a video, the theme's behind a photo), and shrinks
-   * back into it on the way out. Without an origin (a link, a saved row) it opens from a slightly smaller, faded copy of
-   * itself in the middle. The page stays full size inside the opening, scaled so its picture matches the tapped one, so
+   * screen behind darkening as it goes, and shrinks back into it on the way out. Without an origin (a link, a saved row)
+   * it opens from a slightly smaller, faded copy of itself in the middle. The page stays full size inside the opening, scaled so its picture matches the tapped one, so
    * what grows is the same picture, never a stretched one. The words, the rail and the buttons fade in once it has opened
    * (ViewerChromeContext) and out before it closes.
    */
@@ -464,7 +435,7 @@ export default function ReelViewerScreen() {
    */
   const startEntry = (startKey ? entries?.find((e) => e.key === startKey) : entries?.[startIndex]) ?? null;
   const startItem = startEntry?.item ?? null;
-  const startSlide = startEntry ? (shown[startEntry.key]?.slide ?? startEntry.slide ?? 0) : 0;
+  const startSlide = startEntry ? (shown[startEntry.key] ?? startEntry.slide ?? 0) : 0;
   /**
    * Where the zoom opens from and lands: the tapped picture, or, where the feed shows the page's photos side by side (a
    * buzz's grid), the tile of the photo on screen now, so closing on the third photo lands on the third tile.
@@ -473,14 +444,14 @@ export default function ReelViewerScreen() {
   const focus = useMemo(() => {
     const m = startItem?.media[startSlide];
     if (startItem && m?.type === "video") {
-      const v = wholeVideo(aspectOf(m), screenW, screenH);
+      const v = wholeVideo(aspectOf(m), screenW, screenH, true);
       return { y: v.top + v.height / 2, width: v.width, height: v.height };
     }
     const aspect = m && m.type === "photo" ? aspectOf(m) : null;
     if (!startItem || aspect === null) return { y: screenH / 2, width: screenW, height: screenH };
-    const { place } = photoLayout(aspect, screenW, screenH, photoTop(contentTop, startItem.media.length), photoFloor(screenH, barHeight, startItem));
+    const place = photoLayout(aspect, screenW, screenH);
     return { y: place.top + place.height / 2, width: place.width, height: place.height };
-  }, [startItem, startSlide, screenW, screenH, contentTop, barHeight]);
+  }, [startItem, startSlide, screenW, screenH]);
   // The post the viewer was opened from keeps its feed row on the same photo as the page (it is hidden behind it), so a
   // swipe back uncovers that photo, and the page lands on it.
   useEffect(() => {
@@ -866,14 +837,6 @@ export default function ReelViewerScreen() {
 
   // Everything the pages read besides their own entry: a change re-renders them.
   const listExtra = useMemo(() => ({ visible, focused, opened, closingNow, drawnPages, height, width, muteInset, contentTop, barHeight, shown }), [visible, focused, opened, closingNow, drawnPages, height, width, muteInset, contentTop, barHeight, shown]);
-  /** The top row and the status bar take the colours of the page under them; the screen behind, those of the page on screen. */
-  const topOnPage = surfaceAt(under) === "page";
-  /**
-   * The top row's light style, over a photo's white page only. In dark mode every page is black behind it, so it keeps
-   * one style throughout and never changes under the finger.
-   */
-  const lightTop = topOnPage && !isDark;
-  const shownOnPage = surfaceAt(visible) === "page";
 
   let body = null;
   if (height > 0 && entries && entries.length > 0) {
@@ -934,8 +897,6 @@ export default function ReelViewerScreen() {
         removeClippedSubviews={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
         onEndReached={() => {
           if (moreError) return;
           if (opened) void loadMore();
@@ -991,9 +952,10 @@ export default function ReelViewerScreen() {
     {/* The viewer's own share sheet: iOS presents a sheet from the screen on top, and the one in the root layout sits under
         this modal screen, where it could never appear. */}
     <ShareSheetProvider>
-      <ViewerStatusBar open={open} style={topOnPage && !isDark ? "dark" : "light"} show={focused} />
-      {/* The screen behind fades to the page's colour as the page opens over it: black behind a video, the theme's behind a photo. */}
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.backdrop, shownOnPage && styles.backdropPage, backdropStyle]} />
+      {/* Light in both themes: every page's picture runs under it, on its shade. */}
+      <ViewerStatusBar open={open} show={focused} />
+      {/* The screen behind darkens as the page opens over it. */}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]} />
       {/* The opening the page grows through, and the full-size page inside it. */}
       <Animated.View style={[styles.opening, frameStyle]}>
         <Animated.View style={[{ width: screenW, height: screenH }, pageStyle]}>
@@ -1002,21 +964,21 @@ export default function ReelViewerScreen() {
     <ViewerClosingContext.Provider value={closingNow}>
     <ViewerSwipeContext.Provider value={swipeBack}>
     <ViewerClockContext.Provider value={clockApi}>
-    <View style={[styles.root, shownOnPage && styles.rootPage]} onLayout={(e) => setHeight(Math.round(e.nativeEvent.layout.height))}>
+    <View style={styles.root} onLayout={(e) => setHeight(Math.round(e.nativeEvent.layout.height))}>
       {body}
 
       {/* One row floating over the picture: Back at the left, the toggle in the middle; touches between them go through to the page. */}
       <Animated.View pointerEvents="box-none" style={[styles.top, { paddingTop: rowTop }, chromeStyle]}>
         <View pointerEvents="box-none" style={styles.row}>
-          {/* Back on clear glass over a video, as the system draws its bar buttons over media; over a photo's page, the bar's own glass. */}
-          <GlassIconButton icon="chevron-back" label="Back" onPress={leave} variant={lightTop ? "bar" : "media"} size={40} iconSize={19} haptic={false} hitSlop={8} style={styles.back} />
-          {SCOPE_TOGGLE_SHOWN && scoped && segments.length > 1 ? <ScopeToggle segments={segments} value={chosen} onChange={choose} overVideo={!lightTop} shadow={lightTop ? undefined : styles.shadow} /> : null}
+          {/* Back on clear glass over the picture, as the system draws its bar buttons over media. */}
+          <GlassIconButton icon="chevron-back" label="Back" onPress={leave} variant="media" size={40} iconSize={19} haptic={false} hitSlop={8} style={styles.back} />
+          {SCOPE_TOGGLE_SHOWN && scoped && segments.length > 1 ? <ScopeToggle segments={segments} value={chosen} onChange={choose} overVideo shadow={styles.shadow} /> : null}
         </View>
       </Animated.View>
 
       {loadingMore && onLast ? (
         <View style={[styles.foot, { bottom: barHeight + 6 }]} pointerEvents="none">
-          <ActivityIndicator color={shownOnPage ? colors.muted : colors.onMedia} />
+          <ActivityIndicator color={colors.onMedia} />
         </View>
       ) : moreError && onLast ? (
         <View style={[styles.foot, { bottom: barHeight + 6 }]} pointerEvents="box-none">
@@ -1044,10 +1006,10 @@ export default function ReelViewerScreen() {
 }
 
 /**
- * The viewer's status bar style, taken once the page covers most of the screen and given back as it closes (half way):
+ * The viewer's light status bar, taken once the page covers most of the screen and given back as it closes (half way):
  * on its own, so the switch half way through a zoom redraws only this, never the pages.
  */
-function ViewerStatusBar({ open, style, show }: { open: SharedValue<number>; style: "light" | "dark"; show: boolean }) {
+function ViewerStatusBar({ open, show }: { open: SharedValue<number>; show: boolean }) {
   const [taken, setTaken] = useState(() => open.value > 0.5);
   useAnimatedReaction(
     () => open.value > 0.5,
@@ -1055,7 +1017,7 @@ function ViewerStatusBar({ open, style, show }: { open: SharedValue<number>; sty
       if (now !== was) runOnJS(setTaken)(now);
     },
   );
-  return show && taken ? <StatusBar style={style} /> : null;
+  return show && taken ? <StatusBar style="light" /> : null;
 }
 
 /** A page whose post is still loading (its picture stands in, under a spinner), or one that has been deleted since. It swipes back too. */
@@ -1097,13 +1059,9 @@ function PendingPage({ entry, width, height, over, pictures = true, onShown, giv
   );
 }
 
-/**
- * Over video, the media colours (light text, dark scrims) in both themes; over a photo's page (the `…Page` styles), the
- * theme's own colours.
- */
+/** The media colours (light text, dark scrims) in both themes: every page is a picture over its own blurred copy. */
 const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.mediaBg },
-  rootPage: { backgroundColor: colors.bg },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 8 },
   stateTitle: { color: colors.onMedia, ...textStyle.title3, marginTop: 6, textAlign: "center" },
   stateBody: { color: colors.onMediaMuted, fontSize: 14, textAlign: "center", lineHeight: 20 },
@@ -1120,7 +1078,6 @@ const useStyles = makeStyles((colors) => ({
   pendingDim: { backgroundColor: "rgba(0,0,0,0.35)" },
   fill: { flex: 1 },
   backdrop: { backgroundColor: colors.mediaBg },
-  backdropPage: { backgroundColor: colors.bg },
   // Clips the page to the growing frame, with the tapped picture's rounded corners at the start.
   opening: { position: "absolute", overflow: "hidden", borderCurve: "continuous" },
 }));
