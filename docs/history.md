@@ -73,6 +73,10 @@ open work is in [status.md](status.md).
   the staging rehearsal and backup tooling, the production checklist) merged into `main`. None of
   49 to 56 is on production.
 
+- 2026-11-01 20:18 UTC: PR #80 (`settings-redesign`, the owner's commit "Update UniBuzz features and UI") merged into
+  `main` by the owner: the app's Settings as a menu of sections, each its own screen. App only; the website redeployed
+  without a change of its own; testers get it with an EAS update (owner's approval).
+
 - 2026-11-01 19:52 – 19:53 UTC: PRs #77 (`viewer-full-bleed`), #78 (`nav-velocity-collapse`) and #79
   (`home-full-bleed-top`) merged into `main` in that order by the owner: the app's viewers from the top edge over a
   blurred copy, the bottom bar collapsing by the speed of a scroll, and Home's feeds under the status bar. App only; the

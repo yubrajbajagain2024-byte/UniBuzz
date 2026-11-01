@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, Keyboard, RefreshControl, View, type ListV
 import { useFocusEffect, useRouter } from "expo-router";
 import { campusShortName, ITEM_CATEGORIES, labelFor, listingMedia, listItems, videosFor, type ItemCategoryValue, type ItemWithSeller, type PostEngagement } from "@apartment-book/shared";
 import { listingPoster } from "@/lib/listing-poster";
-import type { MarketFilters } from "@/components/housing/filter-sheet";
+import type { MarketFilterChoice } from "@apartment-book/shared";
 import type { CampusChoice } from "@/components/marketplace/campus-menu";
 import { categoryIcon, priceText } from "@/components/marketplace/item-text";
 import { PostCard } from "@/components/post-card";
@@ -103,7 +103,7 @@ export function MarketplaceSection({
   onCategoryChange: (category: ItemCategoryValue | null) => void;
   onSearchBusy?: (busy: boolean) => void;
   /** The filter sheet's choices for this page: sort, condition and price. */
-  filters: MarketFilters;
+  filters: MarketFilterChoice;
   filtered: boolean;
   /** The page on screen: only then does a tap on the Explore tab scroll it back to the top. */
   active?: boolean;

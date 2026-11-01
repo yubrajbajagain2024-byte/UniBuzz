@@ -47,13 +47,17 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 
 - **Events** (PR #74, merged and deployed 2026-10-31 03:43 UTC; [branches/events.md](branches/events.md)): the bar is
   Home, Explore, Messages, Events, Profile; the Events tab (For you | All events, date and category pills, search,
-  saved), event pages, organizations that students create and staff verify, the university's ICS and RSS feeds synced
-  by the website, the console's Events section; migration 61, written, rehearsed offline and applied on staging, **not
-  on production**: until it is, the website's Events pages show empty states and the console's Events tab shows an
-  error (the apps are unchanged until an EAS update). Reviewed on 2026-10-31 through a staging-backed preview with Texas
+  saved), event pages, organizations that students create and staff verify, the university's ICS and RSS feeds synced by
+  the website, the console's Events section; migration 61, written, rehearsed offline and applied on staging, **not on
+  production**: until it is, the website's Events pages show empty states and the console's Events tab shows an error
+  (the apps are unchanged until an EAS update). Reviewed on 2026-10-31 through a staging-backed preview with Texas
   State's real calendar synced. Still to do, each with the owner's approval: a full backup and 61 alone (as 58 to 60
   went), `CRON_SECRET` in Vercel's Production environment, Texas State's calendar feed added in `/admin/events`, an EAS
-  update.
+  update. As of 2026-11-01 the app, which reads production, fails every Events write there (saving interests answered
+  "Could not find the table 'public.event_interests' in the schema cache"): none of 61's eight tables exists on
+  production. On `discovery-redesign` the app says "Events need the latest server update" instead (`EVENTS_NOT_READY`),
+  and `tests/staging/events.mjs` now saves interests and reads them back from a fresh session; the probe is to run on
+  staging, then 61 goes to production alone (backup first), all with the owner's approval.
 - **Apply the pending migrations.** One run of `db:setup` from `main` in database-URL mode
   ([supabase/CLAUDE.md](../supabase/CLAUDE.md)), after a backup, applies them in file order: 44 and
   46 together, 49 and 50 (Business v2), 51 to 54 (Buzz), 55 and 56 (Business v2, PR #51), once
@@ -107,8 +111,22 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   Website button are live on the website; the hours need **migration 57** on production (with the release above) and
   the app's part an EAS update, both the owner's approval. Until 57, the website shows and offers no hours. See
   [branches/business-hours.md](branches/business-hours.md).
-- **Settings, redesigned** (`settings-redesign`, 2026-11-01, not committed yet): the long single screen becomes a menu
-  of sections, each its own screen (Account & Profile, Privacy, Safety & Security, Notifications, Appearance, About &
+- **Explore and Events, simplified** (`discovery-redesign`, 2026-11-01, committed, not pushed): three levels (the
+  section labels; one search field with a filter button counting the filters on; one row of chips: each page's few quick
+  filters, a removable chip for every other choice in force, Clear), the rest in the filter sheets (Marketplace
+  categories and roommate post types moved there, a dot by each group in force); For you's interests panel is one
+  dismissible line, and Your interests is in the Events filter sheet. The quick filters are thin-outlined pills, the one
+  in force UniBuzz blue; Housing and Roommate have no video quick filter (it is in the sheet). Profile tabs change only
+  on an intended swipe (18% of the page, or a 500 pt/s flick over 24 points) and the bottom bar's collapse starts over
+  on each profile tab; the grid's blinking was reproduced on the iOS Simulator by recording the screen and measuring a
+  square's brightness frame by frame (a touch dimmed it to 85% until the touch became a scroll or a swipe; a slow
+  sideways slide on the first tab opened the post) and is gone there after the fix (no dimming, a 10-point tap
+  allowance, pictures kept in memory). Not yet checked on a real iPhone. Shared logic in
+  `packages/shared/src/discovery.ts`, offline tests. Seen on the iOS Simulator (iPhone 17 Pro, dark theme): Housing,
+  Marketplace and For you laid out; **tapping the chips and the sheets not tried there** (the simulator's display
+  stopped updating), nor on a real iPhone. App only; reaches testers with an EAS update (owner's approval).
+- **Settings, redesigned** (`settings-redesign`, PR #80, merged 2026-11-01): the long single screen becomes a menu of
+  sections, each its own screen (Account & Profile, Privacy, Safety & Security, Notifications, Appearance, About &
   Support) on Apple-style grouped rows; switches and choices save at once, the two forms with Save; each saves only what
   it changed (`updateProfileSettings`); a searchable university picker that allows only the university the sign-in email
   proves; Blocked accounts with Unblock (new); Delete account as quiet text at the bottom of Account → Account

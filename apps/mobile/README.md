@@ -281,25 +281,31 @@ The bar scrolls like Instagram's (`src/lib/collapsing-header.ts`): it slides up 
 scrolls down, by as much as the page moved, and slides back the moment the page scrolls up, however far down it is; a
 swipe or a tap between pages brings it back too, and Reels never moves it. On Buzz the filter bar slides under it first,
 then rides away with it (both from Buzz's one scroll value, `scrollValue` in the collapsing header), so Buzz's feed
-reaches the top edge too. The same goes for the Housing | Roommate | Marketplace
-row on Explore and the pills under it (the bar with its title and Search stays put): they slide up under the fixed bar
+reaches the top edge too. The same goes for Explore's and Events' search and filters (DiscoveryBar; the bar with the
+title stays put): they slide up under the fixed bar
 as the list under them scrolls down, and back as soon as it
 scrolls up. The bottom bar never moves. The choice lives in
 `src/lib/home-scope.ts` and drives For you and Posts alike: those pages have no filter chips of their own (Buzz keeps its
 own filter bar, see Buzz below).
 Explore (the Housing tab in the code, with a compass icon) works the same way with three pages,
-**Housing | Roommate | Marketplace** (apartments, roommates, items), under its own top bar laid out like the inbox's (`src/app/(tabs)/housing.tsx`): the big
-"Find" title, the three labels with the sliding aurora underline, the inbox's search box (searching the page on screen) with a
-round filter button beside it (`src/components/housing/filter-sheet.tsx`: a sheet of the page's own filters, applied on "Show
-results", counted on the button; rooms sort, bedrooms, rent, distance from campus, furnished, pets and video tours; roommate
-posts a budget cap, who the post is open to, distance and video; items sort, condition and price), and the
-pills that narrow the page (All on Housing, All | Has a room | Looking for a room on Roommate, All and the item
-categories on Marketplace); the labels and the pills slide up under the title as the page scrolls. It opens on Housing, a swipe or a tap on the label above the
+**Housing | Roommate | Marketplace** (apartments, roommates, items) (`src/app/(tabs)/housing.tsx`): the big "Find"
+title, then three levels and nothing more (`src/components/discovery-bar.tsx`, shared with Events): the three labels
+with the sliding aurora underline; one search field (searching the page on screen) with the filter button beside it,
+which counts the filters on; and one row of small round pills, see-through with a hairline ring (the one in force in
+UniBuzz blue, ring and words, on the soft blue fill): the page's few quick filters, each applied with one tap (Furnished, Pets OK, Within 1 mi on Housing; Has a room, Looking for a room on Roommate; Furniture, Textbooks,
+Electronics, Kitchen on Marketplace), a chip for every other choice in force (video tours included), which a tap
+drops, and Clear.
+Everything else is in the sheet the button opens (`src/components/housing/filter-sheet.tsx`, one set of choices per
+page, a dot by each group in force, Reset, applied on "Show results"): apartments sort, bedrooms, rent, distance from
+campus, furnished, pets and video tours; roommate posts has a room or looking, a budget cap, who the post is open to,
+distance and video; items every category, sort, condition and price. The chips and the counts come from
+`packages/shared/src/discovery.ts` (`exploreQuickFilters`, `exploreActiveChips`). The bar slides up under the title as
+the page scrolls. It opens on Housing, a swipe or a tap on the label above the
 pager moves to Roommate or the Marketplace and back (silently, by tap or swipe, like Home's), and the floating "+"
 (no haptic either) follows the visible page ("List an apartment",
 "Create roommate post" or "Sell an item"). The order comes from `HOUSING_SECTIONS` in `packages/shared/src/constants.ts`.
 The Marketplace page is the old Marketplace tab's grid, moved in whole (`src/components/housing/marketplace-section.tsx`):
-the same cards and hearts, its categories in the pills row, its search (applied
+the same cards and hearts, its categories in the quick filters and the sheet, its search (applied
 once typing pauses, a spinner in the box meanwhile) and "Sell an item", a page at a time as it scrolls; the old
 `/marketplace` address redirects to it.
 Profiles work like Instagram too: a Follow button (it reads "Following" once you follow), follower / following
@@ -349,7 +355,13 @@ the top; every other says which address it needs; an account no university verif
 Classes, Saved, Liked and Listings each have a setting (Everyone, Friends, Only me; friends are people you follow who
 follow you back), changed from the line at the top of the tab or in Settings → Privacy; by default Classes is Friends and
 Saved, Liked and Listings are Only me (migration 37). A visitor without access gets no tab for that section at all (the
-pager has one page per tab they get), while you always see all six. Hold one of your own posts or reels in the grid (or use
+pager has one page per tab they get), while you always see all six. A sideways swipe changes tab only when it is meant
+(`intendedSwipe` in `src/components/profile/profile-view.tsx`): dragged at least 18% of the page (56 points at least),
+or flicked at 500 points a second or more over at least 24 points; anything less springs back to the open tab. Each tab
+keeps its page mounted and its grid loaded once, and the bottom bar's collapse starts over on each tab. A square never
+changes under a finger (no dimming: a touch that turns into a scroll or a swipe would flash it), a tap is a touch that
+moved under 10 points (`TAP_SLOP` in `src/components/profile/profile-tile.tsx`: a slide inside a square no longer opens the
+post), and its picture is kept decoded in memory as well as on disk, so a square drawn again shows it at once. Hold one of your own posts or reels in the grid (or use
 its ••• menu) to pin it to the top of your profile, three at most. Someone else's profile has Follow, Message and More
 (block, report) instead. It needs migration 18 (`supabase/migrations/20260927000000_profile_page.sql`: usernames, the
 who-can-see settings, `profile_classes`, likes readable only through functions, `profile_stats`, `post_view_counts` and
@@ -520,17 +532,18 @@ the grid is the newest posts and reels, the suggestions the newest people, and t
 ## Events
 
 The fourth tab (`src/app/(tabs)/events.tsx`) is the campus's calendar: the big "Events" title with Saved at its right,
-For you | All events above a pager (Explore's layout: the labels, the inbox-style search box and one row of pills slide
-up under the title as a page scrolls), and the floating "+" to publish. Beside the search box is the Marketplace's
-round filter button (with a count of the choices in force); it opens a sheet (`src/components/events/event-filter-sheet.tsx`)
+For you | All events above a pager, with Explore's three levels (DiscoveryBar: the labels, one search field with the
+filter button, one row of chips, all sliding up under the title as a page scrolls), and the floating "+" to publish.
+The quick filters narrow both pages with a tap: Today, This week, Weekend (`eventDateRange` in packages/shared, on the
+campus's clock; Upcoming is none of them), then a chip for each event type in force, a tap from being dropped, and
+Clear. The filter button counts the choices in force and opens a sheet (`src/components/events/event-filter-sheet.tsx`)
 with When and Event type: Academic, Career, Social, Sports, Music, Arts, Tech, Wellness, Cultural, Service, Faith and
-Other (`EVENT_CATEGORIES`), any number of them, and "Show results". The pills narrow both pages too: when (Upcoming,
-Today, This week, Weekend: `eventDateRange` in packages/shared, on the campus's clock), then, after a hairline, the
-event types in force, each a tap away from being dropped. **For you** (`src/components/events/for-you-events-section.tsx`) ranks the campus's upcoming
+Other (`EVENT_CATEGORIES`), any number of them, Reset and "Show results", and Your interests at the bottom. **For you** (`src/components/events/for-you-events-section.tsx`) ranks the campus's upcoming
 events for the person (`rankEvents`: picked interests, the categories they keep saving and opening, the organizations
-they follow, how soon, how many others saved it; signed out, soonest and most saved first), asks what they are into
-the first time (the chips save `event_interests` and re-rank at once) and suggests organizations to follow while they
-follow few. **All events** (`all-events-section.tsx`) is time order under day headings ("Today", "Tomorrow", "Thu,
+they follow, how soon, how many others saved it; signed out, soonest and most saved first), asks once for interests
+in a single line that opens `src/app/events/interests.tsx` and can be dismissed for good (remembered on the phone,
+`src/lib/event-interests.ts`; the filter sheet's Your interests stays; a save re-ranks at once), and suggests
+organizations to follow while they follow few. **All events** (`all-events-section.tsx`) is time order under day headings ("Today", "Tomorrow", "Thu,
 Nov 12"), a page at a time. Each row (`event-card.tsx`) is the picture or the category's glyph, the title, when, where,
 who is holding it and the category, with the bookmark; cancelled events stay, greyed and marked. An event's page
 (`src/app/events/[id].tsx`) adds the organization with a Follow pill, Save | Share | Directions, the registration link
