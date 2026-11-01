@@ -11,10 +11,11 @@
 // students (confirmed txstate.edu accounts made by the admin API, no email sent) do what the app does: one creates an
 // organization and an event (pending: the other student and the signed-out see nothing), staff verify it (as the
 // database, since the console's two-factor check needs an enrolled authenticator), everyone sees it, the other student
-// saves it, follows the organization, opens it, searches for it; a photo uploaded to events/<author>/ is accepted and one
-// from another folder refused; the feeds table is closed; a calendar is synced twice with the service role (three
-// events, then one dropped and one changed). Everything made is deleted at the end and every table's row count compared
-// with the start. With --restore, 61 is rolled back afterwards (its rollback file and the removal of its _migrations row).
+// saves it, follows the organization, opens it, searches for it, picks interests and finds them after signing in
+// afresh; a photo uploaded to events/<author>/ is accepted and one from another folder refused; the feeds table is
+// closed; a calendar is synced twice with the service role (three events, then one dropped and one changed). Everything
+// made is deleted at the end and every table's row count compared with the start. With --restore, 61 is rolled back
+// afterwards (its rollback file and the removal of its _migrations row).
 import fs from "node:fs";
 import { register } from "node:module";
 import { createClient } from "@supabase/supabase-js";
@@ -48,6 +49,7 @@ const MIGRATION = "20261113000000_events.sql";
 const { parseIcs } = await import(new URL("packages/shared/src/events/ics.ts", ROOT));
 const { planFeedSync } = await import(new URL("packages/shared/src/events/sync.ts", ROOT));
 const { applyFeedSyncPlan, listFeedEventsForSync, listFeedsToSync, recordFeedSync } = await import(new URL("packages/shared/src/queries/event-sync.ts", ROOT));
+const { getEventInterests, setEventInterests } = await import(new URL("packages/shared/src/queries/events.ts", ROOT));
 // The list's read, as packages/shared/src/queries/events.ts sends it.
 const EVENT_SELECT = "id, university_id, organization_id, feed_id, title, description, starts_at, ends_at, all_day, location, category, image_url, registration_url, source, status, save_count, click_count, created_by, created_at, organization:organizations!events_organization_id_fkey(id, name, kind, avatar_url, verified)";
 
@@ -124,7 +126,7 @@ async function student(name) {
   const c = createClient(URL_, ANON, opts);
   const s = await c.auth.signInWithPassword({ email, password });
   if (s.error) throw new Error(s.error.message);
-  return { id: data.user.id, c };
+  return { id: data.user.id, c, email, password };
 }
 const TX = await val("select id from public.universities where email_domain = 'txstate.edu'");
 let ann, bob;
@@ -175,6 +177,17 @@ await check("Bob saves it, follows the organization, opens it twice (counted onc
   const found = await must(bob.c.from("events").select("id").textSearch("tsv", "robot", { type: "websearch", config: "simple" }).eq("university_id", TX));
   expect(found.some((r) => r.id === ev.id), "not found by word");
   expect((await must(ann.c.from("event_saves").select("user_id").eq("event_id", ev.id))).length === 0, "Ann reads Bob's save");
+});
+await check("Bob picks interests with the app's own query; signed in afresh (the app reopened) they are still there, a new pick replaces them, Ann reads none", async () => {
+  await setEventInterests(bob.c, bob.id, ["tech", "music"]);
+  const reopened = createClient(URL_, ANON, opts);
+  const s = await reopened.auth.signInWithPassword({ email: bob.email, password: bob.password });
+  if (s.error) throw new Error(s.error.message);
+  const kept = await getEventInterests(reopened, bob.id);
+  expect([...kept].sort().join() === "music,tech", `kept: ${JSON.stringify(kept)}`);
+  await setEventInterests(reopened, bob.id, ["career"]);
+  expect((await getEventInterests(bob.c, bob.id)).join() === "career", "not replaced");
+  expect((await must(ann.c.from("event_interests").select("category"))).length === 0, "Ann reads Bob's interests");
 });
 await check("the feeds table is closed to students; the console functions answer them 'not found'", async () => {
   await refused(bob.c.from("event_feeds").select("*"), "42501|permission denied");

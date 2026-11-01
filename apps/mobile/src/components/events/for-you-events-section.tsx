@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View, type FlatList } from "react-native";
 import { useRouter } from "expo-router";
-import { eventDateRange, FOR_YOU_EVENTS_POOL, getForYouContext, listEvents, listOrganizations, rankEvents, setEventInterests, type EventCategory, type EventSummary, type ForYouContext, type Organization } from "@apartment-book/shared";
+import { eventDateRange, FOR_YOU_EVENTS_POOL, getForYouContext, listEvents, listOrganizations, rankEvents, type EventSummary, type ForYouContext, type Organization } from "@apartment-book/shared";
 import { Avatar } from "@/components/avatar";
 import { Icon } from "@/components/icon";
 import { ErrorBanner, Loading, useAppearingCells } from "@/components/ui";
@@ -14,11 +14,11 @@ import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useTabBarInset } from "@/lib/tab-bar";
 import { useTabReselect } from "@/lib/tab-reselect";
+import { dismissInterestsPrompt, interestsPromptDismissed, onEventInterestsChanged } from "@/lib/event-interests";
 import { radius, space, textStyle } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { EventCard, useToggleSavedEvent } from "./event-card";
 import { EventsEmpty, iso, RowGap, type EventsPageProps } from "./events-page";
-import { InterestChips } from "./interest-chips";
 import { OrganizationFollowButton } from "./organization-follow-button";
 
 /** Under this many follows the page still suggests organizations. */
@@ -29,8 +29,10 @@ const NO_CONTEXT: ForYouContext = {};
  * For you, the Events tab's first page: the campus's upcoming events in the order the ranking puts them for this person
  * (rankEvents in packages/shared: picked interests, what they keep saving and opening, the organizations they follow,
  * how soon, how many others saved it), narrowed by the bar's filters like the All page. Signed out, or with nothing
- * known yet, it is soonest-and-most-saved first. The first time, the page asks what they are into: picking chips saves
- * the interests and re-ranks at once; while they follow few organizations, a row of the campus's to follow sits under it.
+ * known yet, it is soonest-and-most-saved first. Until interests are picked it asks once, in a single line that opens
+ * Your interests and can be dismissed for good (lib/event-interests.ts); the filter sheet keeps Your interests after
+ * that, and a save there re-ranks the page at once. While they follow few organizations, a row of the campus's to
+ * follow sits at the top.
  */
 export function ForYouEventsSection({ active, topInset, onScroll, universityId, timeZone, q, dateFilter, categories }: EventsPageProps) {
   const colors = useColors();
@@ -52,29 +54,27 @@ export function ForYouEventsSection({ active, topInset, onScroll, universityId, 
   }, [me, universityId, timeZone, q, dateFilter, categories]);
   const organizations = useQuery(() => (me ? listOrganizations(supabase, { universityId, limit: 12 }) : Promise.resolve([] as Organization[])), [me, universityId]);
 
-  // The interests as picked on this page, ahead of the next load: the list re-ranks the moment a chip is tapped.
-  const [picked, setPicked] = useState<Set<string> | null>(null);
+  const interests = query.data?.ctx.interests ?? [];
+  // Interests saved in Your interests (the prompt below, or the filter sheet): ranked again with them at once.
+  const refreshQuery = query.refresh;
+  useEffect(() => onEventInterestsChanged(() => void refreshQuery()), [refreshQuery]);
+  /** Whether this account dismissed the interests prompt on this phone (null until known, so it never flashes in). */
+  const [promptDismissed, setPromptDismissed] = useState<boolean | null>(null);
   useEffect(() => {
-    setPicked(null);
+    setPromptDismissed(null);
+    if (!me) return;
+    let live = true;
+    void interestsPromptDismissed(me).then((dismissed) => live && setPromptDismissed(dismissed));
+    return () => {
+      live = false;
+    };
   }, [me]);
-  const interests = picked ?? new Set(query.data?.ctx.interests ?? []);
-  const toggleInterest = useCallback(
-    (c: EventCategory) => {
-      if (!me) return router.push("/(auth)/login");
-      const next = new Set(interests);
-      if (next.has(c)) next.delete(c);
-      else next.add(c);
-      setPicked(next);
-      void setEventInterests(supabase, me, [...next] as EventCategory[]).catch(() => undefined);
-    },
-    [me, interests, router],
-  );
   // The follows as they are now (the shared set), so following an organization lifts its events at once.
   const ranked = useMemo(() => {
     if (!query.data) return [];
-    const ctx: ForYouContext = { ...query.data.ctx, interests: [...interests], followedOrganizationIds: [...follows] };
+    const ctx: ForYouContext = { ...query.data.ctx, followedOrganizationIds: [...follows] };
     return rankEvents(query.data.events, ctx, query.data.now);
-  }, [query.data, interests, follows]);
+  }, [query.data, follows]);
 
   const inset = useMemo(() => listInset(topInset), [topInset]);
   const listRef = useRef<FlatList<EventSummary>>(null);
@@ -91,19 +91,35 @@ export function ForYouEventsSection({ active, topInset, onScroll, universityId, 
     }
   }, [query.refresh, organizations.refresh, me]);
 
-  const askInterests = Boolean(me) && query.data !== null && interests.size === 0;
+  const askInterests = Boolean(me) && query.data !== null && interests.length === 0 && promptDismissed === false;
   const suggest = Boolean(me) && follows.size < FEW_FOLLOWS && (organizations.data?.length ?? 0) > 0;
   const header =
     askInterests || suggest ? (
       <View style={styles.header}>
         {askInterests ? (
-          <View style={styles.block}>
-            <View style={styles.blockHead}>
-              <Icon name="sparkles-outline" sf="sparkles" size={16} color={colors.brand} />
-              <Text style={styles.blockTitle}>What are you into?</Text>
-            </View>
-            <Text style={styles.blockHint}>Pick a few and For you follows.</Text>
-            <InterestChips picked={interests} onToggle={toggleInterest} />
+          // One line, asked once: it opens Your interests, and its × puts it away for good.
+          <View style={styles.prompt}>
+            <Pressable onPress={() => router.push("/events/interests" as never)} accessibilityRole="button" accessibilityLabel="Pick your interests" accessibilityHint="For you puts them first" style={({ pressed }) => [styles.promptMain, pressed && { opacity: 0.7 }]}>
+              <Icon name="sparkles-outline" sf="sparkles" size={18} color={colors.brand} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.promptTitle}>Pick your interests</Text>
+                <Text style={styles.promptHint}>For you puts them first</Text>
+              </View>
+              <Icon name="chevron-forward" sf="chevron.right" size={14} color={colors.faint} />
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setPromptDismissed(true);
+                if (me) dismissInterestsPrompt(me);
+              }}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Not now"
+              accessibilityHint="You can pick interests later from Filters"
+              style={({ pressed }) => [styles.promptClose, pressed && { opacity: 0.6 }]}
+            >
+              <Icon name="close" sf="xmark" size={13} weight="semibold" color={colors.muted} />
+            </Pressable>
           </View>
         ) : null}
         {suggest ? (
@@ -168,7 +184,12 @@ const useStyles = makeStyles((colors) => ({
   block: { marginHorizontal: space.lg, padding: space.md, gap: space.sm, borderRadius: 18, borderCurve: "continuous", backgroundColor: colors.panel },
   blockHead: { flexDirection: "row", alignItems: "center", gap: 6 },
   blockTitle: { ...textStyle.headline, color: colors.text },
-  blockHint: { ...textStyle.footnote, color: colors.muted, marginTop: -4 },
+  // For you's interests prompt: one line on the panel, with its × at the right.
+  prompt: { marginHorizontal: space.lg, flexDirection: "row", alignItems: "center", borderRadius: 16, borderCurve: "continuous", backgroundColor: colors.panel },
+  promptMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11, paddingLeft: 14, paddingRight: 6 },
+  promptTitle: { ...textStyle.subheadline, fontWeight: "600", color: colors.text },
+  promptHint: { ...textStyle.footnote, color: colors.muted },
+  promptClose: { width: 40, alignSelf: "stretch", alignItems: "center", justifyContent: "center" },
   orgRow: { gap: space.sm, paddingVertical: 2 },
   orgCard: { width: 140, padding: space.md, gap: space.sm, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: colors.card, alignItems: "center" },
   orgPerson: { alignItems: "center", gap: 2, alignSelf: "stretch" },

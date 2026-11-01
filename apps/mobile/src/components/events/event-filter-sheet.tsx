@@ -1,21 +1,12 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { EVENT_CATEGORIES, EVENT_DATE_FILTERS, type EventCategory, type EventDateFilter } from "@apartment-book/shared";
+import { DEFAULT_EVENT_FILTERS, EVENT_CATEGORIES, EVENT_DATE_FILTERS, type EventCategory, type EventDateFilter, type EventFilterChoice } from "@apartment-book/shared";
 import { Icon, type IconName } from "@/components/icon";
 import { Sheet, SheetFooter, SheetHeader } from "@/components/sheet";
 import { Button } from "@/components/ui";
 import { radius, space } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { categoryIcon } from "./event-glyphs";
-
-/** What narrows the Events tab beyond its search box: when, and which types of event (any of them; none is every type). */
-export type EventFilterChoice = { dateFilter: EventDateFilter; categories: readonly EventCategory[] };
-export const DEFAULT_EVENT_FILTERS: EventFilterChoice = { dateFilter: "any", categories: [] };
-
-/** How many choices differ from the defaults: the badge on the filter button. Each event type picked counts. */
-export function eventFilterCount(choice: EventFilterChoice): number {
-  return (choice.dateFilter === DEFAULT_EVENT_FILTERS.dateFilter ? 0 : 1) + choice.categories.length;
-}
 
 /** The types in EVENT_CATEGORIES' order, whatever order they were tapped in, so the query and the badge read the same. */
 function ordered(picked: ReadonlySet<EventCategory>): EventCategory[] {
@@ -25,10 +16,12 @@ function ordered(picked: ReadonlySet<EventCategory>): EventCategory[] {
 /**
  * The sheet behind the filter button beside the Events search box, the Marketplace's filter sheet for events: When
  * (Upcoming, Today, This week, Weekend: one of them) and Event type (Academic, Career, Social, Sports, Music, Arts and the
- * rest: any number, each with its glyph). Choices are drafted here and sent on "Show results"; Reset puts the defaults
- * back. Both pages of the tab, For you and All events, show the result.
+ * rest: any number, each with its glyph), a dot by a group's name while it holds a choice. Choices are drafted here and
+ * sent on "Show results"; Reset puts the defaults back. Both pages of the tab, For you and All events, show the result.
+ * At the bottom, Your interests (`onEditInterests`, signed in): what For you puts first, a setting rather than a panel on
+ * the page.
  */
-export function EventFilterSheet({ open, value, onApply, onClose }: { open: boolean; value: EventFilterChoice; onApply: (next: EventFilterChoice) => void; onClose: () => void }) {
+export function EventFilterSheet({ open, value, onApply, onClose, onEditInterests }: { open: boolean; value: EventFilterChoice; onApply: (next: EventFilterChoice) => void; onClose: () => void; onEditInterests?: () => void }) {
   const styles = useStyles();
   const colors = useColors();
   const [when, setWhen] = useState<EventDateFilter>(value.dateFilter);
@@ -80,13 +73,31 @@ export function EventFilterSheet({ open, value, onApply, onClose }: { open: bool
         }
       />
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <Text style={styles.group}>When</Text>
+        <View style={styles.groupRow}>
+          <View style={styles.groupTitle}>
+            <Text style={[styles.group, styles.groupInRow]}>When</Text>
+            {when !== DEFAULT_EVENT_FILTERS.dateFilter ? <View style={styles.groupDot} accessibilityLabel="On" /> : null}
+          </View>
+        </View>
         <View style={styles.chips}>{EVENT_DATE_FILTERS.map((f) => chip(f.value, f.label, when === f.value, () => setWhen(f.value)))}</View>
         <View style={styles.groupRow}>
-          <Text style={[styles.group, styles.groupInRow]}>Event type</Text>
+          <View style={styles.groupTitle}>
+            <Text style={[styles.group, styles.groupInRow]}>Event type</Text>
+            {types.size > 0 ? <View style={styles.groupDot} accessibilityLabel="On" /> : null}
+          </View>
           <Text style={styles.groupNote}>{types.size === 0 ? "All types" : `${types.size} picked`}</Text>
         </View>
         <View style={styles.chips}>{EVENT_CATEGORIES.map((c) => chip(c.value, c.label, types.has(c.value), () => toggle(c.value), categoryIcon(c.value).name))}</View>
+        {onEditInterests ? (
+          <Pressable onPress={onEditInterests} accessibilityRole="button" accessibilityLabel="Your interests" accessibilityHint="What For you puts first" style={({ pressed }) => [styles.interests, pressed && { opacity: 0.7 }]}>
+            <Icon name="sparkles-outline" sf="sparkles" size={18} color={colors.brand} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.interestsTitle}>Your interests</Text>
+              <Text style={styles.groupNote}>What For you puts first</Text>
+            </View>
+            <Icon name="chevron-forward" sf="chevron.right" size={14} color={colors.faint} />
+          </Pressable>
+        ) : null}
       </ScrollView>
       <SheetFooter style={styles.footer}>
         <Button title="Show results" size="large" onPress={() => onApply({ dateFilter: when, categories: ordered(types) })} />
@@ -102,6 +113,11 @@ const useStyles = makeStyles((colors) => ({
   group: { fontSize: 13, fontWeight: "600", color: colors.muted, marginTop: space.md, marginBottom: 8, textTransform: "uppercase" },
   groupRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginTop: space.md, marginBottom: 8 },
   groupInRow: { marginTop: 0, marginBottom: 0 },
+  groupTitle: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // A group with a choice in force.
+  groupDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.brand },
+  interests: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: space.lg, paddingVertical: 12, paddingHorizontal: 14, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: colors.input },
+  interestsTitle: { fontSize: 15, fontWeight: "600", color: colors.text },
   groupNote: { fontSize: 13, color: colors.faint },
   // The same pills as Explore's filter sheet, with the type's glyph.
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },

@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { getEventInterests, setEventInterests, type EventCategory } from "@apartment-book/shared";
 import { InterestChips } from "@/components/events/interest-chips";
 import { Button, Loading } from "@/components/ui";
+import { emitEventInterestsChanged } from "@/lib/event-interests";
 import { alertWithHaptic, hapticSuccess } from "@/lib/haptics";
 import { errorText, useQuery } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
@@ -28,6 +29,7 @@ export default function EventInterestsScreen() {
     setBusy(true);
     try {
       await setEventInterests(supabase, user!.id, [...picked!] as EventCategory[]);
+      emitEventInterestsChanged();
       hapticSuccess();
       router.back();
     } catch (e) {

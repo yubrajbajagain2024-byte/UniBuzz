@@ -3,7 +3,7 @@ import { RefreshControl, Text, View, type FlatList, type NativeScrollEvent, type
 import { ADS_EVERY, interleaveAds, KM_PER_MILE, listApartments, videosFor, type ApartmentWithOwner } from "@apartment-book/shared";
 import { SponsoredCard } from "@/components/ads/sponsored-card";
 import { isAdRow, useAdImpressions, useFeedAds, type AdRow } from "@/lib/use-feed-ads";
-import type { RoomFilters } from "@/components/housing/filter-sheet";
+import type { RoomFilterChoice } from "@apartment-book/shared";
 import { HousingCard } from "@/components/housing/housing-card";
 import { FEED_HEADER_PADDING } from "@/components/post-card";
 import { EmptyState, ErrorBanner, Loading, useAppearingCells } from "@/components/ui";
@@ -27,7 +27,7 @@ function CardGap() {
  * reporting its scroll through `onScroll`. The search (`q`) and the campus come from the Housing screen's own bar, which
  * also owns the "+" button.
  */
-export function ApartmentsSection({ topInset, onScroll, q, campus, filters, filtered, active = true }: { topInset: number; onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void; q: string; campus: "mine" | "all"; filters: RoomFilters; filtered: boolean; active?: boolean }) {
+export function ApartmentsSection({ topInset, onScroll, q, campus, filters, filtered, active = true }: { topInset: number; onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void; q: string; campus: "mine" | "all"; filters: RoomFilterChoice; filtered: boolean; active?: boolean }) {
   const colors = useColors();
   const { user, profile } = useSession();
   const universityId = campus === "all" ? undefined : (profile?.university_id ?? undefined);
