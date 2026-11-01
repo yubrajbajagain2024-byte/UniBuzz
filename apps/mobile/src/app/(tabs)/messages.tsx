@@ -13,6 +13,7 @@ import { useQuery } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useTabBarInset } from "@/lib/tab-bar";
+import { useCollapseOnScroll } from "@/lib/tab-bar-collapse";
 import { radius, space } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { useMessageRequests } from "@/lib/use-message-requests";
@@ -249,10 +250,17 @@ export default function MessagesScreen() {
   // The hairline under the top bar shows once the page on screen has moved; a new list (search, another pill) starts at the top.
   const listKey = searching ? "search" : filter;
   useEffect(() => setScrolledPages(NOT_SCROLLED), [listKey]);
-  const onListScroll = useCallback((p: InboxPage, e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const next = e.nativeEvent.contentOffset.y > 0;
-    setScrolledPages((prev) => (prev[p] === next ? prev : { ...prev, [p]: next }));
-  }, []);
+  // The bottom bar collapses to its Messages button on a flick down the page on screen and comes back as it scrolls back
+  // (lib/tab-bar-collapse.ts); never while a search is open, its field and the keyboard in use.
+  const trackTabBar = useCollapseOnScroll(focused && !searching, ORDER.indexOf(page));
+  const onListScroll = useCallback(
+    (p: InboxPage, e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const next = e.nativeEvent.contentOffset.y > 0;
+      setScrolledPages((prev) => (prev[p] === next ? prev : { ...prev, [p]: next }));
+      if (p === pageRef.current) trackTabBar(Math.max(0, e.nativeEvent.contentOffset.y), e.nativeEvent);
+    },
+    [trackTabBar],
+  );
   const scrolled = scrolledPages[page];
 
   const onPull = useCallback(async () => {

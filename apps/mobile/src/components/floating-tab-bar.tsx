@@ -120,11 +120,11 @@ function restOf(groups: Group[], index: number): { left: number; width: number }
  * (tabPress can be prevented, tabLongPress is sent), each tab keeps its icon, title and badge from its screen options,
  * and screen readers hear "Home, tab, 1 of 5". Everything that moves runs on the UI thread (Reanimated).
  *
- * The bar collapses like Reddit's while a feed scrolls on (lib/tab-bar-collapse.ts): it narrows to a circle as tall
+ * The bar collapses like Reddit's on a fast flick down a feed (lib/tab-bar-collapse.ts): it narrows to a circle as tall
  * as itself and shrinks a little from its bottom left corner, the row sliding so the tab on screen stays in the circle's
  * middle while the labels and the capsule fade, so only that tab's icon is left. The row keeps its measured width the
- * whole time (the bar clips it), so no tab is laid out again while it moves, and the other tabs fade as it goes. Home,
- * Explore and Events collapse it, each to its own icon. A tap on the circle brings the whole bar back. A copy of the bar
+ * whole time (the bar clips it), so no tab is laid out again while it moves, and the other tabs fade as it goes. Every
+ * tab's lists collapse it, each to its own icon. A tap on the circle brings the whole bar back. A copy of the bar
  * (`onSelect`, over the full-screen viewer) never collapses.
  */
 export function FloatingTabBar({ state, descriptors, emitter, navigateToTab, action, onSelect, ...rest }: TabBarProps & { action?: TabBarAction; onSelect?: (routeKey: string, focused: boolean) => void }) {
