@@ -35,9 +35,10 @@ export type CollapsingHeader = {
  * rest reports -height and the inset is added back before the clamp.
  *
  * `onFollowedScroll`, when given, hears every scroll event of the list the bar follows, with how far that list is from
- * its top (the inset taken off): Home hands it to the bottom bar's collapse (lib/tab-bar-collapse.ts).
+ * its top (the inset taken off) and the event itself: Home, Explore and Events hand it to the bottom bar's collapse
+ * (lib/tab-bar-collapse.ts), which reads the event's timestamp for the scroll's speed.
  */
-export function useCollapsingHeader(pages: number, height: number, initial = 0, onFollowedScroll?: (fromTop: number) => void): CollapsingHeader {
+export function useCollapsingHeader(pages: number, height: number, initial = 0, onFollowedScroll?: (fromTop: number, e: NativeScrollEvent) => void): CollapsingHeader {
   const scrollYs = useRef<Animated.Value[]>([]);
   const selectors = useRef<Animated.Value[]>([]);
   if (scrollYs.current.length !== pages) {
@@ -115,7 +116,7 @@ export function useCollapsingHeader(pages: number, height: number, initial = 0, 
             const was = fromTopJs.current[page] ?? 0;
             fromTopJs.current[page] = fromTop;
             hiddenJs.current[page] = Math.min(Math.max((hiddenJs.current[page] ?? 0) + fromTop - was, 0), Math.max(1, heightRef.current));
-            if (page === selected.current) followedScroll.current?.(fromTop);
+            if (page === selected.current) followedScroll.current?.(fromTop, e.nativeEvent);
             if (!revealed.current || page !== selected.current) return;
             // The page on screen scrolls down after a reveal: the bar is handed back to it.
             const delta = y - before;

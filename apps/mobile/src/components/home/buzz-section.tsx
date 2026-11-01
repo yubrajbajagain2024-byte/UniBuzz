@@ -229,7 +229,7 @@ function Feed({ active, topInset }: { active: boolean; topInset: number }) {
         useNativeDriver: true,
         listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
           const y = e.nativeEvent.contentOffset.y;
-          trackTabBar(Math.max(0, ios ? y + insetRef.current : y));
+          trackTabBar(Math.max(0, ios ? y + insetRef.current : y), e.nativeEvent);
         },
       }),
     [scrollY, trackTabBar, ios],

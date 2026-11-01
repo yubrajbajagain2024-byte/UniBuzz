@@ -23,3 +23,4 @@ export * from "./types/database";
 export * from "./types/models";
 export * from "./schemas";
 export * from "./queries";
+export * from "./scroll-collapse";

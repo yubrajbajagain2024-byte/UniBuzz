@@ -131,13 +131,18 @@ so it stretches a touch in flight and settles as it lands. The new tab's symbol 
 to its plain look with no bounce, and the tabs make room for the capsule, GroupMe style, on a critically damped spring
 (`src/components/floating-tab-bar.tsx`, on Reanimated); every tab's list and floating button keeps `tabBarInset` clear
 under it. (FloatingTabBar can still hold an action in the middle, `action`, which the capsule passes behind but never
-stops on; the app's bar has none.) While a page of Home (For you, Buzz), Explore or Events scrolls on, the bar collapses
-like Reddit's (iOS 26's tab bar minimising): it narrows to a circle at the bottom left holding just that tab's icon
-(Home's, Explore's or Events'), the other tabs fading as it goes, and the "+" (or Buzz's pen) becomes its twin at the
-bottom right (the same circle at the same height, as far in from the right edge as the circle is from the left); the
-moment the page scrolls back, or reaches its top, the whole bar returns the same way. A tap on the circle brings it back
-too, and so do another page of the tab, another tab or a screen reader, which always gets the whole bar. Messages and
-Profile keep the whole bar (`src/lib/tab-bar-collapse.ts`). Search is the magnifier beside the bell in Home's top bar, which opens `src/app/search.tsx` (below); the people search the share sheet's Find people
+stops on; the app's bar has none.) The bar collapses like Reddit's (iOS 26's tab bar minimising), by the speed of the
+scroll: reading at any pace keeps the whole bar, and only a deliberate flick down a page of Home (For you, Buzz), Explore,
+Messages (not while searching), Events or your Profile, at 700 points a second or more over at least 32 points
+(`createScrollCollapse` in `packages/shared/src/scroll-collapse.ts`, from each scroll event's native timestamp, tuned by
+`TAB_BAR_SCROLL` in `src/lib/tab-bar-collapse.ts`; first values, to be tuned on a phone), narrows it to a circle at the
+bottom left holding just that tab's icon, the other tabs fading as it goes, and the "+" (or Buzz's pen) becomes its twin at the
+bottom right (the same circle at the same height, as far in from the right edge as the circle is from the left). Once
+the page scrolls back 24 points (at any speed; smaller turns are ignored), or reaches its top, the whole bar returns the same
+way, springing on the UI thread (at once with Reduce Motion). A bounce past a list's end is not a scroll back, and once
+the bar has come back a new flick has to wait a quarter of a second, so one gesture never flickers it. A tap on the
+circle brings it back too, and so do another page of the tab, another tab or a screen reader, which always gets the whole
+bar. Reels, a profile pushed over a screen and the full-screen viewers never collapse it. Search is the magnifier beside the bell in Home's top bar, which opens `src/app/search.tsx` (below); the people search the share sheet's Find people
 and a profile's Find friends push is `src/app/find-people.tsx`. The Notifications bell in the top-right corner of Home's floating top bar opens every
 notification the database keeps for you (`src/app/notifications.tsx`: likes, comments and replies, follows,
 saves of your listings, places near campus, newest first; new messages and Snaps stay in Messages, with its unread

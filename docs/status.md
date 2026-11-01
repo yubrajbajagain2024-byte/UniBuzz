@@ -107,6 +107,15 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   Website button are live on the website; the hours need **migration 57** on production (with the release above) and
   the app's part an EAS update, both the owner's approval. Until 57, the website shows and offers no hours. See
   [branches/business-hours.md](branches/business-hours.md).
+- **The bottom bar collapses by the speed of a scroll** (`nav-velocity-collapse`, 2026-11-01, pushed, no PR yet):
+  reading at any pace keeps the whole bar; a flick of 700 points a second or more, over at least 32 points, collapses it
+  to the tab's icon at the bottom left with the "+" as its twin; 24 points back, or the top, restores it. On every tab's
+  lists, Messages and Profile now included (`packages/shared/src/scroll-collapse.ts`, offline tests). Checked on the iOS
+  Simulator (iPhone 17 Pro) with scripted drags on Orbit, Marketplace, Events, Messages and Profile: 278 to 625 points a
+  second kept the bar, 1,643 to 1,786 collapsed it, small turns were ignored, one change per gesture, sideways photo
+  swipes at over 2,000 never counted, short lists never flicker. **Not tried on a real iPhone**; Buzz (its first-buzz
+  notice was up), Reduce Motion and a profile with posts not tried. The values still need tuning on a phone. Reaches
+  testers with an EAS update (owner's approval).
 - **The full-screen viewer in the app**: no "Add comment…" bar, the tab bar kept in view, the rail nearer the right edge
   (PR #61); closing from a later reel shrinks into the post it was opened from (PR #62); the zoom at Instagram's speed
   and no blur under the words (PR #63); Buzz's photos and video in the same viewer, anonymously (PR #64); swiping up and
