@@ -30,7 +30,6 @@ import { openHomeSection } from "@/lib/home-section";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useTabBarInset } from "@/lib/tab-bar";
-import { useCollapseOnScroll } from "@/lib/tab-bar-collapse";
 import { useTabReselect } from "@/lib/tab-reselect";
 import { BuzzViewerList } from "@/components/buzz/media";
 
@@ -71,14 +70,21 @@ const META_FRESH_MS = 5 * 60_000;
 
 type Row = { id: string };
 
-export function BuzzSection({ active, topInset }: { active: boolean; topInset: number; onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void }) {
+/**
+ * Home's scroll wiring for Buzz's list (see useCollapsingHeader): its `onScroll` writes the list's offset into `scrollY`,
+ * which slides Home's top bar away (`barShift`) and, from the same value, Buzz's filter bar under it; the bottom bar's
+ * collapse hears it through Home too.
+ */
+export type BuzzScroll = { onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void; scrollY: Animated.Value; barShift: Animated.AnimatedInterpolation<number> };
+
+export function BuzzSection({ active, topInset, scroll }: { active: boolean; topInset: number; scroll: BuzzScroll }) {
   const { user, loading } = useSession();
   const gate = useBuzzGate();
   const tabBar = useTabBarInset();
 
   let content = null;
   if (!loading && !user) content = active ? <Centered topInset={topInset} bottom={tabBar}><BuzzSignedOutPanel /></Centered> : null;
-  else if (gate.status === "accepted") content = <Feed active={active} topInset={topInset} />;
+  else if (gate.status === "accepted") content = <Feed active={active} topInset={topInset} scroll={scroll} />;
   else if (!active) content = null;
   else if (gate.status === "required")
     content = (
@@ -126,7 +132,7 @@ const CardRow = memo(function CardRow({ id }: { id: string }) {
   );
 });
 
-function Feed({ active, topInset }: { active: boolean; topInset: number }) {
+function Feed({ active, topInset, scroll }: { active: boolean; topInset: number; scroll: BuzzScroll }) {
   const router = useRouter();
   const focused = useIsFocused();
   const tabBar = useTabBarInset();
@@ -214,32 +220,26 @@ function Feed({ active, topInset }: { active: boolean; topInset: number }) {
     if (r) openComposer(r.promptId ? { promptId: r.promptId } : undefined);
   }, [active, composerRequest, openComposer]);
 
-  /* ---------- the filter bar slides away as the feed scrolls down; the bottom bar collapses ---------- */
-
-  const scrollY = useRef(new Animated.Value(ios ? -insetTop : 0)).current;
-  // The bottom bar collapses to its Home button as the feed scrolls on and comes back as it scrolls back, as on For you
-  // (lib/tab-bar-collapse.ts); the FAB rides down beside it. The inset is read through a ref, so the handler, and the
-  // list's native wiring, stay the same when the filter bar is measured.
-  const trackTabBar = useCollapseOnScroll(active && focused);
-  const insetRef = useRef(insetTop);
-  insetRef.current = insetTop;
-  const onScroll = useMemo(
-    () =>
-      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-        useNativeDriver: true,
-        listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-          const y = e.nativeEvent.contentOffset.y;
-          trackTabBar(Math.max(0, ios ? y + insetRef.current : y), e.nativeEvent);
-        },
-      }),
-    [scrollY, trackTabBar, ios],
-  );
+  /*
+   * ---------- Reddit's header: Home's top bar and the filter bar slide away together as the feed scrolls down ----------
+   * The list writes its offset into Home's value for Buzz (`scroll`): Home's bar slides away by its own height once the
+   * filter bar has slid under it, and the filter bar rides up with it, so the feed runs on up to the screen's top edge,
+   * under the status bar. Both come back the moment it scrolls up. The bottom bar's collapse hears it through Home.
+   */
+  const { onScroll, scrollY, barShift } = scroll;
+  // Where this list rests (its inset is Home's bar and the filter bar), not Home's bar alone, until it reports.
+  useEffect(() => {
+    if (ios) scrollY.setValue(-insetTop);
+    // Once, as the list mounts: later inset changes are placed below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const hidden = useMemo(() => {
     const clampTop = { inputRange: [0, 1], outputRange: [0, 1], extrapolateLeft: "clamp" as const, extrapolateRight: "extend" as const };
     const fromTop = ios ? Animated.add(scrollY, insetTop).interpolate(clampTop) : scrollY.interpolate(clampTop);
     return Animated.diffClamp(fromTop, 0, Math.max(1, filterHeight));
   }, [scrollY, ios, insetTop, filterHeight]);
-  const barY = useMemo(() => Animated.multiply(hidden, -1), [hidden]);
+  // Its own slide under Home's bar, plus Home's bar's slide away.
+  const barY = useMemo(() => Animated.add(Animated.multiply(hidden, -1), barShift), [hidden, barShift]);
   // iOS: a list resting at the top stays there when the inset above it changes (the filter bar measured, a new text size).
   const restingY = useRef<number | null>(null);
   const placedInset = useRef(insetTop);

@@ -10,10 +10,10 @@ import { SlidingTabs } from "@/components/sliding-tabs";
 import { hapticTap } from "@/lib/haptics";
 import { SCOPE_TOGGLE_SHOWN, useHomeScope } from "@/lib/home-scope";
 import { useSession } from "@/lib/session";
-import { auroraGradient, radius } from "@/lib/theme";
+import { auroraGradient, radius, statusShade } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { ProfileMenuSheet } from "./profile-menu";
-import { BuzzBarLayer, BuzzLabelMask, BuzzMeGlyph, BuzzStatusStripLayer, useBuzzBar } from "./buzz-top-bar";
+import { BuzzBarLayer, BuzzLabelMask, BuzzMeGlyph, BuzzStatusShade, useBuzzBar } from "./buzz-top-bar";
 import { phosphor } from "@/lib/palette";
 import { Icon } from "@/components/icon";
 import { GlassBackdrop } from "@/components/glass";
@@ -136,6 +136,30 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
   const solid = useMemo(() => (pageWidth > 0 ? scrollX.interpolate({ inputRange: SOLID.map((_, i) => i * pageWidth), outputRange: SOLID, extrapolate: "clamp" }) : null), [pageWidth, scrollX]);
   // Near Buzz the bar is Phosphor (see useBuzzBar): light words, a lime underline, no photo of you at rest.
   const buzzBar = useBuzzBar(scrollX, pageWidth, section);
+  /**
+   * Nothing opaque stays under the status bar: once the bar slides away the feed runs on to the screen's top edge, under
+   * the clock, as Reddit's does, clearly visible. Only a faint tint of the bar's colour (statusShade) stays behind the
+   * status bar's icons, and only while something is under them: it fades in as the bar's own background leaves the status
+   * bar (`away`, 0 to 1 over the last status-bar height of its slide), in the theme's colour, Buzz's near Buzz, and not at
+   * all over Reels' video (`solid`).
+   */
+  const [barHeight, setBarHeight] = useState(insets.top + HOME_TOP_BAR_HEIGHT);
+  const measure = (e: LayoutChangeEvent) => {
+    onLayout(e);
+    const h = e.nativeEvent.layout.height;
+    setBarHeight((prev) => (Math.abs(prev - h) > 0.5 ? h : prev));
+  };
+  const away = useMemo(() => {
+    const status = Math.max(insets.top, 1);
+    const height = Math.max(barHeight, status + 1);
+    return translateY.interpolate({ inputRange: [-height, status - height, 0], outputRange: [1, 0, 0], extrapolate: "clamp" });
+  }, [translateY, barHeight, insets.top]);
+  const shadeOpacity = useMemo(() => {
+    const look = solid ?? new Animated.Value(overVideo ? 0 : 1);
+    // Near Buzz its own shade takes over (BuzzStatusShade): the two never mix to grey.
+    const plain = buzzBar.layer ? Animated.subtract(1, buzzBar.layer) : 1;
+    return Animated.multiply(Animated.multiply(away, look), plain);
+  }, [away, solid, overVideo, buzzBar.layer]);
   const onBuzz = buzzBar.near && !overVideo;
   const fg = overVideo ? colors.onMedia : onBuzz ? phosphor.ink : colors.text;
   const dim = overVideo ? colors.onMediaMuted : onBuzz ? phosphor.ink3 : colors.muted;
@@ -166,7 +190,7 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
 
   return (
     <>
-      <Animated.View onLayout={onLayout} pointerEvents={overVideo ? "box-none" : "auto"} style={[styles.bar, { paddingTop: insets.top + TOP_GAP, transform: [{ translateY }] }]}>
+      <Animated.View onLayout={measure} pointerEvents={overVideo ? "box-none" : "auto"} style={[styles.bar, { paddingTop: insets.top + TOP_GAP, transform: [{ translateY }] }]}>
         <Animated.View pointerEvents="none" style={[styles.solid, { opacity: solid ?? (overVideo ? 0 : 1) }]} />
         <BuzzBarLayer layer={buzzBar.layer} />
         <View style={styles.row}>
@@ -210,10 +234,9 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
           </View>
         ) : null}
       </Animated.View>
-      {/* The status bar's strip stays put while the bar slides away under it, as on iOS: the wordmark and the feed pass
-          beneath the clock, never through it. Faded with the bar's solid look, so Reels keeps its video edge to edge. */}
-      <Animated.View pointerEvents="none" style={[styles.statusStrip, { height: insets.top, opacity: solid ?? (overVideo ? 0 : 1) }]} />
-      <BuzzStatusStripLayer layer={buzzBar.layer} height={insets.top} />
+      {/* Behind the status bar, only a faint tint (see `away`): the feed passes under the clock, to the screen's top edge. */}
+      <Animated.View pointerEvents="none" style={[styles.statusShade, { height: insets.top, opacity: shadeOpacity }]} />
+      <BuzzStatusShade layer={buzzBar.layer} away={away} height={insets.top} />
       <ProfileMenuSheet visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </>
   );
@@ -259,7 +282,7 @@ const useStyles = makeStyles((colors, scheme) => ({
   bar: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "transparent" },
   // The solid look behind the rows, safe area included, its hairline on the bar's bottom edge: faded by the pager (see `solid`).
   solid: { position: "absolute", top: 0, left: 0, right: 0, bottom: -StyleSheet.hairlineWidth, backgroundColor: colors.bar, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  statusStrip: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 11, backgroundColor: colors.bar },
+  statusShade: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 11, experimental_backgroundImage: statusShade(colors.bar) },
   row: { height: ROW, flexDirection: "row", alignItems: "center", paddingHorizontal: SIDE_PAD },
   side: { width: SIDE, height: ROW, alignItems: "center", justifyContent: "center" },
   // Your photo and, near Buzz, the glyph in its place: layers over each other in the same square.

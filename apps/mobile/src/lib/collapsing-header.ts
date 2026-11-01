@@ -12,6 +12,11 @@ export type CollapsingHeader = {
   translateY: Animated.AnimatedInterpolation<number>;
   /** The `onScroll` of list `page` (give it `scrollEventThrottle={16}` too). The same handler every time, so the list attaches it once. */
   onScroll: (page: number) => (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  /**
+   * List `page`'s scroll offset as `onScroll(page)` writes it, on the native side: for a page that slides a bar of its own
+   * below this one from the same scroll (Buzz's filters), and that sets it to where its list rests (its own inset).
+   */
+  scrollValue: (page: number) => Animated.Value;
   /** Which list the bar follows from now on; -1 for none (the bar then stays in place). */
   select: (page: number) => void;
   /** Bring the bar back wherever the lists are (the pager starts to move, say); it follows the chosen list again once that list scrolls down. */
@@ -132,8 +137,9 @@ export function useCollapsingHeader(pages: number, height: number, initial = 0, 
   );
 
   const hidden = useCallback(() => (revealed.current || selected.current < 0 ? 0 : (hiddenJs.current[selected.current] ?? 0)), []);
+  const scrollValue = useCallback((page: number) => scrollYs.current[page]!, []);
 
-  return useMemo(() => ({ translateY, onScroll, select, reveal, hidden }), [translateY, onScroll, select, reveal, hidden]);
+  return useMemo(() => ({ translateY, onScroll, scrollValue, select, reveal, hidden }), [translateY, onScroll, scrollValue, select, reveal, hidden]);
 }
 
 /** FlatList with native-driven scroll events (Animated.event with useNativeDriver), keeping its item type. */
