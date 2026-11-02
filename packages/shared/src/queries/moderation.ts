@@ -1,5 +1,6 @@
 import type { Client } from "../types/models";
 import { MESSAGE_MEDIA_BUCKET } from "../message-media";
+import { getMyStaffAccess } from "./admin";
 
 export type ReportTargetType = "apartment" | "item" | "roommate" | "profile" | "message" | "comment" | "post" | "buzz" | "buzz_comment" | "story";
 export type ReportReason = "spam" | "scam" | "harassment" | "inappropriate" | "other";
@@ -120,8 +121,20 @@ async function removeMyMessageMedia(supabase: Client, userId: string): Promise<v
   }
 }
 
-/** Permanently delete the signed-in user's account, their uploads and everything they posted. Sign out afterwards. */
+/** Shown to the only owner of the staff who tries to delete their account (the database refuses it too, with the same meaning). */
+export const LAST_OWNER_DELETE_MESSAGE = "You are the only owner on the UniBuzz staff. Make someone else an owner in CampConnect Admin before deleting your account.";
+
+/**
+ * Permanently delete the signed-in user's account, their uploads and everything they posted. Sign out afterwards.
+ * Staff accounts are checked first: the database refuses to delete the only owner and asks staff for a verified
+ * second factor (CampConnect Admin's migration 15, live), and that refusal must come before any upload is removed.
+ */
 export async function deleteMyAccount(supabase: Client): Promise<void> {
+  const staff = await getMyStaffAccess(supabase).catch(() => null);
+  if (staff) {
+    if (!staff.mfaVerified) throw new Error("Two-factor authentication required");
+    if (staff.lastOwner) throw new Error(LAST_OWNER_DELETE_MESSAGE);
+  }
   const { data } = await supabase.auth.getUser();
   if (data.user) {
     await removeMyUploads(supabase, data.user.id).catch(() => {});

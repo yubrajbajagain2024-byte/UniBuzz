@@ -22,6 +22,7 @@ const REST = [
   "20261109000000_media_server_fields.sql",
   "20261109000100_business_hardening.sql",
   "20261110000000_business_hours.sql",
+  "20261115000000_console_business.sql",
 ];
 // 62 (story actions) goes to production on its own too (story-actions-rollout.test.mjs); it is not part of this rehearsal.
 const AHEAD = ["20261114000000_story_actions.sql"];

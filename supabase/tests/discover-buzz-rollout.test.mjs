@@ -21,6 +21,7 @@ const REST = [
   "20261109000000_media_server_fields.sql",
   "20261109000100_business_hardening.sql",
   "20261110000000_business_hours.sql",
+  "20261115000000_console_business.sql",
 ];
 // Others going to production on their own, left out until they are live. 62 (story actions) went live on 2026-11-02,
 // so production's state includes it; none waits today.

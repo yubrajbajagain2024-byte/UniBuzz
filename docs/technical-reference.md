@@ -13,7 +13,7 @@ Built with **Next.js 16 + TypeScript + Tailwind** on top of **Supabase** (Postgr
 | Housing (Apartments and Roommates) | One main tab, labelled Explore in the bar, two slidable halves with the Marketplace as a third page after them (see [Housing](#housing)). Postgres tables with PostGIS: campus and listing coordinates, `apartments_within(university, radius)` for "within 2 miles of campus", distance filled by a trigger. Map view and location picker use Leaflet + OpenStreetMap (free); address search uses Nominatim through `/api/geocode` |
 | Events | The fourth tab (Home, Explore, Messages, **Events**, Profile). A campus's events from two sources: the university's own calendars (ICS and RSS feeds staff add in the console at `/admin/events`; the website syncs them, `apps/web/src/lib/events-server`) and verified clubs, student organizations and departments, which any student can create and staff verify; an unverified organization's events show to its members alone. **For you** ranks upcoming events with one deterministic formula (`rankEvents` in `packages/shared/src/events.ts`: picked interests and the categories someone keeps saving, followed organizations, how soon, how many saved or opened it); **All events** is time order under day headings; both take the date pills (Upcoming, Today, This week, Weekend), the category pills and the search box. Save, Share (the website's `/events/<id>`), a registration link, and follow an organization. Migration 61 (`20261113000000_events.sql`): `organizations`, `organization_members`, `organization_follows`, `event_feeds` (closed to the API), `events`, `event_saves`, `event_interests`, `event_engagement`, `universities.timezone`, the `events_console_*` functions. See [Events](#events) |
 | Marketplace | Same listing pattern with a `category` field; the third page of the Explore tab. No payments |
-| Messaging | Supabase Realtime over `conversations`, `conversation_members`, `messages`. Device push tokens stored in `device_push_tokens` for the future apps. The app's inbox has two pages, Chats and Groups, side by side like Home's (a swipe or a tap on a label, with the same knock), and All | Unread | Requests pills: a direct chat that someone you don't follow started with you sits under Requests until you reply (or follow them). No table holds this: it is read off the chats, `follow_stats` and whether you have written in each (`conversationsWrittenIn` in `packages/shared/src/queries/messages.ts`), so it is the same on every device |
+| Messaging | Supabase Realtime over `conversations`, `conversation_members`, `messages`. Device push tokens stored in `device_push_tokens` for the future apps. The app's inbox has two pages, Chats and Groups, side by side like Home's (a swipe or a tap on a label, with the same knock), and All \| Unread \| Requests pills: a direct chat that someone you don't follow started with you sits under Requests until you reply (or follow them). No table holds this: it is read off the chats, `follow_stats` and whether you have written in each (`conversationsWrittenIn` in `packages/shared/src/queries/messages.ts`), so it is the same on every device |
 | Calls | Audio and video calls in every chat, direct and group (class groups included), from the app (see [Calls](#calls)). The database keeps the call (`calls`, `call_participants`, migration 35) and writes its row into the chat (`messages.call`, following the call live: "Calling…", "In progress", "Audio call · 3:24", "Missed video call"); the sound and picture travel over [LiveKit](https://livekit.io), with a token minted by the `livekit-token` Edge Function only for someone the database has in the call. The website shows the call rows and says calls are made from the app |
 | Activity status | Instagram style, the same in the app and on the website: under the other person's name at the top of a direct chat (the Messages page and the desktop chat dock on the website), a small green dot and "Active now" while they are online, otherwise when they were last active ("Active 1 min ago", "Active 3 hours ago", "Active yesterday" for the day before today, "Active 2 days ago", redrawn every 30 seconds and asked again every minute while the chat is open, and whenever they send a message), or no status at all when there is nothing to show (the website's chat header then says "Direct message", as before). Group chats keep "N members". Who is online comes from Supabase Realtime Presence on a private channel, `presence:active` (`PRESENCE_TOPIC`), that only signed-in people who show their activity status may join (the green dots on avatars, the app's online friends row and Roommates' Online now come from it too, leaving out people blocked either way, from `blocked_either_way_ids()`). The app going to the background stamps the time and stops appearing there at once (no timer runs in the background on a phone, so a grace would last until the server dropped the silent connection); a hidden browser tab does the same 15 seconds later on a computer (a quick look at another tab changes nothing for anyone), and at once on a phone or tablet or when the browser freezes the page. Back in front, they stamp first and appear once that stamp confirms the status is still shown; after a dropped connection that outlasted the last stamp they stamp again before appearing; in front, the time is stamped and the block list read again every minute. Logging out leaves the channel at once. Exact last-active times live in `user_activity`, a table the API can neither read nor write: `activity_status()` answers only while you show your own status (hide yours and you see nobody's), they show theirs and neither of you has blocked the other: for anyone you share a chat with, whether they are recent (so "Active now" can show, as their green dot does anyway), and their time, cut to the minute, only once they have written to you in a chat you are both in, since you joined it (an empty chat, a group someone made with everyone, or what a group said before you joined is not enough). "Active now" needs presence and a recent stamp both, since anyone on the channel could claim presence for someone else. Settings → "Show your activity status" turns it off: it deletes your time, and your devices stop marking messages "Delivered" (people see "Seen" once you read something new). Only that switch turns it back on (`set_show_active_status()`), so a stale Settings save from an installed old build cannot undo a hide. Migration 22 (`supabase/migrations/20261011000000_activity_status.sql`) adds the table, the `touch_activity()`, `activity_status()`, `blocked_either_way_ids()` and `set_show_active_status()` functions and the Realtime Authorization policies of the channel, retires the public `profiles.last_seen_at` (emptied and never written again; old builds still read it), makes `mark_delivered_all()` do nothing while you hide your status and `mark_conversation_read()` change nothing when there is nothing new to read (opening a chat no longer tells its members when you had the app open), dates every message no later than when it is sent (one dated ahead used to stay "new" and keep "Seen" and "Delivered" moving), lets chat members change only their own receipts and a group's name (no moving a membership into another chat, no turning a direct chat into a group), lets a notification be changed (`read_at` only) or deleted only once it shows, and grants `profiles` and `notifications` to the API column by column so their system columns (`xmin`, `xmax`, which traced who wrote or locked a row and when, down to anonymous Buzz replies and when they were made) are unreadable. The labels live in `packages/shared/src/activity.ts`, the presence store and the queries in `packages/shared/src/queries/presence.ts` |
 | Login | `@txstate.edu` only. The allowed domains live on the `universities` table (`email_domain`), the sign-up form validates against them, a `before insert` trigger on `auth.users` rejects everything else, and new users are attached to their university automatically **Forgot password** (website and app) emails a link that lands on the website's `/reset-password`, which reads the link's session from the address and sets the new password; a link lasts an hour and one use, and an expired one says so (`packages/shared/src/auth.ts`). The app's own `reset-password` screen serves a link that opens the app and Settings → Safety & Security → Change password. Supabase's answers are said in plain words that never reveal whether an account exists ("That email and password don't match" for a wrong password and an unknown email alike). |
@@ -153,6 +153,75 @@ SUPABASE_ACCESS_TOKEN=… STAGING_SUPABASE_REF=<staging ref> node supabase/tests
 The staging project (`campconnect-staging`) is built like production: this repo's migrations through 36, the two in `supabase/applied-outside-repo`, then 37 onwards, and the seed.
 
 **Presence (migration 40).** Testing presence on staging showed that Supabase Realtime checks a private channel's join with a broadcast read, so migration 22's presence policy, which allowed only presence reads, refused every join: "Active now" and the green dots stay empty. Migration 40 (`20261102000000_presence_channel_join.sql`) allows reading that one topic for either kind, still only for people who show their status (sending stays presence only, so there are no broadcasts to read); `supabase/tests/presence-channel-join.test.mjs` checks it.
+
+## CampConnect Admin: Analytics and Business
+
+Two sections of CampConnect Admin, the separate staff app (`apps/admin`), backed by migration 63
+(`supabase/migrations/20261115000000_console_business.sql`); branch notes in
+[branches/admin-analytics-business.md](branches/admin-analytics-business.md) while it is not merged. The student website
+has none of it.
+
+- **Who may use it.** Owners and admins of the staff (not suspended) in a session signed in with a second factor: the
+  app's own gate (`requireStaff(path, { minRole: "admin" })` through `requireConsoleAdmin()`, and the proxy's aal2
+  check), each server action (`requireStaffAction`) and each `console_*` function (`ts_require_admin`, migration 41)
+  check it. Moderators do not see the two items in the navigation, and the pages send them back to the overview. The
+  Business section also needs the UniBuzz admin role on the account (`profiles.role`, set by `grant_role()`), because
+  it reuses Business v2's review functions; a staff admin without it sees a notice saying so.
+- **Analytics** (`apps/admin/src/app/(admin)/analytics/page.tsx`): Platform, Ads and Revenue views; 7, 30, 90 or 365
+  days ending today, in Central-time days; a campus filter (Platform and Ads); every number against the previous range.
+  - Platform (`console_analytics_overview`): students and sign-ups (with a running total), engaged students (wrote
+    anything: posts, reels, comments, likes, messages, follows, listings, items), active students now / today / 7 /
+    30 days and day by day, engagement by kind and day, campuses, the last hour. Buzz counts as posts only, never as
+    people, and by when students could see it (`visible_at`), never by when it was written. Business accounts and staff are not counted.
+  - Ads (`console_analytics_ads`): impressions, reach, clicks and click rate, saves and messages from ads, business
+    profile visits, by day and placement; top 10 campaigns; campaigns by status; review times.
+  - Revenue (`console_analytics_revenue`): booked (payments recorded), voided, net, earned (each payment spread over the
+    days it paid for), by day, placement, category and advertiser; the pipeline (ads in review and their budgets).
+  - "Live" asks again every 30 seconds while the tab is in front (on by default, per browser); charts have a table view
+    and keyboard reading; each section downloads as CSV (built in the browser, formulas defused).
+- **Business** (`apps/admin/src/app/(admin)/business/`):
+  - Overview: businesses to review, ads in review, running and scheduled, money this month, campaigns ending in three
+    days.
+  - Advertisers: search (name, owner, email, id), filters by standing; a business's page has the standing actions
+    (approve, reject, suspend, reinstate, back to review, with the note the business reads), Verified Partner, the
+    profile, the advertiser accounts (team, linking to each person's page under Users, where suspensions are), campaigns, payments,
+    students' reports (never who reported), the team's notes (never shown to the business) and its audit log.
+  - Campaigns: in review first, oldest first; each campaign's page shows the creative as students would see it,
+    what still stops it, the money (budget, rate-card price, payments, how much of the paid period has run), its numbers
+    by day and its history. Actions: approve with the payment (the rate-card price filled in to start from), reject,
+    pause and resume, change the dates and budget (with a reason the business reads; payments already recorded keep their period),
+    record a further payment (for the rest of the ad; its note is for the team only).
+  - Drafting for a business: the team can prepare a draft for an approved business; it lands in the business's Ads
+    Manager and its owner and admins are told. The business adds photos if it likes and submits it: the spend stays its
+    decision.
+  - Payments: the ledger across businesses (30 / 90 / 365 days or all, in force or voided, search), totals, void with a
+    reason (an ad left with no payment in force ends), CSV.
+  - Pricing: the rate card, a daily price per campus for each placement and a minimum per ad. A campaign's price is the
+    sum over its placements of rate × days × campuses, at least the highest minimum. A suggestion only: approving records
+    what was actually paid. Businesses do not see it.
+  - Reports and Audit: Business v2's students' reports queue and business audit log, as in the portal's admin pages.
+    The team's own records here (notes, rate changes, the note on a further payment) go to the app's Audit log
+    (`staff_audit_log`), never to the business's.
+- **Migration 63** (`supabase/migrations/20261115000000_console_business.sql`, rollback beside it): the `console_*`
+  functions above; three closed tables (`ad_rates`, `business_admin_notes`, `platform_activity_daily`); the
+  `platform-activity` pg_cron job (every 15 minutes, last at :59) that keeps active students per campus and day as
+  numbers only, because `user_activity` keeps one time per student and only for those who show their activity status.
+  It changes no existing object. Its functions read Business v2's tables, so it comes after 49, 50 and 56, and the
+  release's rollback undoes it first. The rollback refuses while notes or rates exist (export, then delete them).
+  `console_audit()` writes the team's records to CampConnect Admin's `staff_audit_log` where it exists (production) and
+  to the staff console's `audit_log` on a database built from this repo alone.
+- **Reused, not rebuilt:** Business v2's `admin_review_business`, `admin_set_verified`, `admin_approve_ad`,
+  `admin_reject_ad`, `admin_pause_ad`, `admin_resume_ad`, `admin_list_business_reports`,
+  `admin_resolve_business_report`, `business_audit`, `business_daily_stats`. The portal's own admin pages
+  (`/business/admin`) are unchanged. The admin app holds no service key for this, so before approving a Reels ad it
+  does not measure the video at Mux as the portal's admin page does: the reviewer looks at it, and the database
+  approves no video ad without migration 55's guard.
+- **Before migration 63 is applied**: both sections say they need it; the rest of the app works as before.
+
+Checks: `supabase/tests/console-business.test.mjs` (who may call, every number, the campaign and payment rules, the rate
+card, re-running and the rollback, on this repo's schema and production's), `packages/shared/tests/ad-ops.test.mjs`
+(money as typed, Central-time fields, CSV), and `apps/admin/e2e/admin.mjs` (with a staff account and its authenticator
+key: every view of both sections, shown to owners and admins only).
 
 ## Video tours (Mux)
 
