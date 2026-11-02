@@ -11,7 +11,7 @@ import {
   type SharedItem,
   type SharedSourceMessage,
 } from "../message-media";
-import { sharedPostOf } from "../share";
+import { sharedPostOf, shareFailureOf, type ShareFailure } from "../share";
 import { conversationTitle } from "../utils";
 
 export const MESSAGE_SELECT = "*, sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)";
@@ -338,29 +338,35 @@ export async function sendMessage(
 }
 
 /**
- * The share sheet's Send: one direct message per friend, each carrying the same snapshot and the optional note. Friends
- * are sent one after another; the ones that failed come back so the sheet can say who did not get it.
+ * The share sheet's Send: one message per chat, each carrying the same snapshot and the optional note: a direct chat
+ * with each friend in `recipientIds` (made if it does not exist yet), and each group chat in `conversationIds` the
+ * sender belongs to. Chats are sent one after another. The ones that failed come back by id (a friend's id, or the
+ * group chat's) with the reason the database gave (shareFailureOf), so the sheet can say who did not get it and why:
+ * someone who may not see it is not a network failure.
  */
 export async function sendSharedPost(
   supabase: Client,
-  input: { senderId: string; recipientIds: string[]; sharedPost: SharedPost; note?: string },
-): Promise<{ sent: string[]; failed: string[] }> {
+  input: { senderId: string; recipientIds: string[]; conversationIds?: string[]; sharedPost: SharedPost; note?: string },
+): Promise<{ sent: string[]; failed: string[]; reasons: Record<string, ShareFailure> }> {
   // Through the same reader the chat uses, so the stored snapshot always has the canonical link and https pictures.
   const sharedPost = sharedPostOf(input.sharedPost);
   if (!sharedPost) throw new Error("There is nothing to share.");
   const sent: string[] = [];
   const failed: string[] = [];
+  const reasons: Record<string, ShareFailure> = {};
   const content = (input.note ?? "").trim();
-  for (const recipientId of input.recipientIds) {
+  const chats = [...input.recipientIds.map((id) => ({ id, direct: true })), ...(input.conversationIds ?? []).map((id) => ({ id, direct: false }))];
+  for (const chat of chats) {
     try {
-      const conversationId = await getOrCreateDirectConversation(supabase, recipientId);
+      const conversationId = chat.direct ? await getOrCreateDirectConversation(supabase, chat.id) : chat.id;
       await sendMessage(supabase, { conversationId, senderId: input.senderId, content, sharedPost });
-      sent.push(recipientId);
-    } catch {
-      failed.push(recipientId);
+      sent.push(chat.id);
+    } catch (error) {
+      failed.push(chat.id);
+      reasons[chat.id] = shareFailureOf(error, sharedPost);
     }
   }
-  return { sent, failed };
+  return { sent, failed, reasons };
 }
 
 export async function getOrCreateDirectConversation(supabase: Client, otherUserId: string): Promise<string> {

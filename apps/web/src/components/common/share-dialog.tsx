@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Link2, Search, Share, Users, X } from "lucide-react";
-import { APP_NAME, listFriends, type ProfileSummary, type SharedPost } from "@apartment-book/shared";
+import { APP_NAME, listFriends, sharedPostNoun, shareFailureSummary, type ProfileSummary, type SharedPost } from "@apartment-book/shared";
 import { sendSharedPostAction } from "@/lib/actions/messages";
 import { isOptimizableImage } from "@/lib/images";
 import { createClient } from "@/lib/supabase/client";
@@ -23,11 +23,6 @@ export type ShareDialogProps = {
   open: boolean;
   onClose: () => void;
   currentUser: { id: string } | null;
-  /**
-   * The post is not Global (a campus post). The database refuses its card in a chat with anyone who cannot see it, and a
-   * send reports only who missed out, not why, so a failed send names that reason first.
-   */
-  restricted?: boolean;
 };
 
 const NOTE_MAX = 500;
@@ -54,7 +49,7 @@ export function ShareDialog(props: ShareDialogProps) {
   return createPortal(<ShareSheet {...props} />, document.body);
 }
 
-function ShareSheet({ sharedPost, url, onClose, currentUser, restricted }: Omit<ShareDialogProps, "open">) {
+function ShareSheet({ sharedPost, url, onClose, currentUser }: Omit<ShareDialogProps, "open">) {
   const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -178,8 +173,9 @@ function ShareSheet({ sharedPost, url, onClose, currentUser, restricted }: Omit<
         const failed = picked.filter((p) => result.failed.includes(p.id));
         setPicked(failed);
         setStatus("idle");
-        const names = failed.map((p) => p.full_name).join(", ");
-        setNotice(restricted ? `Could not send to ${names}. Some people in this chat can't see this post.` : `Could not send to ${names}. Try again.`);
+        // Why, as the database said it: someone who may not see a campus post is not a network failure (shareFailureOf).
+        const why = shareFailureSummary(failed.map((p) => ({ name: p.full_name, group: false, ...(result.reasons[p.id] ?? { kind: "other" as const, message: "Try again." }) })), sharedPostNoun(sharedPost));
+        setNotice(`Could not send to ${failed.map((p) => p.full_name).join(", ")}. ${why}`);
         return;
       }
       setStatus("sent");

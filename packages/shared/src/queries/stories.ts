@@ -3,7 +3,9 @@ import type { PostAudience } from "../constants";
 import type { Story, StoryAuthor } from "../stories";
 import type { Database } from "../types/database";
 import type { ListingVideo, PhotoMeta } from "../types/models";
+import { sharedPostFromStory, shareFailureOf, STORY_ACTIONS_NOT_READY } from "../share";
 import { isMissingRelation } from "./profile-page";
+import { getOrCreateDirectConversation, sendMessage } from "./messages";
 
 type Client = SupabaseClient<Database>;
 
@@ -128,15 +130,44 @@ export async function listStoryViewers(supabase: Client, storyId: string): Promi
     .map((r) => ({ viewer: r.viewer!, at: r.created_at, liked: liked.has(r.viewer!.id) }));
 }
 
+/**
+ * A like or a mute on a database without migration 62 has no table to write to, and PostgREST answers "Could not find
+ * the table 'public.story_likes' in the schema cache": said instead in the person's words, as Events' EVENTS_NOT_READY.
+ */
+function storyActionError(error: { code?: string; message: string }): Error {
+  return isMissingRelation(error) ? new Error(STORY_ACTIONS_NOT_READY) : Object.assign(new Error(error.message), error);
+}
+
 /** A heart on someone else's story; liking twice is one like. The database refuses one's own and any story out of sight. */
 export async function likeStory(supabase: Client, userId: string, storyId: string): Promise<void> {
   const { error } = await supabase.from("story_likes").upsert({ story_id: storyId, user_id: userId }, { onConflict: "story_id,user_id", ignoreDuplicates: true });
-  if (error) throw error;
+  if (error) throw storyActionError(error);
 }
 
 export async function unlikeStory(supabase: Client, userId: string, storyId: string): Promise<void> {
   const { error } = await supabase.from("story_likes").delete().eq("story_id", storyId).eq("user_id", userId);
-  if (error) throw error;
+  if (error) throw storyActionError(error);
+}
+
+/**
+ * "Send message" under someone's story: the words, with the story as a "Replied to a story" card, in the direct chat
+ * with its author (made if it does not exist yet), where the author's inbox shows it. The database checks the story
+ * (still there, the sender in its audience, no block) and rewrites the card from it (guard_message_story_card,
+ * migration 62); a refusal is thrown with its reason in the person's words (shareFailureOf). Returns the chat's id.
+ */
+export async function sendStoryReply(supabase: Client, input: { senderId: string; story: Pick<Story, "id" | "author" | "photo" | "video">; text: string }): Promise<string> {
+  const text = input.text.trim();
+  if (!text) throw new Error("Write a reply first.");
+  if (input.story.author.id === input.senderId) throw new Error("This is your own story.");
+  const conversationId = await getOrCreateDirectConversation(supabase, input.story.author.id);
+  const card = sharedPostFromStory(input.story, true);
+  try {
+    await sendMessage(supabase, { conversationId, senderId: input.senderId, content: text, sharedPost: card });
+  } catch (error) {
+    const failure = shareFailureOf(error, card);
+    throw failure.kind === "other" ? error : new Error(failure.message);
+  }
+  return conversationId;
 }
 
 /** The people whose stories the caller has muted (none before migration 62): their stories stay out of the tray. */
@@ -154,7 +185,7 @@ export async function setStoryMuted(supabase: Client, userId: string, authorId: 
   const { error } = muted
     ? await supabase.from("story_mutes").upsert({ user_id: userId, author_id: authorId }, { onConflict: "user_id,author_id", ignoreDuplicates: true })
     : await supabase.from("story_mutes").delete().eq("user_id", userId).eq("author_id", authorId);
-  if (error) throw error;
+  if (error) throw storyActionError(error);
 }
 
 /** The author takes a story down before its time. */

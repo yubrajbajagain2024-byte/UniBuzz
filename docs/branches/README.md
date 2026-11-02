@@ -9,7 +9,7 @@ current", rules 2 and 3).
 | Branch | Owner | What it is | State | Details |
 | --- | --- | --- | --- | --- |
 | `main` | everyone, via PRs | integration branch; **every push deploys production** | — | [../status.md](../status.md) |
-| `ankur/dev` | Ankur | Ankur's feature line | merged (PRs #35, #38, #41, and #50 on 2026-10-28: Buzz threaded replies, top reply, prompt threads, categories, migrations 51 to 54, not on production); since 2026-11-01 **a PR open**: the offline rehearsal for 44, 46 and 51 to 54 going live ahead of the release, and PR #54's fix to 53 | [ankur/dev.md](ankur/dev.md) |
+| `ankur/dev` | Ankur | Ankur's feature line | merged (PRs #35, #38, #41, and #50 on 2026-10-28: Buzz threaded replies, top reply, prompt threads, categories, migrations 51 to 54, not on production); and PR #84 (2026-11-02 03:57 UTC): the offline rehearsal for 44, 46 and 51 to 54 going live ahead of the release, and PR #54's fix to 53 (none of them on production yet) | [ankur/dev.md](ankur/dev.md) |
 | `ankur/owner-moderation` | Ankur | Buzz v2 and Trust & Safety | merged (PR #37) | [ankur/owner-moderation.md](ankur/owner-moderation.md) |
 | `step-admin` | Yubraj | **CampConnect Admin**, the separate staff app, and migrations 14–18 | **not merged**; merge plan in its `docs/step-admin-merge-plan.md` | [step-admin.md](step-admin.md) |
 | `step-1-brand-shell` | Yubraj | first brand-and-shell pass (2026-09-07) | **1 commit never merged**; superseded | [step-1-brand-shell.md](step-1-brand-shell.md) |
@@ -46,7 +46,8 @@ current", rules 2 and 3).
 | `settings-redesign` | Sunil | The app's Settings as a menu of sections, each its own screen, a searchable university picker, Delete account in Account Management (no migration) | merged (PR #80, 2026-11-01) | this table and docs/status.md (one PR) |
 | `discovery-redesign` | Sunil | Explore's and Events' search and filters in three levels, the advanced choices in the sheets, For you's interests asked once, Events' plain error before migration 61, a steady Profile grid (no migration) | merged (PR #81, 2026-11-01 23:18 UTC) | this table and docs/status.md (one PR) |
 | `migration-61-live` | Sunil | Migration 61 recorded as live on production (2026-11-01 23:31 UTC) and taken out of the rollout rehearsals' "ahead" lists (no migration of its own) | merged (PR #82, 2026-11-01 23:48 UTC) | this table and docs/migrations.md (one PR) |
-| `ankur-autonomy` | Sunil | Ankur's sessions work end to end without asking (code, tests, pushes, his own merges, development and staging deploys); production writes wait on Sunil's approval, each on its own (no migration) | open | `CLAUDE.md` (Workflow) and docs/decisions.md |
+| `ankur-autonomy` | Sunil | Ankur's sessions work end to end without asking (code, tests, pushes, his own merges, development and staging deploys); production writes wait on Sunil's approval, each on its own (no migration) | merged (PR #83) | `CLAUDE.md` (Workflow) and docs/decisions.md |
+| `story-actions-fix` | Sunil | Story likes, replies and shares: the real reason for a refused share, group chats in the app's share sheet, the heart's last tap winning, readable errors before migration 62; 62's offline suite and a staging probe; 62 applied on staging, then on production on 2026-11-02 04:32 UTC | open | docs/status.md and docs/migrations.md (one PR) |
 
 **Safe to delete once their owner agrees**, because `main` has all their work (what is left on them
 is an old `CLAUDE.md` copy or, on `business-portal-prelaunch`, the stray `app.json`):

@@ -157,7 +157,7 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
   }
 
   /** The share sheet: send it to friends as a chat card, or "Share to…" the link with the system sheet. */
-  const share = () => shareSheet.open(sharedPostFromFeedPost(post, media), { url: `${SITE_URL}${path}`, label: `${author.full_name} on ${APP_NAME}`, restricted: audience !== "global" });
+  const share = () => shareSheet.open(sharedPostFromFeedPost(post, media), { url: `${SITE_URL}${path}`, label: `${author.full_name} on ${APP_NAME}` });
 
   async function message() {
     if (!user) return needLogin();

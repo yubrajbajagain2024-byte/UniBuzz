@@ -97,3 +97,46 @@ export function storyAge(createdAt: string, now: number = Date.now()): string {
   if (minutes < 60) return `${minutes}m`;
   return `${Math.floor(minutes / 60)}h`;
 }
+
+/**
+ * What a heart's requests came to: `value` is what the database now holds, `attempted` the heart the last request tried
+ * to set (a like or an unlike, for the error's title), `error` why it failed (null when nothing did).
+ */
+export type LikeSyncOutcome = { value: boolean; error: unknown | null; attempted: boolean };
+
+/**
+ * The story heart's requests, one at a time and the last tap winning. Two quick taps (like, unlike) would otherwise be
+ * two requests racing, and the like arriving last would leave a filled heart in the database under an empty one on
+ * screen. `set` records what the person wants now; while a request is out, later taps only change what is wanted, and
+ * when it returns the next request (if any) brings the database to it. The caller that started the run gets its
+ * outcome (what the database holds at the end, and the error that stopped it); taps that joined a running request get
+ * null, so a failure is reported once. `saved` is what the database held when the viewer opened.
+ */
+export function createLikeSync(send: (liked: boolean) => Promise<void>, saved: boolean): { set: (liked: boolean) => Promise<LikeSyncOutcome | null>; wanted: () => boolean } {
+  let held = saved;
+  let wanted = saved;
+  let running = false;
+  return {
+    wanted: () => wanted,
+    async set(liked) {
+      wanted = liked;
+      if (running) return null;
+      running = true;
+      try {
+        while (held !== wanted) {
+          const next = wanted;
+          try {
+            await send(next);
+            held = next;
+          } catch (error) {
+            wanted = held;
+            return { value: held, error, attempted: next };
+          }
+        }
+        return { value: held, error: null, attempted: held };
+      } finally {
+        running = false;
+      }
+    },
+  };
+}

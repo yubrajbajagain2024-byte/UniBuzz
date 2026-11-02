@@ -290,7 +290,6 @@ export function ReelCard({
           open={shareDialog.open}
           onClose={shareDialog.hide}
           currentUser={currentUserId ? { id: currentUserId } : null}
-          restricted={audience !== "global"}
         />
       ) : null}
     </section>
