@@ -57,6 +57,25 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   Still to do, each with the owner's approval: `CRON_SECRET` in Vercel's Production environment, Texas State's
   calendar feed added in `/admin/events`, an EAS update so testers get the tab (and PR #81's filters and readable
   Events error).
+- **Password recovery, and sign-in's words** (`password-recovery`, 2026-11-02, pushed; PR to open): "Forgot
+  password?" in the app sent a reset email, but nothing anywhere let the person set a new password from its link (the
+  website had no page for it and no "Forgot password?" of its own), so a forgotten password could not be recovered.
+  Now: `/forgot-password` and `/reset-password` on the website, a Forgot password screen in the app, and a
+  `reset-password` screen in the app for a link that opens it and for Settings → Safety & Security → Change password.
+  Both apps ask Supabase for the implicit kind of link, so it opens in any browser (decisions.md); the page reads the
+  session from the link and enters it; a link lasts an hour and one use, and an expired, used or hand-opened page says
+  what to do. Supabase's answers are said in plain words that never reveal whether an account exists; emails are
+  trimmed before they are checked (iOS adds a space). No production Supabase setting changes: a redirect to any
+  address on the site's own host is allowed. Checked on staging through the API (`staging/auth-recovery.mjs`, 14/14:
+  sign-up, confirmation, login, both error paths, the link, the new password, expiry, the allow-list) and the website
+  in a browser (`e2e/password-recovery.mjs`, 9/9); in the app on the Simulator by deep link (the Mac's screen was
+  locked, so nothing was tapped): Forgot password, the Change password row and form, an expired link, and a recovery
+  link's tokens entering the screen's session (as query parameters: Expo Go's `exp://` address drops a `#` part; a
+  real `apartmentbook://` link carries them after the `#`, to be checked on a development build). Not yet tried on an
+  iPhone: the Forgot screen's send and the reset form's save, in the app (the same code the website and the staging
+  probe exercised). **Ankur's "Invalid login
+  credentials"** on production was not looked up (that reads a student's account): with Google sign-in off there, it
+  is a wrong password or no account for that email; Forgot password now covers the first, Create an account the second.
 - **The story viewer, redesigned** (PR #86, merged 2026-11-02 05:28 UTC, the website redeployed without a change of its own): on a tall phone the
   story is a rounded 9:16 card under the status bar and its actions sit on black below it (`storyFrame`), so they are
   always legible and a tap that misses one never moves the story on; on a short screen (iPhone SE) the story fills it

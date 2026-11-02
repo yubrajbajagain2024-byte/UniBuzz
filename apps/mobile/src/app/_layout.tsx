@@ -55,6 +55,9 @@ function ThemedStack() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: content }} />
         <Stack.Screen name="(auth)/login" options={{ title: "Log in", presentation: "modal" }} />
         <Stack.Screen name="(auth)/signup" options={{ title: "Create account", presentation: "modal" }} />
+        {/* Pushed from the login modal, so it slides in inside it; and where a recovery link that opens the app lands. */}
+        <Stack.Screen name="(auth)/forgot-password" options={{ title: "Reset password" }} />
+        <Stack.Screen name="reset-password" options={{ title: "New password" }} />
         <Stack.Screen name="apartments/[id]" options={{ title: "Apartment" }} />
         <Stack.Screen name="roommates/[id]" options={{ title: "Roommate post" }} />
         <Stack.Screen name="marketplace/[id]" options={{ title: "Item" }} />

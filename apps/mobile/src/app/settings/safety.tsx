@@ -9,8 +9,9 @@ import { useSession } from "@/lib/session";
 import { SITE_URL, supabase } from "@/lib/supabase";
 
 /**
- * Settings → Safety & Security: the people you have blocked; your activity status (saved at once, through the one call
- * that may show it again, set_show_active_status: migration 22); and reports: your account's standing (warnings, removed
+ * Settings → Safety & Security: your password (changed on app/reset-password, the screen a recovery link also opens);
+ * the people you have blocked; your activity status (saved at once, through the one call that may show it again,
+ * set_show_active_status: migration 22); and reports: your account's standing (warnings, removed
  * content, appeals), the Community Guidelines, and how to report something.
  */
 export default function SafetySettingsScreen() {
@@ -52,6 +53,9 @@ export default function SafetySettingsScreen() {
 
   return (
     <SettingsPage>
+      <SettingsSection title="Password" footer="Pick one you use nowhere else. Forgot it? Log out, then tap Forgot password on the login screen.">
+        <SettingsRow title="Change password" onPress={() => router.push("/reset-password")} />
+      </SettingsSection>
       <SettingsSection footer="The posts and comments of people you block are hidden from you, and neither of you can message the other.">
         <SettingsRow title="Blocked accounts" value={blocked === null ? null : String(blocked)} onPress={() => router.push("/settings/blocked")} />
       </SettingsSection>
