@@ -23,6 +23,7 @@ State University. Sign-up is limited to the email domains on the `universities` 
   is the campus's calendar: the university's feeds and verified organizations. Housing, roommates
   and the Marketplace are supporting tools on the Explore tab; they must not set the app's
   identity, navigation or wording outside Explore.
+- **Calls stay hidden for the launch:** keep their code and records; only the owner turns them on.
 - **Three surfaces, one Supabase project:** UniBuzz for students (Next.js website and Expo app);
   UniBuzz Business at `/business` (its own host once `NEXT_PUBLIC_BUSINESS_SITE_URL` is set), where
   businesses never start conversations; CampConnect Admin for staff: the separate staff app
@@ -183,10 +184,9 @@ environment variable. Typos, formatting and read-only exploration are not.
    never status. Refer to other entries by title, not by number.
 2. **Avoid merge conflicts by design.** While a branch is in progress, record its progress only in
    its own `docs/branches/<branch name>.md` (a slash in the name is a folder:
-   `docs/branches/ankur/dev.md`). Its changes to shared files (status, migrations, testing,
-   history, branches/README) go in late, in its PR, after merging `main` into it. Something that
-   happens on no branch (a migration applied to production, a test run on `main`) gets a short
-   docs-only PR.
+   `docs/branches/ankur/dev.md`). Its changes to shared files (status, migrations, testing, history,
+   branches/README) go in late, in its PR, after merging `main` into it. Something that happens on
+   no branch (a migration applied to production, a test run on `main`) gets a short docs-only PR.
 3. A branch that outlives one session or PR gets its own file; once the branch is merged and
    deleted, move a short summary to docs/history.md and delete the file.
 4. **State, not prose: write what is true, the ugly parts included**, and date what can go stale

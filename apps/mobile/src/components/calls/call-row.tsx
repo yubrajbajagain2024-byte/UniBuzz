@@ -7,7 +7,8 @@ import { makeStyles, useColors } from "@/lib/theme-provider";
  * A call's row in the chat, as the Messages app draws one: the phone or camera in a circle, "Audio call" with how it
  * went under it ("3:24", "No answer", "Calling…"), or "Missed video call" in red for the one who did not pick up. The
  * row follows the call live (the database updates it as the call goes on). A tap calls back, or joins a call that is
- * still going on.
+ * still going on. Without `onPress` (calls paused, CALLS_PAUSED) the row is history only: no phone at its end, nothing
+ * on a tap, and a long press still offers the message's actions.
  */
 export function CallRow({ call, mine, width, onPress, onLongPress }: { call: MessageCall; mine: boolean; width: number; onPress?: () => void; onLongPress?: () => void }) {
   const styles = useStyles();
@@ -15,16 +16,16 @@ export function CallRow({ call, mine, width, onPress, onLongPress }: { call: Mes
   // The message's sender is the one who called, so "mine" says whether the viewer is the caller.
   const text = callRowText(call, mine ? call.started_by : null);
   const live = call.status !== "ended";
-  const hint = live ? "Joins the call" : "Calls back";
+  const hint = onPress ? (live ? "Joins the call" : "Calls back") : undefined;
   return (
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={350}
-      accessibilityRole="button"
+      accessibilityRole={onPress ? "button" : "text"}
       accessibilityLabel={[text.title, text.detail].filter(Boolean).join(", ")}
       accessibilityHint={hint}
-      style={({ pressed }) => [styles.row, mine ? styles.mine : styles.theirs, { width }, pressed && { opacity: 0.75 }]}
+      style={({ pressed }) => [styles.row, mine ? styles.mine : styles.theirs, { width }, pressed && onPress && { opacity: 0.75 }]}
     >
       <View style={[styles.circle, mine && styles.circleMine]}>
         <Icon name={call.kind === "video" ? "videocam" : "call"} size={18} color={text.missed ? colors.red : mine ? colors.onBrand : colors.text} />
@@ -39,7 +40,7 @@ export function CallRow({ call, mine, width, onPress, onLongPress }: { call: Mes
           </Text>
         ) : null}
       </View>
-      <Icon name={live ? "call" : call.kind === "video" ? "videocam-outline" : "call-outline"} size={16} color={mine ? colors.onBrand : colors.brand} style={styles.action} />
+      {onPress ? <Icon name={live ? "call" : call.kind === "video" ? "videocam-outline" : "call-outline"} size={16} color={mine ? colors.onBrand : colors.brand} style={styles.action} /> : null}
     </Pressable>
   );
 }

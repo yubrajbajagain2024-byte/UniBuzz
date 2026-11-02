@@ -3,6 +3,7 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { registerPushToken } from "@apartment-book/shared";
+import { CALLS_PAUSED } from "./calls";
 import { supabase } from "./supabase";
 
 /** What a push from the database carries (migration 36): the notification's kind and link, or a call ringing this phone. */
@@ -46,14 +47,17 @@ export async function registerForPush(userId: string): Promise<void> {
   if (status !== "granted") return;
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", { name: "Messages and updates", importance: Notifications.AndroidImportance.DEFAULT });
-    // Calls: heads-up, with the ring (bundled by the expo-notifications plugin, app.json) and the phone buzzing.
-    await Notifications.setNotificationChannelAsync("calls", {
-      name: "Calls",
-      importance: Notifications.AndroidImportance.MAX,
-      sound: "ring.wav",
-      vibrationPattern: [0, 700, 500, 700],
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-    });
+    // Calls: heads-up, with the ring (bundled by the expo-notifications plugin, app.json) and the phone buzzing. Not
+    // made while calls are paused (CALLS_PAUSED), so Android's settings list no Calls for the app.
+    if (!CALLS_PAUSED) {
+      await Notifications.setNotificationChannelAsync("calls", {
+        name: "Calls",
+        importance: Notifications.AndroidImportance.MAX,
+        sound: "ring.wav",
+        vibrationPattern: [0, 700, 500, 700],
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      });
+    }
   }
   const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
   const token = (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined)).data;
