@@ -79,8 +79,8 @@ test("newPasswordSchema: at least 8 characters, typed twice the same; resetReque
   assert.match(mismatch.error.issues[0].message, /don't match/);
   assert.equal(S.newPasswordSchema.safeParse({ password: "longenough1", confirm: "longenough1" }).success, true);
   assert.equal(S.newPasswordSchema.safeParse({ password: "x".repeat(73), confirm: "x".repeat(73) }).success, false, "bcrypt's 72");
-  assert.deepEqual(S.resetRequestSchema.parse({ email: "  CRF153@TxState.edu " }), { email: "crf153@txstate.edu" }, "tidied before it is checked: iOS adds a space after an address");
-  assert.deepEqual(S.signInSchema.parse({ email: "Crf153@txstate.edu ", password: "x" }), { email: "crf153@txstate.edu", password: "x" });
+  assert.deepEqual(S.resetRequestSchema.parse({ email: "  MAYA.T@TxState.edu " }), { email: "maya.t@txstate.edu" }, "tidied before it is checked: iOS adds a space after an address");
+  assert.deepEqual(S.signInSchema.parse({ email: "Maya.T@txstate.edu ", password: "x" }), { email: "maya.t@txstate.edu", password: "x" });
   assert.equal(S.createSignUpSchema(["txstate.edu"]).safeParse({ fullName: "Ann Author", email: "ann@txstate.edu ", password: "longenough1" }).success, true);
   assert.equal(S.resetRequestSchema.safeParse({ email: "not an email" }).success, false);
 });
