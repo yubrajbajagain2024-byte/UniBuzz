@@ -108,8 +108,9 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
 ## Workflow
 
 - Branch from `main` and land work through a **pull request**. Never push to `main`.
-- **Every push to `main` deploys the website to production** (Vercel is connected to Git). Merging
-  is deploying, so a migration the code needs must already be live.
+- **Every push to `main` deploys the website and CampConnect Admin to production** (both Vercel
+  projects are Git-connected since 2026-11-02; each builds on every push). Merging is deploying: a
+  migration the code needs must already be live.
 - **Sunil and Ankur (`ProXteller`) each merge their own pull requests** into `main` once the checks
   below pass, without waiting for the other's approval: the author's merge is that deploy's
   approval. The other production writes below still need the owner's approval.
@@ -130,9 +131,8 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
   their approval (owners: [docs/branches/README.md](docs/branches/README.md)). Never rewrite
   commits that are already pushed.
 - **Every production write needs the owner's explicit approval**: a migration, a role grant, an EAS
-  publish, a script that writes to the live project, an admin-app deploy (`npm run deploy:admin`;
-  `apps/admin` is not connected to Git), and a manual deploy
-  (`vercel deploy --prod --yes --archive=tgz` from the repo root ships the local tree).
+  publish, a script that writes to the live project, a manual deploy of either app (`npm run deploy:admin`;
+  `vercel deploy --prod --yes --archive=tgz` from the repo root ships the local tree).
 - Never chain `cd` with `;` in front of a command that writes files; use `&&` or absolute paths
   (a failed `cd` once let EAS write a stray `app.json` at the repo root).
 

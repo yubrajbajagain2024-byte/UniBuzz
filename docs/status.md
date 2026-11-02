@@ -270,7 +270,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   change. **Migration 63** (`20261115000000_console_business.sql`), **not on production**: until it is, both sections say
   they need it. Rehearsed on staging 2026-10-30/31 with the Business v2 release, through the API and in the admin app
   signed in as staff with a second factor. Still to do, each with the owner's approval: the release (63 goes with it),
-  `grant_role` for business admins, the `campconnect-admin` Vercel project reconnected and deployed from `main`. See
+  `grant_role` for business admins, the `campconnect-admin` Vercel project (reconnected to the repository on 2026-11-02) deployed from `main`, which its first merge touching `apps/admin` does. See
   [branches/admin-analytics-business.md](branches/admin-analytics-business.md).
 - **Buzz on the website.** The app has the threaded replies, top replies and prompt threads; the
   website still shows two levels of replies, no top reply, and prompt threads as ordinary buzzes

@@ -146,12 +146,14 @@ The website project and the mobile app are not touched by any of this.
 | Analytics and Business in CampConnect Admin, offline tests, independent review | ready |
 | Staging: the release with 63 under traffic, its console through the API and in the admin app with two-factor sign-in, the website's pages and console, the portal test | ready (2026-10-30/31) |
 | `step-admin` reconciled with `main` outside its migrations | ready (commit `f532cf8`); the owner's questions 1 to 3 and 5 remain |
-| `main` merged in (PRs #61 to #75; the migration renamed to 63) | ready |
-| Review of PR #60 by the owner (and Sunil for the shared package) | **needs the owner** |
-| Production backup (`scripts/backup.mjs --full`), the dry run, the migrations, `grant_role`, the merge, the admin deploy | **each needs the owner's approval**; steps 1 to 8 above |
-| The Vercel Git connection for `campconnect-admin` | **needs the owner** (plan above); until then `npm run deploy:admin` |
-| The unpushed migration on the owner's Mac (`admin-check-1028`): rename so it sorts after 63, apply alone, then push | **needs the owner** |
-| Events (61) alone first | Sunil's branch; on staging since 2026-10-31, not on production |
+| `main` merged in (PRs #61 to #89; the migration renamed to 63, after `story_actions`) | ready |
+| PR #60 merged (2026-11-02 23:24 UTC, the owner's approval) | done; the website deployed by the merge (Vercel: success, pages 200) |
+| Production backup (`scripts/backup.mjs before-migration-63 --full`), the dry run, the migrations, `grant_role` | **each needs the owner's approval**; steps 1 to 4 above (a fresh `SUPABASE_ACCESS_TOKEN` in a git-ignored file first) |
+| The Vercel reconnection of `campconnect-admin` | done 2026-11-02 (`vercel git connect`); its first deploy from `main` comes with PR #91 (`admin-vercel-git`), or `npm run deploy:admin` |
+| The unpushed migration on the owner's Mac (`admin-check-1028`, now `20261115000100`): apply alone, then push | **needs the owner** |
+| `step-admin`'s merge-plan questions 1 to 3 (where 14 to 18 live, `_migrations` rows, migration 18) | resolved 2026-11-02 (docs/decisions.md): they stay in `supabase/applied-outside-repo/`, 18 now copied there with its suite; no production write needed. Sunil's confirmation asked for (note below) |
+| Events (61) and story actions (62) ahead of the release | live (2026-11-01 and 2026-11-02) |
+| Staging: the other session's run and this one's cleanup | to confirm with Sunil (note below); the token used here is revoked |
 
 ## Note for Sunil: staging on 2026-10-30/31, and the admin migrations
 
