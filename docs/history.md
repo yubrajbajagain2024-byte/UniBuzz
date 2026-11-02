@@ -75,6 +75,9 @@ open work is in [status.md](status.md).
   the staging rehearsal and backup tooling, the production checklist) merged into `main`. None of
   49 to 56 is on production.
 
+- 2026-11-01 23:48 UTC: PR #82 (`migration-61-live`) merged into `main` by the owner: migration 61 recorded as live, and
+  the rollout rehearsals starting from a production that has it. Docs and tests only.
+
 - 2026-11-01 23:31 UTC: migration 61 (Events) applied to production on its own, with the owner's approval, after its
   staging probe (13/13) and a full backup checked against the live project (`before-migration-61`); one transaction
   through the Management API, its `_migrations` row with it; every check after passed ([migrations.md](migrations.md)).
