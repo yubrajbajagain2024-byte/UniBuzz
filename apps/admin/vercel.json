@@ -4,5 +4,6 @@
       "path": "/api/media/worker",
       "schedule": "0 9 * * *"
     }
-  ]
+  ],
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ../../packages/shared ../../package.json ../../package-lock.json"
 }

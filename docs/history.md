@@ -89,6 +89,10 @@ open work is in [status.md](status.md).
   The same day, with the owner's approval, the `campconnect-admin` Vercel project was disconnected from the repository: it
   builds `apps/admin`, which only `step-admin` has, so every other push failed there (docs/decisions.md).
 
+- 2026-11-02: the `campconnect-admin` Vercel project reconnected to the repository (`vercel git connect`, with the
+  owner's "reconnect and merge everything"), now that `apps/admin` is on `main`; its first deployment from `main` comes with
+  the `vercel.json` ignore-command PR (`admin-vercel-git`).
+
 - 2026-11-02 04:32 UTC: migration 62 (story actions) applied to production on its own, with the owner's approval,
   after staging (04:02 UTC, `staging/story-actions.mjs` 15/15) and a full backup checked against the live project
   (`before-migration-62`); one transaction through the Management API, its `_migrations` row with it; every check
