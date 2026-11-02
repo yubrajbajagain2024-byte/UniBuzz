@@ -9,7 +9,7 @@ current", rules 2 and 3).
 | Branch | Owner | What it is | State | Details |
 | --- | --- | --- | --- | --- |
 | `main` | everyone, via PRs | integration branch; **every push deploys production** | — | [../status.md](../status.md) |
-| `ankur/dev` | Ankur | Ankur's feature line | merged (PRs #35, #38, #41, and #50 on 2026-10-28: Buzz threaded replies, top reply, prompt threads, categories, migrations 51 to 54, not on production) | [ankur/dev.md](ankur/dev.md) |
+| `ankur/dev` | Ankur | Ankur's feature line | merged (PRs #35, #38, #41, and #50 on 2026-10-28: Buzz threaded replies, top reply, prompt threads, categories, migrations 51 to 54, not on production); since 2026-11-01 **a PR open**: the offline rehearsal for 44, 46 and 51 to 54 going live ahead of the release, and PR #54's fix to 53 | [ankur/dev.md](ankur/dev.md) |
 | `ankur/owner-moderation` | Ankur | Buzz v2 and Trust & Safety | merged (PR #37) | [ankur/owner-moderation.md](ankur/owner-moderation.md) |
 | `step-admin` | Yubraj | **CampConnect Admin**, the separate staff app, and migrations 14–18 | **not merged**; merge plan in its `docs/step-admin-merge-plan.md` | [step-admin.md](step-admin.md) |
 | `step-1-brand-shell` | Yubraj | first brand-and-shell pass (2026-09-07) | **1 commit never merged**; superseded | [step-1-brand-shell.md](step-1-brand-shell.md) |
