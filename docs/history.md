@@ -81,6 +81,11 @@ open work is in [status.md](status.md).
   (`before-migration-62`); one transaction through the Management API, its `_migrations` row with it; every check
   after passed ([migrations.md](migrations.md)). Story likes, replies and shares stop failing on production.
 
+- 2026-11-02 03:57 UTC: PR #84 (`ankur/dev`) merged into `main` by Ankur: the offline rehearsal for Discover (44, 46)
+  and Buzz (51 to 54) going live ahead of the release in two transactions, and PR #54's fix to 53 (a typed title stays).
+  None of the six is on production. Its rehearsal starts from a production with 62 since `story-actions-fix` merged
+  `main` in.
+
 - 2026-11-01 23:48 UTC: PR #82 (`migration-61-live`) merged into `main` by the owner: migration 61 recorded as live, and
   the rollout rehearsals starting from a production that has it. Docs and tests only.
 

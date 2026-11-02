@@ -1,11 +1,11 @@
 // Discover (44 and 46) and Buzz (51 to 54) applied to production on their own, ahead of the Business v2 release,
 // rehearsed offline the way 58 to 61 were: a database in production's state (production's migration order, the
-// migrations applied outside this repo, 47 and 58 to 61 applied although 44, 46 and 49 to 57 are not, 62 not yet), with
+// migrations applied outside this repo, 47 and 58 to 62 applied although 44, 46 and 49 to 57 are not), with
 // posts of every audience, buzzes and prompt answers from before 53 in it; then the two transactions exactly as
 // production will run them, one query each, every file followed by its public._migrations row: Discover (44, then 46,
 // which ranks Global posts only and refreshes before the transaction ends) and Buzz (51, 52, 53, 54). A failure part-way
 // applies nothing. Discover and Buzz are checked through the API roles; then the rest of the release (49, 50, 55, 56, 57)
-// and 62 apply after them, in file order, as `npm run db:setup` will, and both still work; then the documented undo (the
+// applies after them, in file order, as `npm run db:setup` will, and both still work; then the documented undo (the
 // six rollbacks newest first, each deleting its row, in one query) leaves the schema of a database that never had them
 // except buzz_posts.category, which 54's rollback keeps on purpose; then the two transactions again.
 import { boot, read, expectOk, done } from "./harness.mjs";
@@ -22,8 +22,9 @@ const REST = [
   "20261109000100_business_hardening.sql",
   "20261110000000_business_hours.sql",
 ];
-// 62 (story actions) goes to production on its own too (story-actions-rollout.test.mjs); here it comes after the release.
-const AHEAD = ["20261114000000_story_actions.sql"];
+// Others going to production on their own, left out until they are live. 62 (story actions) went live on 2026-11-02,
+// so production's state includes it; none waits today.
+const AHEAD = [];
 const check = (cond, message) => { if (!cond) throw new Error(message); };
 
 const { db, mk, as, asAnon, asService } = await boot({ live: true, skip: [...DISCOVER, ...BUZZ, ...REST, ...AHEAD] });
@@ -47,8 +48,8 @@ const undo = (files) =>
 const recorded = async (files) => Number(await val(db.query("select count(*) from public._migrations where name = any($1)", [files])));
 const NO_BUZZ_YET = "to_regclass('public.buzz_prompt_threads') is null and not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'buzz_posts' and column_name = 'category')";
 
-await expectOk("before: production's state (47 and 58 to 61 applied; 44, 46, 49 to 57 and 62 not)", async () => {
-  check(await has("select to_regclass('public.stories') is not null and to_regclass('public.events') is not null and to_regclass('public.businesses') is not null as ok"), "a live migration is missing");
+await expectOk("before: production's state (47 and 58 to 62 applied; 44, 46 and 49 to 57 not)", async () => {
+  check(await has("select to_regclass('public.stories') is not null and to_regclass('public.events') is not null and to_regclass('public.story_likes') is not null and to_regclass('public.businesses') is not null as ok"), "a live migration is missing");
   check(await has(`select to_regclass('public.discover_post_ranks') is null and to_regclass('public.ads') is null and ${NO_BUZZ_YET} as ok`), "not production's state");
 });
 
@@ -177,7 +178,7 @@ async function buzzWorks(label) {
 await buzzWorks("Buzz, as the transaction left it");
 
 // --- The rest of the release after them -------------------------------------------------------------------------------
-await expectOk("the rest of the release (49, 50, 55, 56, 57) and 62 apply after them, in file order, as db:setup will", async () => {
+await expectOk("the rest of the release (49, 50, 55, 56, 57) applies after them, in file order, as db:setup will", async () => {
   for (const f of [...REST, ...AHEAD]) await db.exec(read(`migrations/${f}`));
   check(await has("select to_regclass('public.ads') is not null and exists (select 1 from pg_constraint where conname = 'businesses_hours_check') as ok"), "the release is missing");
 });
@@ -203,4 +204,4 @@ await expectOk("both transactions apply again afterwards", async () => {
 await discoverWorks("applied again");
 await buzzWorks("applied again");
 
-done("DISCOVER AND BUZZ AHEAD OF THE RELEASE (44, 46 AND 51 TO 54 AFTER 61, THEN 49, 50, 55 TO 57 AND 62)");
+done("DISCOVER AND BUZZ AHEAD OF THE RELEASE (44, 46 AND 51 TO 54 AFTER 62, THEN 49, 50, 55 TO 57)");

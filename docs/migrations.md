@@ -91,12 +91,13 @@ buzzes and 54's keeps the categories (nothing reads them).
 
 **44, 46 and 51 to 54 ahead of the release:** they need only what production has, and none of them
 creates or replaces a function, view, table or trigger that 49, 50, 55 to 57 or 58 to 62 does, so
-they may go live on their own, as 58 to 61 did (supabase/CLAUDE.md), in two transactions: Discover
+they may go live on their own, as 58 to 62 did (supabase/CLAUDE.md), in two transactions: Discover
 (44, its `_migrations` row, 46, its row; never 44 alone, because 44 ends by ranking posts of every
 audience and 46 re-ranks Global posts only before the transaction ends), then Buzz (51 to 54, each
 with its row). Rehearsed offline by `tests/discover-buzz-rollout.test.mjs` (2026-11-01): production's
 state, the two transactions, a failure part-way that applies nothing, Discover and Buzz through the
-API roles, the rest of the release and 62 after them, the documented undo, and both again. Still to
+API roles, the rest of the release after them (62 is live since 2026-11-02, so the rehearsal starts with it),
+the documented undo, and both again. Still to
 do: the staging rehearsal, a full backup and Sunil's approval; afterwards, take the six out of the
 release lists.
 
