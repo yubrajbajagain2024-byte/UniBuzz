@@ -53,7 +53,8 @@ apps/web/src/
   components/      UI by area (home, feed, posts, buzz, messages, profile, housing, business, staff, …)
   lib/             actions/ (server actions), supabase/ (clients), buzz-server/ and events-server/
                    (server-only), staff/, business/, mux.ts, env.ts   proxy.ts: auth guard + the portal's host
-apps/web/e2e/      Playwright: home-feed.mjs, release-smoke.mjs (every page of each role), business-sidebar.mjs
+apps/web/e2e/      Playwright: home-feed.mjs, release-smoke.mjs (every page of each role), business-sidebar.mjs,
+                   password-recovery.mjs (sign-up, confirmation, login, Forgot password, the reset page; staging only)
 apps/mobile/       Expo app (expo-router): apps/mobile/CLAUDE.md
 packages/shared/   everything that is not UI: types/ (incl. database.ts), schemas/ (zod), queries/
                    (every read and write), buzz/, trust-safety/, events/ (calendar parsers, the sync

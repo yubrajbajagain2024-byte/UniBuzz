@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { signInSchema } from "@apartment-book/shared";
+import { authErrorMessage, signInSchema } from "@apartment-book/shared";
 import { Button, Field, Screen } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { textStyle } from "@/lib/theme";
@@ -22,7 +22,7 @@ export default function LoginScreen() {
     setError(null);
     const { error: err } = await supabase.auth.signInWithPassword(parsed.data);
     setBusy(false);
-    if (err) return setError(err.message);
+    if (err) return setError(authErrorMessage(err.message));
     // Close only this modal: the screen underneath (a tab, the inbox, a search) re-renders signed in.
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)");
@@ -40,13 +40,7 @@ export default function LoginScreen() {
         <Pressable onPress={() => router.replace("/(auth)/signup")}>
           <Text style={{ textAlign: "center", color: colors.brand, fontWeight: "600" }}>New here? Create an account</Text>
         </Pressable>
-        <Pressable
-          onPress={async () => {
-            if (!email) return setError("Enter your email first, then tap this again.");
-            const { error: err } = await supabase.auth.resetPasswordForEmail(email);
-            setError(err ? err.message : "Check your email for a reset link.");
-          }}
-        >
+        <Pressable onPress={() => router.push({ pathname: "/(auth)/forgot-password", params: email.trim() ? { email: email.trim() } : {} })} accessibilityRole="button">
           <Text style={{ textAlign: "center", color: colors.muted }}>Forgot password?</Text>
         </Pressable>
         <View style={{ height: 24 }} />

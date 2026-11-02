@@ -15,7 +15,8 @@ src/app/compose/  the create flow behind every "+": camera → edit → publish;
 src/app/create/   per-kind entry points: post, reel, buzz, apartment, roommate, item
 src/app/…         buzz, messages, posts, reels, apartments, roommates, marketplace, profile, follows,
                   call, snap, stories, topics, settings, notifications, saved, find-people, events
-                  (an event, saved, interests, new, edit), organizations (page, new, edit, members)
+                  (an event, saved, interests, new, edit), organizations (page, new, edit, members),
+                  (auth)/forgot-password, reset-password (a recovery link that opens the app; Change password)
 src/lib/          app-only helpers: calls.ts, home-scope.ts, stories-store.ts, event-saves-store.ts,
                   organization-follows-store.ts, campus-time-zone.ts, supabase.ts, dev-overrides.ts, …
 e2e/              Maestro flows (flows/*.yaml, run.sh), seed and lifecycle scripts
