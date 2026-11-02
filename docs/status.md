@@ -22,7 +22,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   2026-10-26). Since PR #41 (2026-10-27) an emoji no longer holds a Buzz for review. In the app,
   replies form a Reddit-style tree, feed cards show a top reply, and each day's prompt has one
   thread per feed; in the app and on the website a buzz may have a category. These need 51 to 54,
-  not live as of 2026-10-28; until then both fall back (two levels, no top reply, prompt answers
+  not live as of 2026-11-01; until then both fall back (two levels, no top reply, prompt answers
   as their own buzz, no category kept).
 - **Messages:** realtime chats, groups, semester course chats, voice messages, replies,
   attachments, requests, mute; **Snaps** (view-once); **Calls** (built, paused).
@@ -62,7 +62,10 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   46 together, 49 and 50 (Business v2), 51 to 54 (Buzz), 55 and 56 (Business v2, PR #51), once
   `business-v2`'s ad trigger fix is merged (the order of release below). Confirm with `verify.mjs --live`, then
   publish the app update. Their code is already on `main`, which deploys production, so this is
-  overdue. Needs the owner and a credential.
+  overdue. Needs the owner and a credential. Ankur's 44, 46 and 51 to 54 (Discover and Buzz) can go
+  ahead of that run on their own, in two transactions, rehearsed offline on 2026-11-01
+  ([migrations.md](migrations.md), "44, 46 and 51 to 54 ahead of the release"); they wait on the
+  staging rehearsal and Sunil's approval.
 - **UniBuzz Business v2 is on `main` without its migrations.** PR #49 was merged on 2026-10-28 at
   04:07 UTC (and #51 at 07:06 UTC), so production's website runs Business v2 code while neither
   migration 49 nor 50 is applied (production's `_migrations`, read-only, 2026-10-28). Until they are, the code
