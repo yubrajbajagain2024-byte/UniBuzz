@@ -9,8 +9,8 @@ notes live in [docs/](docs/README.md).
 
 More specific instructions load when you work in these folders:
 [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md), [supabase/CLAUDE.md](supabase/CLAUDE.md), and
-`apps/web/CLAUDE.md`, an import of `apps/web/AGENTS.md`: the Next.js 16 rules that `next dev`
-writes itself. Leave those two alone.
+`apps/web/CLAUDE.md` and `apps/admin/CLAUDE.md`, imports of their `AGENTS.md`: the Next.js 16 rules
+that `next dev` writes itself. Leave those alone.
 
 ## The project
 
@@ -25,8 +25,9 @@ State University. Sign-up is limited to the email domains on the `universities` 
   identity, navigation or wording outside Explore.
 - **Three surfaces, one Supabase project:** UniBuzz for students (Next.js website and Expo app);
   UniBuzz Business at `/business` (its own host once `NEXT_PUBLIC_BUSINESS_SITE_URL` is set), where
-  businesses never start conversations; CampConnect Admin for staff (the website's `/admin`
-  console, and a separate staff app whose state is in docs/branches/README.md).
+  businesses never start conversations; CampConnect Admin for staff: the separate staff app
+  (`apps/admin`, where the advertising business is run) and, until the two are reconciled, the
+  website's `/admin` Trust & Safety console.
 - **Legacy names stay.** The product was *CampConnect* until 2026-10-26; the staff app keeps the
   name *CampConnect Admin*. *Apartment Book*, the first name, survives only in identifiers:
   `@apartment-book/shared`, `@apartment-book/moderation`, the root package `apartment-book`, the
@@ -55,6 +56,8 @@ apps/web/src/
                    (server-only), staff/, business/, mux.ts, env.ts   proxy.ts: auth guard + the portal's host
 apps/web/e2e/      Playwright: home-feed.mjs, release-smoke.mjs (every page of each role), business-sidebar.mjs,
                    password-recovery.mjs (sign-up, confirmation, login, Forgot password, the reset page; staging only)
+apps/admin/src/    CampConnect Admin, the staff app (port 3001; its own Vercel project): overview, reports,
+                   flagged, content, users, media, staff, audit, security, analytics, business (lib/console/)
 apps/mobile/       Expo app (expo-router): apps/mobile/CLAUDE.md
 packages/shared/   everything that is not UI: types/ (incl. database.ts), schemas/ (zod), queries/
                    (every read and write), buzz/, trust-safety/, events/ (calendar parsers, the sync
@@ -74,11 +77,12 @@ How each feature works: [README.md](README.md) and [docs/technical-reference.md]
 ```bash
 npm install                 # once, at the repo root
 npm run dev                 # every app; npm run dev -w web for the website (-- -p 3060 for a port)
+npm run dev:admin           # CampConnect Admin alone, on port 3001
 npm run check               # typecheck + lint + build: run before you call work done
 npm run typecheck           # or lint, or build: the same steps one at a time
 npm run test:shared         # packages/shared unit tests, offline
 npm run test:moderation     # packages/moderation unit tests, offline
-npm run db:test             # every supabase/tests suite in PGlite, offline, ~5 min
+npm run db:test             # every supabase/tests suite in PGlite, offline, ~7 min
 ```
 
 Commands against a real Supabase project, and their traps: [supabase/CLAUDE.md](supabase/CLAUDE.md).
@@ -96,8 +100,7 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
 - Website: server-only modules start with `import "server-only"`; writes go through server actions
   in `apps/web/src/lib/actions/`; call `redirect()` and `notFound()` outside `try` blocks; read
   `node_modules/next/dist/docs/` before using a Next.js API you have not checked.
-- Paused features stay behind their flags instead of being deleted (apps/mobile/CLAUDE.md lists
-  them).
+- Paused features stay behind their flags instead of being deleted (apps/mobile/CLAUDE.md lists them).
 - Database changes: follow [supabase/CLAUDE.md](supabase/CLAUDE.md).
 - Settled product and technical choices, with their reasons, are in
   [docs/decisions.md](docs/decisions.md). Do not re-open one without a reason.
@@ -117,10 +120,9 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
   the staging project), all without asking first. Only the production writes below wait, each on
   Sunil's explicit approval, one at a time, then run with a backup, tests and a rollback ready. It
   ends with a short summary: the work done, the commits and PRs, and what was deployed where.
-- Before opening a PR, check what it would bring (`git log origin/main..<branch>`); a branch that
-  is already merged needs none, whatever GitHub's "Compare & pull request" banner suggests. Then
-  run `npm run check`, the tests your change touches (`npm run db:test` for any SQL), and the
-  documentation updates below.
+- Before opening a PR, check what it would bring (`git log origin/main..<branch>`); a branch already
+  merged needs none, whatever GitHub's banner suggests. Then run `npm run check`, the tests your
+  change touches (`npm run db:test` for any SQL), and the documentation updates below.
 - Commit messages: a plain-English subject saying what changed; a body with why, the migrations
   (and whether they are on production) and the tests run. AI-written commits end with a
   `Co-Authored-By:` trailer.
@@ -128,7 +130,8 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
   their approval (owners: [docs/branches/README.md](docs/branches/README.md)). Never rewrite
   commits that are already pushed.
 - **Every production write needs the owner's explicit approval**: a migration, a role grant, an EAS
-  publish, a script that writes to the live project, and a manual deploy
+  publish, a script that writes to the live project, an admin-app deploy (`npm run deploy:admin`;
+  `apps/admin` is not connected to Git), and a manual deploy
   (`vercel deploy --prod --yes --archive=tgz` from the repo root ships the local tree).
 - Never chain `cd` with `;` in front of a command that writes files; use `&&` or absolute paths
   (a failed `cd` once let EAS write a stray `app.json` at the repo root).
@@ -189,9 +192,8 @@ environment variable. Typos, formatting and read-only exploration are not.
 4. **State, not prose: write what is true, the ugly parts included**, and date what can go stale
    ("as of 2026-10-27"). Say where a claim comes from when you have not checked it yourself.
 5. **Verify before you rely on it.** Check that a named file, function, flag or status still holds.
-6. No changelog sections: git history is the record. The old per-branch `CLAUDE.md` copies of
-   2026-10-27 lose to `main`'s in a merge (docs/branches/README.md); resolve any other conflict on
-   its merits.
+6. No changelog sections: git history is the record. Old per-branch `CLAUDE.md` copies (2026-10-27)
+   lose to `main`'s in a merge (docs/branches/README.md); resolve any other conflict on its merits.
 
 On the owner's Mac a local Claude Code `Stop` hook, not in git (`.claude/settings.local.json` →
 `.claude/hooks/claude-md-reminder.sh`), reminds a session when files changed but no documentation

@@ -52,7 +52,9 @@ open work is in [status.md](status.md).
   ([decisions.md](decisions.md)).
 - **2026-11-01:** PRs #77 to #81 merge (the app's viewers, bottom bar, Home's top edge, Settings, Explore's and Events'
   filters); migration 61 (Events) reaches production on its own, ahead of the Business v2 release (23:31 UTC).
-- **2026-11-02:** migration 62 (story actions) reaches production on its own (04:32 UTC).
+- **2026-11-02:** migration 62 (story actions) reaches production on its own (04:32 UTC). PR #60 merges:
+  CampConnect Admin (`apps/admin`, from `step-admin`) is on `main` with its Analytics and Business sections
+  (migration 63, not on production) and the rest of `step-admin` outside its migration files.
 
 ## The AI documentation
 
@@ -78,6 +80,12 @@ open work is in [status.md](status.md).
 
 - 2026-11-02 05:28 UTC: PR #86 (`story-viewer-redesign`) merged into `main` by the owner: the story viewer redesigned.
   App only; the website's production deployment from it is Ready (its pages answer 200); testers get it with an EAS update.
+
+- 2026-11-02: PR #60 (`admin-analytics-business`) merged into `main` with the owner's approval ("merge it if everything
+  is good"): CampConnect Admin and its Analytics and Business sections, `step-admin`'s tooling, suites and README
+  section, the staging scripts' two-factor sign-in. Migration 63 is not on production; the `campconnect-admin` Vercel
+  project is still disconnected, so the merge deployed the website only (two messages changed there). The branch's
+  file stays until the launch plan in it is carried out.
   The same day, with the owner's approval, the `campconnect-admin` Vercel project was disconnected from the repository: it
   builds `apps/admin`, which only `step-admin` has, so every other push failed there (docs/decisions.md).
 

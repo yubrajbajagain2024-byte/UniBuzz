@@ -43,8 +43,7 @@ migration's production status is in [docs/migrations.md](../docs/migrations.md).
 Supabase's `auth` and `storage` schemas.
 
 - `boot()`: this repo's schema. `boot({ live: true })`: production's order, with the
-  `applied-outside-repo/` migrations where they really ran (no `step-admin` migration 18, which is
-  not in this repo). `boot({ upTo })` stops after a migration.
+  `applied-outside-repo/` migrations where they really ran (18, staff invitations by email, included since 2026-11-02). `boot({ upTo })` stops after a migration.
 - `mk(email, name)` makes a confirmed user; `as(uid, fn, { aal: "aal2" })` runs as a user after
   two-factor sign-in (it adds a verified factor); `asAnon`, `asService`; `expectOk`, `expectError`,
   `done`.
@@ -78,6 +77,13 @@ Supabase's `auth` and `storage` schemas.
     URL to `SITE_URL`, which defaults to `http://localhost:3000`**, breaking production's sign-in
     emails. Only for a fresh or local project, or with the real `SITE_URL` (and
     `BUSINESS_SITE_URL`) plus `SKIP_ENV=1`.
+  - `DRY_RUN=1` lists what it would apply and changes nothing: run it first. Each migration runs in
+    its own transaction with its `_migrations` row. A pending file older than a row already applied
+    (out of order) is refused unless `ALLOW_OUT_OF_ORDER=1`: production's Business v2 release needs
+    that flag, since 44 and 46 are older than 47 and 58 to 60, which went live before them.
+- Staging is one project shared by everyone's sessions: read `public._migrations` and the row
+  counts before a rehearsal, expect another session's migrations and rows to appear while yours
+  runs, and remove only the rows your own run made.
 - A migration that needs only what production already has may go live ahead of a pending release,
   alone (58 to 60 did, 2026-10-30; 61 is written to): rehearse it offline on production's state
   (`boot({ live: true, skip })`, as `tests/stories-rollout.test.mjs` and `tests/events-rollout.test.mjs`

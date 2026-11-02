@@ -36,6 +36,9 @@ export function authErrorMessage(message: string): string {
   if (/invalid login credentials/i.test(message)) return "That email and password don't match. Check them, or reset your password.";
   if (/email not confirmed/i.test(message)) return "Confirm your email first: open the link we sent when you signed up, then log in.";
   if (/rate limit|too many requests|security purposes/i.test(message)) return "Too many tries in a row. Wait a few minutes, then try again.";
+  // A suspension from CampConnect Admin sets auth.users.banned_until (its migration 15, live), and Supabase Auth refuses
+  // the sign-in with "User is banned": say what it means instead of echoing that.
+  if (/banned/i.test(message)) return "This account is suspended. Check the notice in your profile or contact support.";
   if (/different from the old password/i.test(message)) return "Choose a password you haven't used before.";
   if (/auth session missing|session.*(expired|missing)|not authenticated|invalid.*token/i.test(message)) return RESET_LINK_EXPIRED;
   return message;
