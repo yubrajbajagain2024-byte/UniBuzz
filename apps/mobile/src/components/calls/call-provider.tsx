@@ -31,8 +31,9 @@ const CallsContext = createContext<CallsValue | null>(null);
  * stops on its own (the database closes the call as missed a little after). One ring at a time: a second call arriving
  * while one rings is left for the chat's banner.
  *
- * While calls are paused (CALLS_PAUSED) Place and Join show the "Coming Soon" notice instead, and no ring is listened
- * for; taps on every other notification still open what they point at.
+ * While calls are paused (CALLS_PAUSED) no ring is listened for, a tapped ring opens its chat, and taps on every other
+ * notification still open what they point at. No screen offers Place or Join then; should anything still ask, the
+ * quiet "Coming Soon" notice answers instead of a call.
  */
 export function CallProvider({ children }: { children: ReactNode }) {
   const { user } = useSession();

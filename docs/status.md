@@ -25,7 +25,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   not live as of 2026-11-01; until then both fall back (two levels, no top reply, prompt answers
   as their own buzz, no category kept).
 - **Messages:** realtime chats, groups, semester course chats, voice messages, replies,
-  attachments, requests, mute; **Snaps** (view-once); **Calls** (built, paused).
+  attachments, requests, mute; **Snaps** (view-once); **Calls** (built; paused and hidden for the
+  launch, "Calls hidden for the launch" below).
 - **Explore:** apartments with PostGIS distance and maps, roommates, Marketplace (one video per
   item, no comments), anonymous listings with per-chat reveal (47, live since 2026-10-27).
 - **Business portal** (`/business`): live with migration 39. Its left sidebar, Billing and Settings pages (PR #56,
@@ -57,7 +58,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   Still to do, each with the owner's approval: `CRON_SECRET` in Vercel's Production environment, Texas State's
   calendar feed added in `/admin/events`, an EAS update so testers get the tab (and PR #81's filters and readable
   Events error).
-- **Profile navigation** (`profile-navigation`, 2026-11-02, pushed; PR to open): someone's profile opened from a
+- **Profile navigation** (`profile-navigation`, merged as PR #89, 2026-11-02 09:13 UTC): someone's profile opened from a
   post closed only with a swipe from the very screen edge, a few points wide: iOS 26's full-screen back swipe waits for
   any sideways scroll view under it to give up, and the profile's tab pager never does (reproduced on the iOS
   Simulator). Now on the first tab of a pushed profile the pager takes no touches (a scroll view switched off once the
@@ -74,7 +75,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   above and below, aligned with the list) with a little more room between the people in its list. Both looked at on the
   Simulator against staging with a throwaway item and roommate post, deleted afterwards. Not checked on an iPhone. App
   only, no migration.
-- **Messages' header scrolls with the list** (`profile-navigation`, 2026-11-02, pushed; PR to open): the title,
+- **Messages' header scrolls with the list** (`profile-navigation`, merged as PR #89, 2026-11-02 09:13 UTC): the title,
   Chats | Groups, the search field and the All | Unread | Requests pills stayed fixed over the inbox. Now they scroll
   away with the list on screen, point for point, and come back only as it returns to its top; only the bottom bar stays,
   and on Messages it no longer collapses on a flick (the owner asked for it to stay fixed). Checked on the Simulator
@@ -84,7 +85,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   way up (both back at the top), a flick (the whole bar stays), and a search (the header holds still, results under it).
   A tap on the search field could not be scripted on the Simulator (on Events' either), so the search was opened with
   text typed in by a temporary edit, since removed. Not checked on an iPhone or in light mode. App only, no migration.
-- **Password recovery, and sign-in's words** (`password-recovery`, 2026-11-02, pushed; PR to open): "Forgot
+- **Password recovery, and sign-in's words** (`password-recovery`, merged as PR #88, 2026-11-02 07:17 UTC): "Forgot
   password?" in the app sent a reset email, but nothing anywhere let the person set a new password from its link (the
   website had no page for it and no "Forgot password?" of its own), so a forgotten password could not be recovered.
   Now: `/forgot-password` and `/reset-password` on the website, a Forgot password screen in the app, and a
@@ -103,6 +104,20 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   probe exercised). **Ankur's "Invalid login
   credentials"** on production was not looked up (that reads a student's account): with Google sign-in off there, it
   is a wrong password or no account for that email; Forgot password now covers the first, Create an account the second.
+- **Calls hidden for the launch** (`pause-calls`, 2026-11-02, pushed; PR to open): calls were already paused behind
+  `CALLS_PAUSED`, but every chat's bar still showed Audio call and Video call, which only brought up a "Coming Soon"
+  pill. The owner postponed calls for the launch to hold down operating costs (docs/decisions.md), so now nothing of
+  them shows in the app: Info stands alone in a direct or group chat's bar, no ring is listened for (no incoming-call
+  screen, no Join banner), a link to the call screen opens Messages, and Android gets no Calls notification channel. A
+  call made before the pause keeps its row in the chat as history (no phone at its end, nothing on a tap, long press
+  still offers Reply and Report), as the website already showed calls. No code, database function or call record is
+  deleted; a build bundled with `EXPO_PUBLIC_CALLS_ENABLED=1` brings everything back. Checked on the Simulator against
+  staging with throwaway calls from Ann (deleted afterwards, with their notifications): both bars show only Info, a
+  tap on a missed call does nothing while a tap on a bubble beside it works, long press opens the message's menu, a
+  ring from Ann while Sim's chat was open showed no incoming screen, and a call link landed on Messages. The pause lives
+  in the app only: a signed-in request made outside the app can still start a call (it then shows in the chat as a
+  live "Ringing" row, and on the other person's phone as a push); closing that takes a migration, not written. App
+  only, no migration; testers get it with the next EAS update.
 - **The story viewer, redesigned** (PR #86, merged 2026-11-02 05:28 UTC, the website redeployed without a change of its own): on a tall phone the
   story is a rounded 9:16 card under the status bar and its actions sit on black below it (`storyFrame`), so they are
   always legible and a tap that misses one never moves the story on; on a short screen (iPhone SE) the story fills it
@@ -294,7 +309,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | `db:setup` token mode resets the production auth Site URL to localhost by default | [supabase/CLAUDE.md](../supabase/CLAUDE.md) |
 | A security fix for a live part of the database is pending | "Security fix pending" above |
 | Supabase CLI history empty on production; `supabase db push` would re-run everything | `supabase/applied-outside-repo/README.md` |
-| Calls need an Apple Developer Program membership (USD 99/yr); native ring (CallKit/PushKit, Android full-screen intent) not built | README §"Calls" |
+| Calls are paused and hidden for the launch (operating costs, 2026-11-02); switching them on also needs an Apple Developer Program membership (USD 99/yr), and the native ring (CallKit/PushKit, Android full-screen intent) is not built. The pause is in the app only: the database still starts a call asked for outside it | README §"Calls"; "Calls hidden for the launch" above |
 | `is_suspended(uuid)` callable while signed out (low severity) | applied-outside-repo README §"Security review" |
 | Buzz's `admin.spam` rule pack flags ordinary phrases (staff can turn it off under Rules) | README §"Buzz (anonymous)" |
 | A Buzz photo can be dated by Storage's `Last-Modified` despite the publication delay | same |
@@ -306,7 +321,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 ## Future plans
 
 - **Core, next up:** clubs and organizations (pages to follow and join), campus events, campus
-  news (none started); calls switched on (blocked, above); more campuses (a `universities` row
+  news (none started); calls switched on (paused for the launch and blocked, above); more campuses (a `universities` row
   with its `email_domain` and campus coordinates).
 - **Buzz category sections:** buzzes can carry a category (54); how sections show them is not
   decided yet (filter chips on the feed, a page per category, following or muting categories).

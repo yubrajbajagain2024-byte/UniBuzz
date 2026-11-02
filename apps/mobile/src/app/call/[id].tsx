@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { requireOptionalNativeModule } from "expo";
 import type { LocalVideoTrack, Track } from "livekit-client";
@@ -10,7 +10,7 @@ import { ParticipantsSheet } from "@/components/calls/participants-sheet";
 import { GlassBackdrop, GlassIconButton } from "@/components/glass";
 import { Icon, type IconName } from "@/components/icon";
 import { playCallEnded, startRingback, stopRingback } from "@/lib/call-sounds";
-import { CALLS_AVAILABLE, CALLS_UNAVAILABLE_TEXT, loadLiveKit } from "@/lib/calls";
+import { CALLS_AVAILABLE, CALLS_PAUSED, CALLS_UNAVAILABLE_TEXT, loadLiveKit } from "@/lib/calls";
 import { hapticSelect, hapticSoft } from "@/lib/haptics";
 import { errorText } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
@@ -56,6 +56,14 @@ function deviceNoteFor(failure: string | undefined): string | null {
   }
 }
 
+/**
+ * The route: while calls are paused (CALLS_PAUSED) a link to a call (an old notification, a typed URL) opens Messages
+ * instead, so no call is joined and no token is asked for.
+ */
+export default function CallRoute() {
+  return CALLS_PAUSED ? <Redirect href="/(tabs)/messages" /> : <CallScreen />;
+}
+
 /** One person on the stage: their picture or their video, and where they stand. */
 type Tile = { key: string; name: string; avatarUrl: string | null; me: boolean; video: ReactNode | null; speaking: boolean; muted: boolean; waiting: boolean; ringing: boolean };
 
@@ -67,7 +75,7 @@ type Tile = { key: string; name: string; avatarUrl: string | null; me: boolean; 
  * call (this screen follows it live); the sound and picture flow over LiveKit, with a token from the server once you
  * are in. Leaving this screen in any way hangs up.
  */
-export default function CallScreen() {
+function CallScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useSession();
   const userId = user?.id ?? "";

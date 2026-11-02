@@ -1,11 +1,14 @@
 import { LogBox, NativeModules, Platform } from "react-native";
 
 /**
- * Calls are paused for now: without an Apple Developer Program membership no iPhone build can carry them yet. The call
- * buttons, the call rows in chats and the call screens all stay, and a tap shows a quiet "Coming Soon" instead of
- * ringing anyone; nothing is written to the database and no ring is listened for. Everything behind them stays as it is
- * (the database functions, the livekit-token function, LiveKit, the native modules and their config), and a build
- * bundled with EXPO_PUBLIC_CALLS_ENABLED=1 turns calls back on.
+ * Calls are paused for the launch, to hold down what they cost to run (the owner's decision, 2026-11-02; at first it
+ * was because no iPhone build could carry them without an Apple Developer Program membership). Nothing of them shows:
+ * no Audio call or Video call in a chat's bar, no Join banner, no ring and no incoming-call screen, and the call screen
+ * cannot be opened (a link to one goes to Messages). A call made before the pause keeps its row in the chat, as history
+ * that a tap no longer calls back, the way the website shows it. Nothing is written to the database and no ring is
+ * listened for. Everything behind them stays as it is (the screens and components, the database functions and the call
+ * records, the livekit-token function, LiveKit, the native modules and their config), and a build bundled with
+ * EXPO_PUBLIC_CALLS_ENABLED=1 turns calls back on.
  */
 export const CALLS_PAUSED: boolean = process.env.EXPO_PUBLIC_CALLS_ENABLED !== "1";
 
