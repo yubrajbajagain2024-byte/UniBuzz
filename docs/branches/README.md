@@ -45,7 +45,8 @@ current", rules 2 and 3).
 | `home-full-bleed-top` | Sunil | Home's feeds scroll on under the status bar to the top edge, a faint tint behind the clock (no migration) | merged (PR #79, 2026-11-01) | this table and docs/status.md (one PR) |
 | `settings-redesign` | Sunil | The app's Settings as a menu of sections, each its own screen, a searchable university picker, Delete account in Account Management (no migration) | merged (PR #80, 2026-11-01) | this table and docs/status.md (one PR) |
 | `discovery-redesign` | Sunil | Explore's and Events' search and filters in three levels, the advanced choices in the sheets, For you's interests asked once, Events' plain error before migration 61, a steady Profile grid (no migration) | merged (PR #81, 2026-11-01 23:18 UTC) | this table and docs/status.md (one PR) |
-| `migration-61-live` | Sunil | Migration 61 recorded as live on production (2026-11-01 23:31 UTC) and taken out of the rollout rehearsals' "ahead" lists (no migration of its own) | committed, not pushed | this table and docs/migrations.md (one PR) |
+| `migration-61-live` | Sunil | Migration 61 recorded as live on production (2026-11-01 23:31 UTC) and taken out of the rollout rehearsals' "ahead" lists (no migration of its own) | merged (PR #82, 2026-11-01 23:48 UTC) | this table and docs/migrations.md (one PR) |
+| `ankur-autonomy` | Sunil | Ankur's sessions work end to end without asking (code, tests, pushes, his own merges, development and staging deploys); production writes wait on Sunil's approval, each on its own (no migration) | open | `CLAUDE.md` (Workflow) and docs/decisions.md |
 
 **Safe to delete once their owner agrees**, because `main` has all their work (what is left on them
 is an old `CLAUDE.md` copy or, on `business-portal-prelaunch`, the stray `app.json`):

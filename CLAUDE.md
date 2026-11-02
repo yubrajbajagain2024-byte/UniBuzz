@@ -109,6 +109,13 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
 - **Sunil and Ankur (`ProXteller`) each merge their own pull requests** into `main` once the checks
   below pass, without waiting for the other's approval: the author's merge is that deploy's
   approval. The other production writes below still need the owner's approval.
+- **Ankur works on his own, end to end** (Sunil's decision, 2026-11-01). A session working for him
+  writes, refactors and deletes code; builds features; fixes bugs and security issues; changes the
+  UI, the APIs and the schema (as migrations); runs tests; commits, pushes his branches, opens PRs
+  and merges his own once the checks pass; and deploys to development and staging (preview builds,
+  the staging project), all without asking first. Only the production writes below wait, each on
+  Sunil's explicit approval, one at a time, then run with a backup, tests and a rollback ready. It
+  ends with a short summary: the work done, the commits and PRs, and what was deployed where.
 - Before opening a PR, check what it would bring (`git log origin/main..<branch>`); a branch that
   is already merged needs none, whatever GitHub's "Compare & pull request" banner suggests. Then
   run `npm run check`, the tests your change touches (`npm run db:test` for any SQL), and the
