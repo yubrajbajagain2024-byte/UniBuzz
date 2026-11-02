@@ -15,6 +15,6 @@ npm run dev:admin            # http://localhost:3001 (the website runs on :3000)
 - **Browser check:** `BASE=http://localhost:3001 node apps/admin/e2e/admin.mjs`, with a staff account and its
   authenticator key for the signed-in checks (see the script's header).
 - **Deploying:** its own Vercel project (`campconnect-admin`, Root Directory `apps/admin`) is connected to the repository
-  since 2026-11-02: a merge into `main` that touches `apps/admin` or `packages/shared` deploys it (`vercel.json`'s
-  `ignoreCommand` skips the rest). `npm run deploy:admin` deploys the local tree by hand; both are production deploys
+  since 2026-11-02: every merge into `main` builds and deploys it (about a minute; the repository's `.vercelignore` strips `.git`
+  from Vercel's clone, so no git-based ignore command can skip builds there). `npm run deploy:admin` deploys the local tree by hand; both are production deploys
   and need the owner's approval.

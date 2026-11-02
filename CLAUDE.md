@@ -109,8 +109,8 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
 
 - Branch from `main` and land work through a **pull request**. Never push to `main`.
 - **Every push to `main` deploys the website and CampConnect Admin to production** (both Vercel
-  projects are Git-connected since 2026-11-02; the admin one skips pushes touching neither `apps/admin`
-  nor `packages/shared`). Merging is deploying: a migration the code needs must already be live.
+  projects are Git-connected since 2026-11-02; each builds on every push). Merging is deploying: a
+  migration the code needs must already be live.
 - **Sunil and Ankur (`ProXteller`) each merge their own pull requests** into `main` once the checks
   below pass, without waiting for the other's approval: the author's merge is that deploy's
   approval. The other production writes below still need the owner's approval.
