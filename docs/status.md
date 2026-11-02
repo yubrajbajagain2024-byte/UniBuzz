@@ -57,6 +57,33 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   Still to do, each with the owner's approval: `CRON_SECRET` in Vercel's Production environment, Texas State's
   calendar feed added in `/admin/events`, an EAS update so testers get the tab (and PR #81's filters and readable
   Events error).
+- **Profile navigation** (`profile-navigation`, 2026-11-02, pushed; PR to open): someone's profile opened from a
+  post closed only with a swipe from the very screen edge, a few points wide: iOS 26's full-screen back swipe waits for
+  any sideways scroll view under it to give up, and the profile's tab pager never does (reproduced on the iOS
+  Simulator). Now on the first tab of a pushed profile the pager takes no touches (a scroll view switched off once the
+  finger is down is too late, also tried), a swipe right from anywhere is iOS's own back swipe, following the finger
+  with Home behind it where it was, and a leftward drag moves the pager to the next tab by the same intent rule. Your own
+  photo or name on a post, a reel, a comment or a mention opens the Profile tab instead of a copy of your profile
+  (`useOpenProfile`). The Profile tab no longer collapses the bottom bar on a flick; the profile's header, its
+  information and its tabs row never changed size (they scroll up as one), so the bar was what shrank (read that way:
+  to be confirmed). Checked on the Simulator against staging: the back swipe mid-drag and on release, Home's place kept,
+  the leftward tab swipe, a nudge springing back, a rightward swipe on the second tab changing tab, vertical scrolling,
+  your own name opening the Profile tab and Home kept. Also on the branch: a square of Profile → Listings shows only
+  its kind's small icon over the photo (people for a roommate post, a tag for an item, a house for an apartment), with
+  no "For sale", "Roommate post" or title over it; and New Message's search field is the compact one (40 points, 12
+  above and below, aligned with the list) with a little more room between the people in its list. Both looked at on the
+  Simulator against staging with a throwaway item and roommate post, deleted afterwards. Not checked on an iPhone. App
+  only, no migration.
+- **Messages' header scrolls with the list** (`profile-navigation`, 2026-11-02, pushed; PR to open): the title,
+  Chats | Groups, the search field and the All | Unread | Requests pills stayed fixed over the inbox. Now they scroll
+  away with the list on screen, point for point, and come back only as it returns to its top; only the bottom bar stays,
+  and on Messages it no longer collapses on a flick (the owner asked for it to stay fixed). Checked on the Simulator
+  against staging with twelve throwaway chats (deleted afterwards): a slow drag (the header and the rows move together),
+  the header gone and staying gone on a scroll back mid-list, a swipe to Groups and back with no jump, a drag from the
+  title, a tap on Messages and pull to refresh (the spinner below the header), a new pill while the header was part
+  way up (both back at the top), a flick (the whole bar stays), and a search (the header holds still, results under it).
+  A tap on the search field could not be scripted on the Simulator (on Events' either), so the search was opened with
+  text typed in by a temporary edit, since removed. Not checked on an iPhone or in light mode. App only, no migration.
 - **Password recovery, and sign-in's words** (`password-recovery`, 2026-11-02, pushed; PR to open): "Forgot
   password?" in the app sent a reset email, but nothing anywhere let the person set a new password from its link (the
   website had no page for it and no "Forgot password?" of its own), so a forgotten password could not be recovered.

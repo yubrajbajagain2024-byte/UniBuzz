@@ -28,6 +28,7 @@ import { ViewerChromeContext, ViewerClockContext, ViewerClosingContext, ViewerZo
 import { hasDrawn, lendPlayer, returnPlayer } from "@/lib/video-handoff";
 import { setVideosMuted, useVideosMuted, VIDEO_AUDIO_MODE, videosMuted } from "@/lib/video-sound";
 import { usePageSwipe, type PageSlides } from "@/lib/viewer-swipe";
+import { useOpenProfile } from "@/lib/open-profile";
 
 /**
  * The shades over a reel are true gradients of a media colour (the same in both themes), each stop that colour at a
@@ -149,6 +150,7 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
   const buzz = reel.buzz ? (liveBuzz ?? reel.buzz) : null;
   const { user } = useSession();
   const router = useRouter();
+  const openProfile = useOpenProfile();
   const show = useActionSheet();
   const shareSheet = useShareSheet();
   const muted = useVideosMuted();
@@ -646,7 +648,7 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
               <Text style={[styles.author, { fontSize: 12, fontWeight: "600", opacity: 0.85 }]}>· Business</Text>
             </Pressable>
           ) : (
-            <Pressable onPress={unlessSwiped(() => router.push({ pathname: "/profile/[id]", params: { id: reel.author.id } }))} style={{ flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start" }} accessibilityRole="link" accessibilityLabel={`${reel.author.name}'s profile`}>
+            <Pressable onPress={unlessSwiped(() => openProfile(reel.author.id))} style={{ flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start" }} accessibilityRole="link" accessibilityLabel={`${reel.author.name}'s profile`}>
               <Text style={styles.author} numberOfLines={1}>
                 {reel.author.name}
               </Text>

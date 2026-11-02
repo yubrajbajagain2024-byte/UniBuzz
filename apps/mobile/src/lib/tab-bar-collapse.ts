@@ -10,8 +10,10 @@ import { reduceMotionEnabled } from "./accessibility";
  * one round button holding the tab on screen (Home's icon on Home, Explore's on Explore, and so on); scrolling back, or
  * reaching the top, brings the whole bar back where it was. What counts as a flick, and as a scroll back, is
  * `createScrollCollapse` in packages/shared (src/scroll-collapse.ts), tuned by TAB_BAR_SCROLL below. Home's For you and
- * Buzz, Explore's three pages, Messages' pages, Events' two and your Profile feed it (useCollapseOnScroll); Reels and the
- * full-screen viewers never do, and leaving a tab, or moving to another page of it, brings the whole bar back.
+ * Buzz, Explore's three pages and Events' two feed it (useCollapseOnScroll); Messages (its header scrolls away and only
+ * the bar stays put) and your Profile (it keeps its whole layout, the bar included), both the owner's choice of
+ * 2026-11-02, Reels and the full-screen viewers never do, and leaving a tab, or moving to another page of it, brings the
+ * whole bar back.
  *
  * `tabBarCollapse` is the state on the UI thread, 0 for the whole bar and 1 collapsed, springing in between: the bar
  * (components/floating-tab-bar.tsx) and the floating create buttons, which ride down beside the collapsed bar like X's,
@@ -90,7 +92,7 @@ function pastEnd(e: NativeScrollEvent | undefined): boolean {
  * list is from its top (iOS content insets already taken off) and the event itself (its timestamp, its size). Only while
  * `active` (the list is the page on screen, its tab focused); when it stops being active the whole bar comes back, so a
  * list left collapsed never leaves another page without its tabs. `page`, for a screen whose pager hands one tracker
- * several lists (Explore, Messages, Events): a new page starts over with the whole bar. Horizontal scrolls (a photo
+ * several lists (Explore, Events): a new page starts over with the whole bar. Horizontal scrolls (a photo
  * carousel, the pager itself) are never fed, so they never count.
  */
 export function useCollapseOnScroll(active: boolean, page: number = 0): (fromTop: number, e?: NativeScrollEvent) => void {

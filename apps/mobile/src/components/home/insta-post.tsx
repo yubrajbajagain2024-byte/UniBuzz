@@ -21,6 +21,7 @@ import { PhotoCarousel } from "../photo-carousel";
 import { POST_FRAME_RADIUS, POST_GUTTER, POST_TEXT, PostActions, PostFrame, PostHeader, PostLink } from "../post-bits";
 import { useShareSheet } from "../share-sheet";
 import { Icon } from "@/components/icon";
+import { useOpenProfile } from "@/lib/open-profile";
 
 export type InstaPostProps = {
   post: FeedPostWithAuthor;
@@ -111,7 +112,8 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
   // Friends-only and selected-people posts cannot go into a chat (see canShareAudience).
   const shareable = canShareAudience(audience);
   const comments = props.comments ?? engagement?.comments ?? 0;
-  const openProfile = (id: string) => router.push({ pathname: "/profile/[id]", params: { id } });
+  // Your own photo or name goes to your Profile tab; anyone else's profile is pushed over the feed.
+  const openProfile = useOpenProfile();
   const openMention = useOpenMention();
   // "Texas State University · Oct 2", or just the date.
   const meta = [subtitle, shortDate(post.created_at)].filter(Boolean).join(" · ");

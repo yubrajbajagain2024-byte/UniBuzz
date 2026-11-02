@@ -19,8 +19,6 @@ export const TILE_RADIUS = 10;
 
 type ListingType = "apartment" | "roommate" | "item";
 const LISTING_ICONS: Record<ListingType, keyof typeof Ionicons.glyphMap> = { apartment: "home", roommate: "people", item: "pricetag" };
-/** What a square in the Listings tab says it is. */
-const LISTING_KINDS: Record<ListingType, string> = { apartment: "Apartment", roommate: "Roommate post", item: "For sale" };
 
 const isListing = (type: ProfileTileType): type is ListingType => type === "apartment" || type === "roommate" || type === "item";
 
@@ -156,9 +154,11 @@ export const ProfileGridTile = memo(function ProfileGridTile({ tile, width, aspe
 });
 
 /**
- * A square of the Listings tab, as on the website: the cover (or the kind's icon on the soft fill), a play mark on a video
- * (otherwise the stack icon of several photos), and at the bottom the kind and a two-line title over a fade. Listing squares
- * in Saved and Liked stay plain ProfileGridTile squares.
+ * A square of the Listings tab: the cover, clean, with only small glyphs on it (the owner's choice, 2026-11-02): the
+ * kind's icon at the bottom left (a roommate post's people, an item's sale tag, an apartment's house), and a play mark on
+ * a video (otherwise the stack icon of several photos) at the top right. No words over the picture; the kind and the
+ * title are still read out (tileLabel). A listing without photos is the kind's icon on the soft fill. Listing squares in
+ * Saved and Liked stay plain ProfileGridTile squares.
  */
 export const ListingGridTile = memo(function ListingGridTile({ tile, width, aspect = TILE_ASPECT, radius = TILE_RADIUS, onOpen }: { tile: ProfileTile; width: number; aspect?: number; radius?: number; onOpen: (tile: ProfileTile) => void }) {
   const styles = useStyles();
@@ -172,10 +172,7 @@ export const ListingGridTile = memo(function ListingGridTile({ tile, width, aspe
   return (
     <Pressable onPressIn={tap.onPressIn} onPress={tap.onPress} accessibilityRole="button" accessibilityLabel={tileLabel(tile)} style={[styles.tile, { width, height: width * aspect, borderRadius: radius }]}>
       {tile.imageUrl ? (
-        <>
-          <Image source={{ uri: tile.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} recyclingKey={tile.key} cachePolicy="memory-disk" />
-          <View style={styles.listingShade} pointerEvents="none" />
-        </>
+        <Image source={{ uri: tile.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} recyclingKey={tile.key} cachePolicy="memory-disk" />
       ) : (
         <View style={styles.listingBlank}>
           <Icon name={LISTING_ICONS[kind]} size={28} color={colors.faint} />
@@ -188,17 +185,8 @@ export const ListingGridTile = memo(function ListingGridTile({ tile, width, aspe
         <Icon name="copy" size={15} color={ink} style={[styles.corner, inkShadow]} />
       ) : null}
 
-      <View style={styles.listingText} pointerEvents="none">
-        <View style={styles.listingKindRow}>
-          <Icon name={LISTING_ICONS[kind]} size={11} color={ink} style={inkShadow} />
-          <Text style={[styles.listingKind, { color: ink }, inkShadow]} numberOfLines={1}>
-            {LISTING_KINDS[kind]}
-          </Text>
-        </View>
-        <Text style={[styles.listingTitle, { color: picture ? colors.onMedia : colors.text }, inkShadow]} numberOfLines={2}>
-          {tile.text ?? LISTING_KINDS[kind]}
-        </Text>
-      </View>
+      {/* Over a photo, the kind's icon alone; a square without one already shows it large in the middle. */}
+      {picture ? <Icon name={LISTING_ICONS[kind]} size={15} color={ink} style={[styles.listingIcon, inkShadow]} /> : null}
     </Pressable>
   );
 });
@@ -213,11 +201,7 @@ const useStyles = makeStyles((colors) => ({
   viewsText: { fontSize: 12, fontWeight: "700" },
   iconShadow: { textShadowColor: colors.mediaTextShadow, textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   corner: { position: "absolute", top: 8, right: 8 },
-  // The fade under a listing's kind and title: from clear to the photo-pill dark, drawn as a real gradient (no seams).
-  listingShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: "55%", experimental_backgroundImage: `linear-gradient(to bottom, transparent, ${colors.mediaPill})` },
-  listingBlank: { flex: 1, alignItems: "center", justifyContent: "center", paddingBottom: 40, backgroundColor: colors.input },
-  listingText: { position: "absolute", left: 8, right: 8, bottom: 8, gap: 2 },
-  listingKindRow: { flexDirection: "row", alignItems: "center", gap: 3 },
-  listingKind: { flexShrink: 1, fontSize: 11, fontWeight: "600" },
-  listingTitle: { fontSize: 12, fontWeight: "700", lineHeight: 15 },
+  listingBlank: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.input },
+  // The kind's glyph, matching the corner marks: the same inset from the bottom-left corner.
+  listingIcon: { position: "absolute", left: 8, bottom: 8 },
 }));
