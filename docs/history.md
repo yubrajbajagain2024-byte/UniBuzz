@@ -52,6 +52,7 @@ open work is in [status.md](status.md).
   ([decisions.md](decisions.md)).
 - **2026-11-01:** PRs #77 to #81 merge (the app's viewers, bottom bar, Home's top edge, Settings, Explore's and Events'
   filters); migration 61 (Events) reaches production on its own, ahead of the Business v2 release (23:31 UTC).
+- **2026-11-02:** migration 62 (story actions) reaches production on its own (04:32 UTC).
 
 ## The AI documentation
 
@@ -74,6 +75,11 @@ open work is in [status.md](status.md).
 - 2026-10-28 19:03 UTC: PR #52 (`business-v2`'s third and fourth rounds: the fixes to 50, 55 and 56,
   the staging rehearsal and backup tooling, the production checklist) merged into `main`. None of
   49 to 56 is on production.
+
+- 2026-11-02 04:32 UTC: migration 62 (story actions) applied to production on its own, with the owner's approval,
+  after staging (04:02 UTC, `staging/story-actions.mjs` 15/15) and a full backup checked against the live project
+  (`before-migration-62`); one transaction through the Management API, its `_migrations` row with it; every check
+  after passed ([migrations.md](migrations.md)). Story likes, replies and shares stop failing on production.
 
 - 2026-11-01 23:48 UTC: PR #82 (`migration-61-live`) merged into `main` by the owner: migration 61 recorded as live, and
   the rollout rehearsals starting from a production that has it. Docs and tests only.
