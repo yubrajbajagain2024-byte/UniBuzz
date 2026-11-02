@@ -17,7 +17,7 @@ export const read = (f) => fs.readFileSync(path.join(SUPABASE_DIR, f), "utf8");
  */
 export const OUTSIDE_MIGRATIONS = [
   { after: "20261029000000_push.sql", files: ["20261023000000_admin.sql", "20261024000000_moderation_support.sql"] }, // 2026-10-25 15:11 UTC
-  { after: "20261102000000_presence_channel_join.sql", files: ["20261103100000_admin_dashboard.sql", "20261103100100_hardening.sql"] }, // 22:31 UTC
+  { after: "20261102000000_presence_channel_join.sql", files: ["20261103100000_admin_dashboard.sql", "20261103100100_hardening.sql", "20261103100200_staff_invite_email.sql"] }, // 22:31 UTC; 18 later that night
 ];
 
 /**

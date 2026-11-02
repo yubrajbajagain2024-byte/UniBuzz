@@ -36,7 +36,7 @@
   `SKIP_AUTH`, `ADMIN_OWNER_EMAIL`), `scripts/configure-auth-email.mjs`, five PGlite suites adapted to
   `boot({ live: true })` (admin, admin-dashboard, moderation-support, permissions-audit, launch-checklist), the README's
   "Admin app" section, the website's suspended-account message and the account-deletion refusal shown in the form.
-  **Still only here:** migration 18 and its suite (`staff-invite-email`), the `hidden_at`/`hidden_reason` message types
+  **Still only here:** the `hidden_at`/`hidden_reason` message types
   with their website and app hunks, `no-admin.mjs` and the "no admin on the website" rule (`main` keeps its `/admin`
   console), `live-order-check.mjs` and `staging-rehearsal.mjs` (superseded by `production-rollout.test.mjs` and
   `staging/release-rehearsal.mjs`), `apps/web/vercel.json`. Questions 1 to 3 (migration names, the `_migrations` rows,

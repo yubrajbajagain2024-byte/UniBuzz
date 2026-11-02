@@ -153,9 +153,14 @@ The website project and the mobile app are not touched by any of this.
 | The unpushed migration on the owner's Mac (`admin-check-1028`): rename so it sorts after 63, apply alone, then push | **needs the owner** |
 | Events (61) alone first | Sunil's branch; on staging since 2026-10-31, not on production |
 
-## Note for Sunil: staging on 2026-10-30/31
+## Note for Sunil: staging on 2026-10-30/31, and the admin migrations
 
-While this branch's rehearsal ran on `campconnect-staging` (22:20 to 02:30 UTC), another session applied 58 to 61
+**The admin migrations:** this branch keeps 14 to 17 in `supabase/applied-outside-repo/` and adds 18 there (copied from
+`step-admin`, applied by `boot({ live: true })` after 17, its 20-check suite in `db:test`). Production's `_migrations` rows
+already carry these file names, so nothing is renamed or moved (docs/decisions.md). If you see a reason to move them
+into `supabase/migrations/` instead, say so before the release; otherwise the merge plan's questions 1 to 3 are closed.
+
+**Staging:** While this branch's rehearsal ran on `campconnect-staging` (22:20 to 02:30 UTC), another session applied 58 to 61
 there and seeded Events (212 rows, 4 organizations, a `unibuzz-demo…` staff account). This run then removed only its
 own rows (accounts `rh-*`/`*.mvv*`, promotions `RH-*`/`INV-mvv*`, its storage objects, and 277 member-less
 conversations created after 22:23 UTC, unreadable to anyone) and rolled its migrations back; it left staging at

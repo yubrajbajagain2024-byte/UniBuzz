@@ -43,8 +43,7 @@ migration's production status is in [docs/migrations.md](../docs/migrations.md).
 Supabase's `auth` and `storage` schemas.
 
 - `boot()`: this repo's schema. `boot({ live: true })`: production's order, with the
-  `applied-outside-repo/` migrations where they really ran (no `step-admin` migration 18, which is
-  not in this repo). `boot({ upTo })` stops after a migration.
+  `applied-outside-repo/` migrations where they really ran (18, staff invitations by email, included since 2026-11-02). `boot({ upTo })` stops after a migration.
 - `mk(email, name)` makes a confirmed user; `as(uid, fn, { aal: "aal2" })` runs as a user after
   two-factor sign-in (it adds a verified factor); `asAnon`, `asService`; `expectOk`, `expectError`,
   `done`.
