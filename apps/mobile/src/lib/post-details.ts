@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 import { Alert } from "react-native";
-import { useRouter } from "expo-router";
+import { useOpenProfile } from "./open-profile";
 import { campusLabel, DEFAULT_POST_AUDIENCE, POST_AUDIENCES, profileIdByUsername, type PostAudience } from "@apartment-book/shared";
 import { errorText } from "./hooks";
 import { supabase } from "./supabase";
@@ -62,7 +62,7 @@ export function linkLabel(url: string): string {
  * change, so one that leads nowhere now says so quietly instead. A second tap while the first is still asking is ignored.
  */
 export function useOpenMention(): (username: string) => void {
-  const router = useRouter();
+  const openProfile = useOpenProfile();
   const busy = useRef(false);
   return useCallback(
     (username: string) => {
@@ -70,7 +70,7 @@ export function useOpenMention(): (username: string) => void {
       busy.current = true;
       profileIdByUsername(supabase, username)
         .then((id) => {
-          if (id) router.push({ pathname: "/profile/[id]", params: { id } });
+          if (id) openProfile(id);
           else Alert.alert(`@${username}`, "No one has that username now.");
         })
         .catch((e: unknown) => Alert.alert("Couldn't open this profile", errorText(e)))
@@ -78,6 +78,6 @@ export function useOpenMention(): (username: string) => void {
           busy.current = false;
         });
     },
-    [router],
+    [openProfile],
   );
 }

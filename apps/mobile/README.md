@@ -132,8 +132,8 @@ to its plain look with no bounce, and the tabs make room for the capsule, GroupM
 (`src/components/floating-tab-bar.tsx`, on Reanimated); every tab's list and floating button keeps `tabBarInset` clear
 under it. (FloatingTabBar can still hold an action in the middle, `action`, which the capsule passes behind but never
 stops on; the app's bar has none.) The bar collapses like Reddit's (iOS 26's tab bar minimising), by the speed of the
-scroll: reading at any pace keeps the whole bar, and only a deliberate flick down a page of Home (For you, Buzz), Explore,
-Messages (not while searching), Events or your Profile, at 700 points a second or more over at least 32 points
+scroll: reading at any pace keeps the whole bar, and only a deliberate flick down a page of Home (For you, Buzz), Explore
+or Events (Messages and your Profile always keep the whole bar), at 700 points a second or more over at least 32 points
 (`createScrollCollapse` in `packages/shared/src/scroll-collapse.ts`, from each scroll event's native timestamp, tuned by
 `TAB_BAR_SCROLL` in `src/lib/tab-bar-collapse.ts`; first values, to be tuned on a phone), narrows it to a circle at the
 bottom left holding just that tab's icon, the other tabs fading as it goes, and the "+" (or Buzz's pen) becomes its twin at the
@@ -339,7 +339,8 @@ and a small mark of who can see that section: a lock for Only me, two people for
 Everyone; the filled icon and the mark crossfade with the swipe on the native side, like the underline, so they never
 wait for the pager to settle), over Instagram's grid: three 3:4 tiles to a row (9:16 on Reels), edge to edge with a
 hairline between them and square corners, a play count on videos only (Listings: your live
-apartments, roommate posts and items for sale, each tile with its kind and title). A stacked profile has Back at the top
+apartments, roommate posts and items for sale, each tile its picture with only the kind's small icon on it, no
+words). A stacked profile has Back at the top
 left instead of Find friends. The Classes tab lists classes by semester, this one first (up to 12 each; add your own there with the subject and course number as two boxes, "CS" and "3358", kept as the one code "CS 3358" the database checks, the section, the days and times it meets and the room; a hold on a class card offers Edit (the same form, filled in; Save moves you between course chats when the section changes) and Delete, which asks first, and there is no other way to change or remove one; once a class is in or changed, the form closes and a line under "Add class" says so, the button bringing it back). Listing a section puts you in that section's course chat, a group in Messages shared by everyone at your campus taking it this semester: the first classmate's listing creates it, removing the class leaves it, a notification tells you about both, it cannot be renamed or hand-filled, and it goes with the semester after a week's notice (migration 24).
 Settings (`src/app/settings.tsx` and `src/app/settings/`, Apple's Settings in UniBuzz's colours: inset grouped sections,
 compact rows, SF Symbols, native switches, small aurora icon tiles, all from `src/components/settings/settings-ui.tsx`)
@@ -362,7 +363,13 @@ Saved, Liked and Listings are Only me (migration 37). A visitor without access g
 pager has one page per tab they get), while you always see all six. A sideways swipe changes tab only when it is meant
 (`intendedSwipe` in `src/components/profile/profile-view.tsx`): dragged at least 18% of the page (56 points at least),
 or flicked at 500 points a second or more over at least 24 points; anything less springs back to the open tab. Each tab
-keeps its page mounted and its grid loaded once, and the bottom bar's collapse starts over on each tab. A square never
+keeps its page mounted and its grid loaded once. The Profile tab keeps its whole layout as it scrolls, the bottom bar
+included (it never collapses there): the header scrolls up under the floating bar and the tabs row sticks under it. Someone
+else's profile, pushed over the feed, closes with a swipe right from anywhere on its first tab (iOS's own back swipe,
+following the finger, the feed underneath where it was); on its first tab the pager takes no touches, since that swipe
+waits for any sideways scroll view to give up and the pager never does, and a leftward drag moves it under the finger
+instead (`firstTabSwipe`). Your own photo or name on a post, a reel, a comment or a mention opens the Profile tab rather
+than a copy of it (`useOpenProfile` in `src/lib/open-profile.ts`). A square never
 changes under a finger (no dimming: a touch that turns into a scroll or a swipe would flash it), a tap is a touch that
 moved under 10 points (`TAP_SLOP` in `src/components/profile/profile-tile.tsx`: a slide inside a square no longer opens the
 post), and its picture is kept decoded in memory as well as on disk, so a square drawn again shows it at once. Hold one of your own posts or reels in the grid (or use
@@ -374,7 +381,12 @@ who-can-see settings, `profile_classes`, likes readable only through functions, 
 The Messages tab is the inbox (`src/app/(tabs)/messages.tsx`): the new-message pencil in the top-right corner, the big
 "Messages" title, Chats | Groups with Home's sliding aurora underline, a rounded search box and the All | Unread |
 Requests pills (each with its count; Requests on Chats only), then the two pages side by side in a pager like Home's: a
-swipe or a tap on a label moves between your direct chats and your group chats, silently, as on Home. On Chats the row of
+swipe or a tap on a label moves between your direct chats and your group chats, silently, as on Home. All of that header
+scrolls away with the list, point for point as if it were part of it, and comes back only as the list returns to its
+top (the status bar stays clear: rows pass out of sight under it); only the bottom bar stays, whole. A drag that starts
+on the title or between the controls scrolls the list too. Before the other page comes into view its list is moved to
+match, so the header never jumps between Chats and Groups; a new pill or a search starts both lists at the top, and
+during a search the header holds still with results passing under it. On Chats the row of
 friends online now sits above the chats (photo, name, the time at the right, the last message under it, no line between
 rows; no @usernames anywhere in Messages, names only, though typing a handle still finds the chat). A long press on a row (or Chat
 info) mutes that person's messages everywhere or that group, and a group also offers every group chat at once, each for 1, 8 or

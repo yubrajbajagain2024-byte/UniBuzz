@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { ActivityIndicator, Alert, Animated, Keyboard, Linking, Platform, RefreshControl, Text, View, useWindowDimensions, type FlatList, type LayoutChangeEvent, type ListRenderItem, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollView, type ScrollViewInstance } from "react-native";
 import type { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useIsFocused, useNavigation, useRouter } from "expo-router";
+import { useFocusEffect, useNavigation, useRouter } from "expo-router";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   blockUser,
@@ -62,7 +63,6 @@ import { ShareProfileSheet } from "./share-profile-sheet";
 import { useTileGrid, type GridCursor, type GridPage, type TileGrid } from "./use-tile-grid";
 import { LockedNotice, VisibilityRow } from "./visibility-row";
 import { useTabReselect } from "@/lib/tab-reselect";
-import { useCollapseOnScroll } from "@/lib/tab-bar-collapse";
 import { Icon } from "@/components/icon";
 
 /**
@@ -254,7 +254,7 @@ type PagerLink = {
  * `count` is how many pages there are: the tabs this viewer gets. When that changes (a follow opens Classes, a block
  * closes them), `relocate` puts the pager on the page that is now the open tab, every page back at the top.
  */
-function useProfilePager({ pageWidth, tuck, barHeight, count, onRefresh, onHeaderHeight, onPageScroll }: { pageWidth: number; tuck: number; barHeight: number; count: number; onRefresh: (index: number) => void; onHeaderHeight: (height: number) => void; onPageScroll?: (e: NativeScrollEvent) => void }) {
+function useProfilePager({ pageWidth, tuck, barHeight, count, onRefresh, onHeaderHeight }: { pageWidth: number; tuck: number; barHeight: number; count: number; onRefresh: (index: number) => void; onHeaderHeight: (height: number) => void }) {
   const pager = useRef<ScrollViewInstance>(null);
   /** The pager's offset on the native side: the tab underline, the tabs row's choice of page and the header copies follow it. */
   const [scrollX] = useState(() => new Animated.Value(START_PAGE * pageWidth));
@@ -268,9 +268,9 @@ function useProfilePager({ pageWidth, tuck, barHeight, count, onRefresh, onHeade
   const swiping = useRef(false);
   /** Where a released swipe is taking the pager, until it gets there (`commit`); null while it is not gliding to a page. */
   const heading = useRef<number | null>(null);
-  const latest = useRef({ pageWidth, tuck, count, onRefresh, onHeaderHeight, onPageScroll });
+  const latest = useRef({ pageWidth, tuck, count, onRefresh, onHeaderHeight });
   useEffect(() => {
-    latest.current = { pageWidth, tuck, count, onRefresh, onHeaderHeight, onPageScroll };
+    latest.current = { pageWidth, tuck, count, onRefresh, onHeaderHeight };
   });
 
   const sync = useCallback(
@@ -365,8 +365,6 @@ function useProfilePager({ pageWidth, tuck, barHeight, count, onRefresh, onHeade
       },
       track: (index, e) => {
         offsets.current[index] = e.contentOffset.y;
-        // The open page's own scrolling, not a swipe between pages, collapses the bottom bar (see onPageScroll).
-        if (index === activeRef.current && !swiping.current) latest.current.onPageScroll?.(e);
       },
       dragStart: () => {
         swiping.current = false;
@@ -389,9 +387,9 @@ function useProfilePager({ pageWidth, tuck, barHeight, count, onRefresh, onHeade
 
   // No JS listener: the underline, the tabs row and the copies of the header follow the pager on the UI thread alone.
   const onPagerScroll = useMemo(() => Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: true }), [scrollX]);
-  const onPagerDragBegin = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const inView = pageAt(e.nativeEvent.contentOffset.x, latest.current.pageWidth, latest.current.count);
+  /** A swipe starts with page `inView` on screen (a drag of the pager, or the first tab's own swipe: see ProfileView). */
+  const beginSwipe = useCallback(
+    (inView: number) => {
       // A quick second swipe caught the pager before it settled (no onMomentumScrollEnd came): the page it reached opens
       // now, so its neighbours are there for this swipe. Otherwise the open page leads the others into step.
       if (inView !== activeRef.current) commit(inView);
@@ -401,6 +399,7 @@ function useProfilePager({ pageWidth, tuck, barHeight, count, onRefresh, onHeade
     },
     [sync, commit],
   );
+  const onPagerDragBegin = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => beginSwipe(pageAt(e.nativeEvent.contentOffset.x, latest.current.pageWidth, latest.current.count)), [beginSwipe]);
   const onPagerDragEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, targetContentOffset, velocity } = e.nativeEvent;
@@ -455,7 +454,7 @@ function useProfilePager({ pageWidth, tuck, barHeight, count, onRefresh, onHeade
   // The floating bar's background and the name on it: clear while the cover shows, solid by the time the tabs row reaches the bar.
   const barOpacity = useMemo(() => tabsShift.interpolate({ inputRange: [barHeight, barHeight + 56], outputRange: [1, 0], extrapolate: "clamp" }), [tabsShift, barHeight]);
 
-  return { pager, scrollX, link, active, mounted, select, relocate, onPagerScroll, onPagerDragBegin, onPagerDragEnd, onPagerSettle, onPagerLayout, tabsShift, barOpacity };
+  return { pager, scrollX, link, active, mounted, select, relocate, beginSwipe, commit, onPagerScroll, onPagerDragBegin, onPagerDragEnd, onPagerSettle, onPagerLayout, tabsShift, barOpacity };
 }
 
 /** What a visitor may see of Classes, Saved, Liked or Listings: still asking, could not ask, a lock, or the tab itself. */
@@ -564,7 +563,7 @@ type TilesPageProps = PageFrame & {
 /**
  * Posts, Reels, Saved, Liked or Listings: the tiles three to a row, edge to edge (Instagram's grid: 3:4 tiles, 9:16 on
  * Reels), loading more as you scroll, and under them a lock, a spinner, an empty tab, an error or "loading more".
- * Listings show their kind and title on the tile (as on the website); the other tabs keep plain picture tiles.
+ * Listings show only their kind's icon on the picture (ListingGridTile); the other tabs keep plain picture tiles.
  */
 const TilesPage = memo(function TilesPage(props: TilesPageProps) {
   const { index, link, header, pageWidth, tabsHeight, active, refreshing, topInset, tab, grid, own, tileWidth, onOpen, onPin, gate, gateMessage, onRetryGate, visibility, savingVisibility, onChangeVisibility } = props;
@@ -736,9 +735,7 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
   const viewerId = user?.id ?? null;
   const own = viewerId === userId;
   const needLogin = useCallback(() => router.push("/(auth)/login"), [router]);
-  const focused = useIsFocused();
   // Read through a ref: the tracker is made below, once the open page is known, and starts over on each tab.
-  const trackTabBarRef = useRef<(fromTop: number, e: NativeScrollEvent) => void>(() => {});
 
   // Your own profile follows the session's copy, which Settings and the photo button refresh.
   const profileQ = useQuery(() => getProfile(supabase, userId), [userId]);
@@ -778,19 +775,50 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
   const tuck = Math.max(0, headerHeight - barHeight);
   /** The page whose pull started the refresh: only its spinner shows. */
   const [refreshingPage, setRefreshingPage] = useState<number | null>(null);
-  const { pager, scrollX, link, active, mounted, select, relocate, onPagerScroll, onPagerDragBegin, onPagerDragEnd, onPagerSettle, onPagerLayout, tabsShift, barOpacity } = useProfilePager({
+  const { pager, scrollX, link, active, mounted, select, relocate, beginSwipe, commit, onPagerScroll, onPagerDragBegin, onPagerDragEnd, onPagerSettle, onPagerLayout, tabsShift, barOpacity } = useProfilePager({
     pageWidth: body.width,
     tuck,
     barHeight,
     count: tabs.length,
     onRefresh: (index) => void refreshAll(index),
     onHeaderHeight: (height) => setHeaderHeight((h) => (h === height ? h : height)),
-    onPageScroll: (e) => trackTabBarRef.current(Math.max(0, e.contentOffset.y), e),
   });
-  // On the Profile tab (not a profile pushed over a screen, which has no bar) the bottom bar collapses to its Profile
-  // button on a flick down the open page and comes back as it scrolls back (lib/tab-bar-collapse.ts). Each tab starts
-  // over (`active`): one page's position against another's is never read as a flick.
-  trackTabBarRef.current = useCollapseOnScroll(topBar && focused, active);
+  // The Profile tab keeps the whole bottom bar however it scrolls (the owner's choice, 2026-11-02): the profile's header,
+  // its tabs row and the bar under it stay their size, the header simply scrolling up under the floating bar. The other
+  // tabs still collapse it on a flick (lib/tab-bar-collapse.ts).
+  // A profile pushed over a screen closes with a swipe right from anywhere, as every pushed screen on iOS does (the system's
+  // own full-screen back swipe, following the finger). On iOS 26 that swipe waits for any sideways scroll view under it
+  // to give up, and the pager never does, even on its first tab where it cannot go right: so on the first tab the pager
+  // takes no touches at all (a scroll view disabled when the finger lands is out of the way; one disabled later is not),
+  // the system's swipe has the rightward drags, and a leftward drag moves the pager here instead, under the finger, to
+  // the next tab or back by the same rule as the pager's own swipes (intendedSwipe). Every other tab, your own Profile
+  // tab, and Android (no such swipe there) keep the pager as it is.
+  const firstTabHeld = Platform.OS === "ios" && !topBar && active === 0 && tabs.length > 1;
+  const firstTabSwipe = useMemo(
+    () =>
+      Gesture.Pan()
+        .runOnJS(true)
+        .enabled(firstTabHeld)
+        // Leftward only: a rightward drag fails at once and is the system's back swipe; a vertical one is the page's scroll.
+        .activeOffsetX(-10)
+        .failOffsetX(10)
+        .failOffsetY([-12, 12])
+        .onStart(() => beginSwipe(0))
+        .onUpdate((e) => {
+          const width = body.width;
+          pager.current?.scrollTo({ x: Math.min(width, Math.max(0, -e.translationX)), animated: false });
+        })
+        .onEnd((e, success) => {
+          const width = body.width;
+          if (success && width > 0 && intendedSwipe(Math.max(0, -e.translationX), -e.velocityX / 1000, width)) {
+            select(1);
+            return;
+          }
+          pager.current?.scrollTo({ x: 0, animated: true });
+          commit(0);
+        }),
+    [firstTabHeld, beginSwipe, select, commit, pager, body.width],
+  );
   // For the one render after the tabs change (the pager is moved right after it), the index may point past the end.
   const tab = tabs[Math.min(active, tabs.length - 1)]?.key ?? "posts";
 
@@ -1223,6 +1251,7 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
 
   return (
     <View style={styles.screen}>
+      <GestureDetector gesture={firstTabSwipe}>
       <View
         style={styles.body}
         onLayout={(e) => {
@@ -1244,7 +1273,7 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             // While a pull-to-refresh spinner shows, that page sits lower than the others, so a swipe would split the header.
-            scrollEnabled={refreshingPage === null}
+            scrollEnabled={refreshingPage === null && !firstTabHeld}
             scrollEventThrottle={16}
             onScroll={onPagerScroll}
             onScrollBeginDrag={onPagerDragBegin}
@@ -1290,6 +1319,7 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
           />
         </Animated.View>
       </View>
+      </GestureDetector>
       {/* Over the pages and the tabs row: the round buttons sit on the cover, and the bar fills in as the cover scrolls away. */}
       <ProfileFloatingBar topInset={topInset} name={name} left={leftAction} right={rightActions} opacity={barOpacity} />
       <ShareProfileSheet visible={sharing} onClose={() => setSharing(false)} profileId={userId} name={name} username={handle} avatarUrl={profile.avatar_url} own={own} />
