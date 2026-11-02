@@ -116,3 +116,12 @@ test("rankEvents: one organization does not take the first rows in a row when so
   // The club's first two lead; the third row goes to the other event rather than a third club row in a row.
   assert.deepEqual(ranked.slice(0, 3), ["club 1", "club 2", "other"]);
 });
+
+test("an Events write on a database without migration 61 says so plainly; any other error goes on as it is", async () => {
+  const { setEventInterests, EVENTS_NOT_READY } = await import("../src/queries/events.ts");
+  const clientFailingWith = (error) => ({ from: () => ({ delete: () => ({ eq: async () => ({ error }) }) }) });
+  const missing = { code: "PGRST205", message: "Could not find the table 'public.event_interests' in the schema cache" };
+  await assert.rejects(setEventInterests(clientFailingWith(missing), "u1", ["career"]), (e) => e instanceof Error && e.message === EVENTS_NOT_READY);
+  const denied = { code: "42501", message: "permission denied for table event_interests" };
+  await assert.rejects(setEventInterests(clientFailingWith(denied), "u1", ["career"]), (e) => e === denied);
+});

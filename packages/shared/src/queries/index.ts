@@ -30,3 +30,4 @@ export * from "./admin-dashboard";
 export * from "./stories";
 export * from "./events";
 export * from "./event-sync";
+export * from "./auth";

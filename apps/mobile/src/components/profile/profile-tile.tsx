@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef } from "react";
-import { Pressable, StyleSheet, Text, View, type ViewInstance } from "react-native";
+import { Pressable, StyleSheet, Text, View, type GestureResponderEvent, type ViewInstance } from "react-native";
 import { Image } from "expo-image";
 import type { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -11,18 +11,46 @@ import { Icon } from "@/components/icon";
 
 /** What VoiceOver calls each kind of square: "Reel: Move-in day…". */
 export const TILE_TYPE_LABELS: Record<ProfileTileType, string> = { post: "Post", reel: "Reel", apartment: "Apartment", roommate: "Roommate post", item: "Item" };
-/** Squares are 3:4, like TikTok's grid; reels (vertical video) are 9:16. The ratio is height over width. */
+/** Tiles are 3:4, like Instagram's and TikTok's grids; reels (vertical video) are 9:16. The ratio is height over width. */
 export const TILE_ASPECT = 4 / 3;
 export const REEL_ASPECT = 16 / 9;
-/** The squares' rounded corners. */
+/** The tiles' rounded corners by default (the search screen's grid); a profile's grid passes 0, Instagram's square corners. */
 export const TILE_RADIUS = 10;
 
 type ListingType = "apartment" | "roommate" | "item";
 const LISTING_ICONS: Record<ListingType, keyof typeof Ionicons.glyphMap> = { apartment: "home", roommate: "people", item: "pricetag" };
-/** What a square in the Listings tab says it is. */
-const LISTING_KINDS: Record<ListingType, string> = { apartment: "Apartment", roommate: "Roommate post", item: "For sale" };
 
 const isListing = (type: ProfileTileType): type is ListingType => type === "apartment" || type === "roommate" || type === "item";
+
+/**
+ * How far a finger may move between touching a square and letting go for it still to be a tap, UIKit's own allowance. A
+ * square sits inside a vertical list inside the profile's sideways pager: a slide that moves neither (a sideways drag on
+ * the first or last tab, a nudge) would otherwise end as a tap that opens the post, since a press is only cancelled when
+ * the finger leaves the square.
+ */
+const TAP_SLOP = 10;
+
+/**
+ * A square's taps, held to TAP_SLOP: where the finger came down, and whether the release is near enough to it. Nothing
+ * is drawn differently while a finger is down (no dimming): a touch that turns into a scroll or a swipe between tabs
+ * would otherwise flash every square it starts on, as it dims and comes back.
+ */
+function useTap(onTap: () => void) {
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const onPressIn = useCallback((e: GestureResponderEvent) => {
+    start.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+  }, []);
+  const onPress = useCallback(
+    (e: GestureResponderEvent) => {
+      const from = start.current;
+      start.current = null;
+      if (from && Math.hypot(e.nativeEvent.pageX - from.x, e.nativeEvent.pageY - from.y) > TAP_SLOP) return;
+      onTap();
+    },
+    [onTap],
+  );
+  return { onPressIn, onPress };
+}
 
 /** "Reel: Move-in day…, pinned, 1.2k views": the words, the pin and the view count the square shows. */
 export function tileLabel(tile: ProfileTile): string {
@@ -59,12 +87,13 @@ export function useOpenTile() {
 }
 
 /**
- * One square of a profile grid, TikTok style: the picture fills it; bottom left a play (videos, reels) or eye (photos) icon
- * with the view count, or a listing's kind (a house, two people, a price tag); top right a pin when pinned, otherwise the
- * stack icon of several photos. A words-only post, or a listing without photos, shows its words on a soft background.
- * `onLongPress` is only given for your own posts and reels (Pin to profile).
+ * One tile of a grid, Instagram style: the picture fills it; bottom left a play icon with the view count on a video or
+ * reel (a photo shows no count, as on Instagram), or a listing's kind (a house, two people, a price tag); top right a pin
+ * when pinned, otherwise the stack icon of several photos. A words-only post, or a listing without photos, shows its
+ * words on a soft background. `radius` rounds its corners (0 on a profile). `onLongPress` is only given for your own
+ * posts and reels (Pin to profile).
  */
-export const ProfileGridTile = memo(function ProfileGridTile({ tile, width, aspect = TILE_ASPECT, onOpen, onLongPress }: { tile: ProfileTile; width: number; aspect?: number; onOpen: (tile: ProfileTile, origin?: ViewerOrigin) => void; onLongPress?: (tile: ProfileTile) => void }) {
+export const ProfileGridTile = memo(function ProfileGridTile({ tile, width, aspect = TILE_ASPECT, radius = TILE_RADIUS, onOpen, onLongPress }: { tile: ProfileTile; width: number; aspect?: number; radius?: number; onOpen: (tile: ProfileTile, origin?: ViewerOrigin) => void; onLongPress?: (tile: ProfileTile) => void }) {
   const styles = useStyles();
   /** The square's frame, measured when it is tapped so the viewer can zoom open from it. */
   const self = useRef<ViewInstance>(null);
@@ -74,20 +103,24 @@ export const ProfileGridTile = memo(function ProfileGridTile({ tile, width, aspe
   // The marks are white with a shadow on a picture; a words-only or blank square has the soft grey fill, so there they are grey.
   const ink = tile.imageUrl ? colors.onMedia : colors.muted;
   const inkShadow = tile.imageUrl ? styles.iconShadow : null;
+  const tap = useTap(() => void measureOrigin(self.current, radius).then((origin) => onOpen(tile, origin)));
   return (
     <Pressable
       ref={self}
-      onPress={() => void measureOrigin(self.current, TILE_RADIUS).then((origin) => onOpen(tile, origin))}
+      onPressIn={tap.onPressIn}
+      onPress={tap.onPress}
       onLongPress={onLongPress ? () => onLongPress(tile) : undefined}
       delayLongPress={350}
       accessibilityRole="button"
       accessibilityLabel={tileLabel(tile)}
       accessibilityActions={onLongPress ? [{ name: "longpress", label: pinLabel }] : undefined}
       onAccessibilityAction={onLongPress ? (e) => e.nativeEvent.actionName === "longpress" && onLongPress(tile) : undefined}
-      style={({ pressed }) => [styles.tile, { width, height: width * aspect }, pressed && { opacity: 0.85 }]}
+      style={[styles.tile, { width, height: width * aspect, borderRadius: radius }]}
     >
       {tile.imageUrl ? (
-        <Image source={{ uri: tile.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} recyclingKey={tile.key} />
+        // Kept decoded in memory as well as on disk, so a square drawn again (a page of the grid scrolled back to, another
+        // tab) shows its picture at once instead of fading it in again.
+        <Image source={{ uri: tile.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} recyclingKey={tile.key} cachePolicy="memory-disk" />
       ) : tile.text ? (
         <View style={styles.words}>
           <Text style={styles.wordsText} numberOfLines={7}>
@@ -100,9 +133,9 @@ export const ProfileGridTile = memo(function ProfileGridTile({ tile, width, aspe
         </View>
       )}
 
-      {tile.views !== null ? (
+      {tile.views !== null && tile.isVideo ? (
         <View style={styles.views} pointerEvents="none">
-          <Icon name={tile.isVideo ? "play" : "eye-outline"} size={13} color={ink} style={inkShadow} />
+          <Icon name="play" size={13} color={ink} style={inkShadow} />
           <Text style={[styles.viewsText, { color: ink }, inkShadow]}>{compactCount(tile.views)}</Text>
         </View>
       ) : listing ? (
@@ -121,11 +154,13 @@ export const ProfileGridTile = memo(function ProfileGridTile({ tile, width, aspe
 });
 
 /**
- * A square of the Listings tab, as on the website: the cover (or the kind's icon on the soft fill), a play mark on a video
- * (otherwise the stack icon of several photos), and at the bottom the kind and a two-line title over a fade. Listing squares
- * in Saved and Liked stay plain ProfileGridTile squares.
+ * A square of the Listings tab: the cover, clean, with only small glyphs on it (the owner's choice, 2026-11-02): the
+ * kind's icon at the bottom left (a roommate post's people, an item's sale tag, an apartment's house), and a play mark on
+ * a video (otherwise the stack icon of several photos) at the top right. No words over the picture; the kind and the
+ * title are still read out (tileLabel). A listing without photos is the kind's icon on the soft fill. Listing squares in
+ * Saved and Liked stay plain ProfileGridTile squares.
  */
-export const ListingGridTile = memo(function ListingGridTile({ tile, width, aspect = TILE_ASPECT, onOpen }: { tile: ProfileTile; width: number; aspect?: number; onOpen: (tile: ProfileTile) => void }) {
+export const ListingGridTile = memo(function ListingGridTile({ tile, width, aspect = TILE_ASPECT, radius = TILE_RADIUS, onOpen }: { tile: ProfileTile; width: number; aspect?: number; radius?: number; onOpen: (tile: ProfileTile) => void }) {
   const styles = useStyles();
   const colors = useColors();
   const kind: ListingType = isListing(tile.type) ? tile.type : "apartment";
@@ -133,13 +168,11 @@ export const ListingGridTile = memo(function ListingGridTile({ tile, width, aspe
   // White with a shadow over a picture; on the soft fill of a listing without photos, the theme's own text colours.
   const ink = picture ? colors.onMedia : colors.muted;
   const inkShadow = picture ? styles.iconShadow : null;
+  const tap = useTap(() => onOpen(tile));
   return (
-    <Pressable onPress={() => onOpen(tile)} accessibilityRole="button" accessibilityLabel={tileLabel(tile)} style={({ pressed }) => [styles.tile, { width, height: width * aspect }, pressed && { opacity: 0.85 }]}>
+    <Pressable onPressIn={tap.onPressIn} onPress={tap.onPress} accessibilityRole="button" accessibilityLabel={tileLabel(tile)} style={[styles.tile, { width, height: width * aspect, borderRadius: radius }]}>
       {tile.imageUrl ? (
-        <>
-          <Image source={{ uri: tile.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} recyclingKey={tile.key} />
-          <View style={styles.listingShade} pointerEvents="none" />
-        </>
+        <Image source={{ uri: tile.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} recyclingKey={tile.key} cachePolicy="memory-disk" />
       ) : (
         <View style={styles.listingBlank}>
           <Icon name={LISTING_ICONS[kind]} size={28} color={colors.faint} />
@@ -152,17 +185,8 @@ export const ListingGridTile = memo(function ListingGridTile({ tile, width, aspe
         <Icon name="copy" size={15} color={ink} style={[styles.corner, inkShadow]} />
       ) : null}
 
-      <View style={styles.listingText} pointerEvents="none">
-        <View style={styles.listingKindRow}>
-          <Icon name={LISTING_ICONS[kind]} size={11} color={ink} style={inkShadow} />
-          <Text style={[styles.listingKind, { color: ink }, inkShadow]} numberOfLines={1}>
-            {LISTING_KINDS[kind]}
-          </Text>
-        </View>
-        <Text style={[styles.listingTitle, { color: picture ? colors.onMedia : colors.text }, inkShadow]} numberOfLines={2}>
-          {tile.text ?? LISTING_KINDS[kind]}
-        </Text>
-      </View>
+      {/* Over a photo, the kind's icon alone; a square without one already shows it large in the middle. */}
+      {picture ? <Icon name={LISTING_ICONS[kind]} size={15} color={ink} style={[styles.listingIcon, inkShadow]} /> : null}
     </Pressable>
   );
 });
@@ -177,11 +201,7 @@ const useStyles = makeStyles((colors) => ({
   viewsText: { fontSize: 12, fontWeight: "700" },
   iconShadow: { textShadowColor: colors.mediaTextShadow, textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   corner: { position: "absolute", top: 8, right: 8 },
-  // The fade under a listing's kind and title: from clear to the photo-pill dark, drawn as a real gradient (no seams).
-  listingShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: "55%", experimental_backgroundImage: `linear-gradient(to bottom, transparent, ${colors.mediaPill})` },
-  listingBlank: { flex: 1, alignItems: "center", justifyContent: "center", paddingBottom: 40, backgroundColor: colors.input },
-  listingText: { position: "absolute", left: 8, right: 8, bottom: 8, gap: 2 },
-  listingKindRow: { flexDirection: "row", alignItems: "center", gap: 3 },
-  listingKind: { flexShrink: 1, fontSize: 11, fontWeight: "600" },
-  listingTitle: { fontSize: 12, fontWeight: "700", lineHeight: 15 },
+  listingBlank: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.input },
+  // The kind's glyph, matching the corner marks: the same inset from the bottom-left corner.
+  listingIcon: { position: "absolute", left: 8, bottom: 8 },
 }));

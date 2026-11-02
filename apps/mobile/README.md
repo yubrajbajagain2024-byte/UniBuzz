@@ -120,9 +120,9 @@ sign in with `apartmentbook://dev-login?email=…&password=…` once that dialog
 ## Home and the tabs
 
 The bottom bar is Home, Explore, Messages, Events, Profile: five tabs (Profile is your own photo
-in a circle, ringed while the tab is on screen; the person icon signed out). There is no "+" in the bar: creating starts
-from Home: Orbit's floating "+", the menu under your photo (Upload) and the "+" over Reels open the create sheet (Post /
-Reel / Buzz / Snap). It floats over the content as a rounded
+in a circle, ringed while the tab is on screen; the person icon signed out). There is no "+" in the bar, and none at the
+top of Home: creating starts from the floating "+" at the bottom right of For you (X's compose button; Buzz has its pen in
+the same place) and the menu under your photo (Upload), which open the camera (Post / Reel / Buzz / Snap). It floats over the content as a rounded
 glass pill, low like Instagram's: just above the home indicator (12pt into the home-indicator inset, 22pt up from the screen's edge on a
 Face ID iPhone; 10pt up where there is no indicator) (`src/app/(tabs)/_layout.tsx`, its size and place in `src/lib/tab-bar.ts`): on iOS 26 real liquid glass, with what scrolls
 under it blurred through, elsewhere a translucent fill; the tab on screen sits in a soft aurora capsule with its icon filled. When you tap
@@ -131,7 +131,18 @@ so it stretches a touch in flight and settles as it lands. The new tab's symbol 
 to its plain look with no bounce, and the tabs make room for the capsule, GroupMe style, on a critically damped spring
 (`src/components/floating-tab-bar.tsx`, on Reanimated); every tab's list and floating button keeps `tabBarInset` clear
 under it. (FloatingTabBar can still hold an action in the middle, `action`, which the capsule passes behind but never
-stops on; the app's bar has none.) Search is the magnifier beside the bell in Home's top bar, which opens `src/app/search.tsx` (below); the people search the share sheet's Find people
+stops on; the app's bar has none.) The bar collapses like Reddit's (iOS 26's tab bar minimising), by the speed of the
+scroll: reading at any pace keeps the whole bar, and only a deliberate flick down a page of Home (For you, Buzz), Explore
+or Events (Messages and your Profile always keep the whole bar), at 700 points a second or more over at least 32 points
+(`createScrollCollapse` in `packages/shared/src/scroll-collapse.ts`, from each scroll event's native timestamp, tuned by
+`TAB_BAR_SCROLL` in `src/lib/tab-bar-collapse.ts`; first values, to be tuned on a phone), narrows it to a circle at the
+bottom left holding just that tab's icon, the other tabs fading as it goes, and the "+" (or Buzz's pen) becomes its twin at the
+bottom right (the same circle at the same height, as far in from the right edge as the circle is from the left). Once
+the page scrolls back 24 points (at any speed; smaller turns are ignored), or reaches its top, the whole bar returns the same
+way, springing on the UI thread (at once with Reduce Motion). A bounce past a list's end is not a scroll back, and once
+the bar has come back a new flick has to wait a quarter of a second, so one gesture never flickers it. A tap on the
+circle brings it back too, and so do another page of the tab, another tab or a screen reader, which always gets the whole
+bar. Reels, a profile pushed over a screen and the full-screen viewers never collapse it. Search is the magnifier beside the bell in Home's top bar, which opens `src/app/search.tsx` (below); the people search the share sheet's Find people
 and a profile's Find friends push is `src/app/find-people.tsx`. The Notifications bell in the top-right corner of Home's floating top bar opens every
 notification the database keeps for you (`src/app/notifications.tsx`: likes, comments and replies, follows,
 saves of your listings, places near campus, newest first; new messages and Snaps stay in Messages, with its unread
@@ -140,10 +151,17 @@ itself like any other in both themes); tapping one marks it read and opens what
 it is about, "Mark all read" sits in the header, and the bell's badge counts the unread live. Home opens on **For you**, a blend of posts and reels (anonymous Buzz threads stay on
 the Buzz page; the fixed pattern lives in `packages/shared/src/for-you.ts` and is shared with the website). Its
 three pages, For you | Buzz | Reels, sit side by side in a pager (Posts is a section without a tab: `HIDDEN_HOME_SECTIONS` in the shared constants keeps it out of the row and the pager while its feed, the post features and the data stay; its Following filter is reachable on the website's `/?tab=posts`; reels also run through For you): swipe left or right to move
-between them, or tap a label in the floating top bar. That bar has two rows, like X's (`src/components/home/home-top-tabs.tsx`): your photo in an aurora
+between them, or tap a label in the floating top bar. A post with several photos takes the swipes first, TikTok's way:
+from its last photo the next swipe on goes to the next section, from its first the next swipe back to the one before,
+so a carousel never keeps the finger (`src/lib/section-pager.ts`; Explore's three pages do the same; it never moves to
+another tab of the bottom bar). On iOS the carousel's own scroll gesture still takes a swipe that starts at its end,
+though it cannot move, so the pager never gets it and the touch used to end as a tap that opened the post: the carousel
+(`src/components/photo-carousel.tsx`) reads the finger from React Native's touches, which keep coming meanwhile, moves
+the pager by it and drops the tap; let go, the pager glides on (a quarter of the way, or a flick) or back. Reels' page
+needs none of this: every reel there is one video, so a sideways swipe on it is the pager's own. That bar has two rows, like X's (`src/components/home/home-top-tabs.tsx`): your photo in an aurora
 ring on the left, which opens your menu (`src/components/home/profile-menu.tsx`, as UniVerse's: a card with your photo,
 name and @username that opens your profile, then Upload, Saved, Settings, Community Guidelines, and Log out on its own;
-over Reels the bar's left slot holds a white "+" instead), the UniBuzz wordmark in the middle (it reads "Following" while
+over Reels too: the bar has no "+"), the UniBuzz wordmark in the middle (it reads "Following" while
 that feed shows) and the Notifications bell on the right; then the three labels spread across the row
 (`src/components/sliding-tabs.tsx`): the active one bold with a rounded aurora underline as wide as the label, sliding
 with the finger over a hairline; moving between sections, by tap or swipe, plays no haptic. Under the labels sits the Campus | Global
@@ -180,12 +198,21 @@ does a swipe pull the page back. The viewer is a modal screen, outside the view 
 Native's touches, so the page's taps check `swipedJustNow` themselves: a touch that ended a swipe never pauses, likes or
 opens anything. Feed and viewer videos skip Live Text on a paused frame (`allowsVideoFrameAnalysis={false}`): its button
 would sit over the play control, and its scan was what crashed Expo Go in the simulator. Screens opened from the viewer (a profile, a chat) come up as cards over it. Pictures are laid out
-TikTok style (`src/components/home/reel-item.tsx`). A video fills the screen (`placeVideo`): a vertical one edge to edge,
-trimmed a little at the sides on a phone taller than 9:16; a square or landscape one whole, as wide as a 9:16 canvas, over
-a subtle, dimmed blur of itself. A photo is never stretched or cropped (`photoLayout`): it sits whole and as wide as the
-screen at the top, under the top row, on the theme's own colour (white in light, black in dark), which stays free below it
-for the name and the words, all in the theme's ink; a photo too tall to leave that space (9:16, a phone
-screenshot) is shown full screen on black like a video instead. Over every page, one top row with Back at the left and the
+TikTok style (`src/components/home/reel-item.tsx`), edge to edge from the screen's very top: nothing is pushed down by
+the safe area, and the status bar and the top row float over every picture on a soft shade (gone while the page zooms).
+A vertical video fills the screen (`placeVideo`), trimmed a little at the sides on a phone taller than 9:16; a square or
+landscape one stays whole, as wide as a 9:16 canvas, at the top (in the middle on the Reels tab, where Home's bar covers
+the top). A photo is never stretched or cropped (`photoLayout`): whole, as wide as the screen (or as tall, for one taller
+than it), from the top edge. Whatever of the screen a picture leaves shows a blurred, dimmed copy of the same picture,
+never black or a flat colour (`BlurredBackdrop` in `src/components/blurred-backdrop.tsx`: loaded only 48 pixels wide,
+then blurred and stretched, since a blur on a full-size photo barely shows once scaled to the screen). A video uploaded
+without its size takes its poster's shape once that loads. The chat's photo and video viewer
+(`src/components/messages/media-viewer.tsx`) and a Snap's (`src/app/snap/[id].tsx`) lay out the same way, a video's
+shape and blurred frame read from its own player. Stories have their own layout (`src/app/stories/[id].tsx`, `storyFrame` in
+`packages/shared/src/stories.ts`): on a tall phone a rounded 9:16 card under the status bar with the reply pill, the heart
+and the paper plane (or, on your own, Activity, Send and Delete) on black below it, so they are always legible and a near
+miss never moves the story on; on a short screen the story fills it and the bar floats over a deeper shade. Holding a
+story fades every control away. Over every page, one top row with Back at the left and the
 Campus | Global toggle in the middle (for reels and For you, while the toggle is shown); the creator's name, the words and the heart, comments, share,
 save and "…" rail sit at the bottom (as on the Reels page, the rail a little nearer the right edge: `railRight`), over a
 video's shades (gradients only, as Instagram's: a blur under the words was re-drawn every frame the video played or the
@@ -195,14 +222,11 @@ closes it like Back, another switches tabs at once. Opened from a profile, a cha
 is no comment bar: the rail's Comments (a tour's Inbox) opens the comments or the chat. Share opens the same share sheet
 as the feeds (send to friends, or "Share to…" the system share sheet with the page's link: `/posts/<id>` for posts and
 posted reels, `/apartments/<id>` or `/roommates/<id>` for listing tours); the viewer mounts its own `ShareSheetProvider`,
-since iOS presents a sheet from the screen on top and the root layout's one cannot appear over this modal screen. On a photo's page each button of
-the rail is white where it sits over the photo (a crisp dark edge on its strokes, no shading behind it, keeps it readable on
-a white wall) and in the
-theme's ink where it sits on the page below; the top row and the status bar follow the page under them,
-switching as a page's edge passes, and an opened description brings the page's colour up behind it. A tap pauses a video: a play button appears in the middle with the sound
+since iOS presents a sheet from the screen on top and the root layout's one cannot appear over this modal screen. The
+rail's buttons, the words, the top row and the status bar are white on every page (a crisp dark edge on the rail's
+strokes keeps it readable on a white wall). A tap pauses a video: a play button appears in the middle with the sound
 button just above it, both fading away again the moment it plays (the sound button keeps it paused). A post with several
-photos or videos swipes sideways on its page, with dots on a line of their own under the top row (its colours changing
-halfway through a swipe), and opens on the one that was showing in the feed; a video plays while its page and slide are on screen, and a double tap anywhere likes. On iOS a video tapped while it plays in the feed is played on in the viewer by the
+photos or videos swipes sideways on its page, with dots just under the top row, over the picture on a small dark pill, and opens on the one that was showing in the feed; a video plays while its page and slide are on screen, and a double tap anywhere likes. On iOS a video tapped while it plays in the feed is played on in the viewer by the
 feed's own player (`src/lib/video-handoff.ts`: lent as the viewer opens, in `openViewer`, so a tap that opens something
 else never lends it; counted, so the page showing it borrows it too, for as long as that page is in reach; given back as
 the viewer goes), so it opens on the very frame that was showing and never pauses, reloads or jumps, there or back. Neither
@@ -259,25 +283,33 @@ what you like, save or comment there shows on the row when you come back (`emitP
 a post deleted there leaves the feeds too.
 The bar scrolls like Instagram's (`src/lib/collapsing-header.ts`): it slides up out of the way as the page on screen
 scrolls down, by as much as the page moved, and slides back the moment the page scrolls up, however far down it is; a
-swipe or a tap between pages brings it back too, and Reels never moves it. The same goes for the Housing | Roommate | Marketplace
-row on Explore and the pills under it (the bar with its title and Search stays put): they slide up under the fixed bar
+swipe or a tap between pages brings it back too, and Reels never moves it. On Buzz the filter bar slides under it first,
+then rides away with it (both from Buzz's one scroll value, `scrollValue` in the collapsing header), so Buzz's feed
+reaches the top edge too. The same goes for Explore's and Events' search and filters (DiscoveryBar; the bar with the
+title stays put): they slide up under the fixed bar
 as the list under them scrolls down, and back as soon as it
 scrolls up. The bottom bar never moves. The choice lives in
 `src/lib/home-scope.ts` and drives For you and Posts alike: those pages have no filter chips of their own (Buzz keeps its
 own filter bar, see Buzz below).
 Explore (the Housing tab in the code, with a compass icon) works the same way with three pages,
-**Housing | Roommate | Marketplace** (apartments, roommates, items), under its own top bar laid out like the inbox's (`src/app/(tabs)/housing.tsx`): the big
-"Find" title, the three labels with the sliding aurora underline, the inbox's search box (searching the page on screen) with a
-round filter button beside it (`src/components/housing/filter-sheet.tsx`: a sheet of the page's own filters, applied on "Show
-results", counted on the button; rooms sort, bedrooms, rent, distance from campus, furnished, pets and video tours; roommate
-posts a budget cap, who the post is open to, distance and video; items sort, condition and price), and the
-pills that narrow the page (All on Housing, All | Has a room | Looking for a room on Roommate, All and the item
-categories on Marketplace); the labels and the pills slide up under the title as the page scrolls. It opens on Housing, a swipe or a tap on the label above the
+**Housing | Roommate | Marketplace** (apartments, roommates, items) (`src/app/(tabs)/housing.tsx`): the big "Find"
+title, then three levels and nothing more (`src/components/discovery-bar.tsx`, shared with Events): the three labels
+with the sliding aurora underline; one search field (searching the page on screen) with the filter button beside it,
+which counts the filters on; and one row of small round pills, see-through with a hairline ring (the one in force in
+UniBuzz blue, ring and words, on the soft blue fill): the page's few quick filters, each applied with one tap (Furnished, Pets OK, Within 1 mi on Housing; Has a room, Looking for a room on Roommate; Furniture, Textbooks,
+Electronics, Kitchen on Marketplace), a chip for every other choice in force (video tours included), which a tap
+drops, and Clear.
+Everything else is in the sheet the button opens (`src/components/housing/filter-sheet.tsx`, one set of choices per
+page, a dot by each group in force, Reset, applied on "Show results"): apartments sort, bedrooms, rent, distance from
+campus, furnished, pets and video tours; roommate posts has a room or looking, a budget cap, who the post is open to,
+distance and video; items every category, sort, condition and price. The chips and the counts come from
+`packages/shared/src/discovery.ts` (`exploreQuickFilters`, `exploreActiveChips`). The bar slides up under the title as
+the page scrolls. It opens on Housing, a swipe or a tap on the label above the
 pager moves to Roommate or the Marketplace and back (silently, by tap or swipe, like Home's), and the floating "+"
 (no haptic either) follows the visible page ("List an apartment",
 "Create roommate post" or "Sell an item"). The order comes from `HOUSING_SECTIONS` in `packages/shared/src/constants.ts`.
 The Marketplace page is the old Marketplace tab's grid, moved in whole (`src/components/housing/marketplace-section.tsx`):
-the same cards and hearts, its categories in the pills row, its search (applied
+the same cards and hearts, its categories in the quick filters and the sheet, its search (applied
 once typing pauses, a spinner in the box meanwhile) and "Sell an item", a page at a time as it scrolls; the old
 `/marketplace` address redirects to it.
 Profiles work like Instagram too: a Follow button (it reads "Following" once you follow), follower / following
@@ -294,22 +326,53 @@ The Share button on posts, reels and listings opens a sheet of your friends, the
 note and Send, and each friend gets a chat message with the post as a card that opens it, the note under it; "Share to…"
 at the bottom is the system share sheet. It needs migration 17 (`supabase/migrations/20260926000000_shared_posts.sql`).
 
-The Profile tab is your profile, TikTok style (`src/components/profile/`, one `ProfileView` for the tab and for
-`/profile/[id]`): a top bar with Find friends, your name (the account sheet, Log out) and the menu (Settings and privacy,
-Saved, the legal pages, Log out); your photo with a "+" to change it, @username (made from your name at sign-up, changed
-in Settings) with a QR icon under three lines: the full name, the major, class year and university ("CS ’28 @ Texas
-State University", from Settings → Major and Graduation year) and the bio; then Following | Followers | Likes (every like
-on your posts, reels and listings), Edit profile / Share profile (a sheet with the profile's QR code and Share) / Find
-friends, then the tabs
-Posts | Classes | Reels | Saved | Liked | Listings as icons, TikTok style (the open one filled, with the sliding
-underline and a small mark of who can see that section: a lock for Only me, two people for Friends, a globe for
+The Profile tab is your profile (`src/components/profile/`, one `ProfileView` for the tab and for `/profile/[id]`), its
+top kept as the owner chose it (2026-10-31): the cover band with Find friends and the menu (Settings and privacy, Saved,
+the legal pages, Log out) as round buttons over it; your photo in its aurora ring with a "+" to change it, Share profile
+(a sheet with the profile's QR code and Share) and Edit profile beside it; your full name (the account sheet, Log out),
+@username (made from your name at sign-up, changed in Settings → Account & Profile → Edit profile, which Edit profile
+opens too) with a QR icon, the university in a small pill with the major and class year beside it ("Computer Science ·
+'28", from Settings → Account & Profile → Major & class year), the bio, and the
+card with Posts | Followers | Following | Likes (every like on your posts, reels and listings); then the tabs
+Posts | Classes | Reels | Saved | Liked | Listings as icons (the open one filled, with an underline as wide as the tab
+and a small mark of who can see that section: a lock for Only me, two people for Friends, a globe for
 Everyone; the filled icon and the mark crossfade with the swipe on the native side, like the underline, so they never
-wait for the pager to settle), over a three-column grid with view counts (Listings: your live
-apartments, roommate posts and items for sale, each square with its kind and title). The Classes tab lists classes by semester, this one first (up to 12 each; add your own there with the subject and course number as two boxes, "CS" and "3358", kept as the one code "CS 3358" the database checks, the section, the days and times it meets and the room; a hold on a class card offers Edit (the same form, filled in; Save moves you between course chats when the section changes) and Delete, which asks first, and there is no other way to change or remove one; once a class is in or changed, the form closes and a line under "Add class" says so, the button bringing it back). Listing a section puts you in that section's course chat, a group in Messages shared by everyone at your campus taking it this semester: the first classmate's listing creates it, removing the class leaves it, a notification tells you about both, it cannot be renamed or hand-filled, and it goes with the semester after a week's notice (migration 24).
+wait for the pager to settle), over Instagram's grid: three 3:4 tiles to a row (9:16 on Reels), edge to edge with a
+hairline between them and square corners, a play count on videos only (Listings: your live
+apartments, roommate posts and items for sale, each tile its picture with only the kind's small icon on it, no
+words). A stacked profile has Back at the top
+left instead of Find friends. The Classes tab lists classes by semester, this one first (up to 12 each; add your own there with the subject and course number as two boxes, "CS" and "3358", kept as the one code "CS 3358" the database checks, the section, the days and times it meets and the room; a hold on a class card offers Edit (the same form, filled in; Save moves you between course chats when the section changes) and Delete, which asks first, and there is no other way to change or remove one; once a class is in or changed, the form closes and a line under "Add class" says so, the button bringing it back). Listing a section puts you in that section's course chat, a group in Messages shared by everyone at your campus taking it this semester: the first classmate's listing creates it, removing the class leaves it, a notification tells you about both, it cannot be renamed or hand-filled, and it goes with the semester after a week's notice (migration 24).
+Settings (`src/app/settings.tsx` and `src/app/settings/`, Apple's Settings in UniBuzz's colours: inset grouped sections,
+compact rows, SF Symbols, native switches, small aurora icon tiles, all from `src/components/settings/settings-ui.tsx`)
+keeps your photo with Change photo at the top, then a short menu whose sections each open their own screen with the
+system's push: **Account & Profile** (Edit profile: name, @username and bio, with Save; University; Major & class year,
+with Save; your sign-in email; and Account Management, where Delete account sits alone at the very bottom as quiet red
+text, asks first, and deletes everything), **Privacy** (who can see Classes, Saved, Liked and Listings, each picked from
+a sheet; My buzzes and How Buzz anonymity works), **Safety & Security** (Blocked accounts, with Unblock; Activity
+status; Account status; the Community Guidelines; how to report), **Notifications** (new places near campus; whether
+the phone allows UniBuzz's notifications, with a row into the phone's Settings), **Appearance** (Light, Dark, System)
+and **About & Support** (help, the Privacy Policy and Terms on the website, the version). Switches and choices save at
+once, with a tick, and go back if the save fails; the two forms save with Save in their header and ask before
+discarding changes. Each saves only what it changed (`updateProfileSettings` in `packages/shared`, which never writes a
+column it was not given). The university picker searches by name, city or email domain (`matchUniversities`) and lets
+you choose only the university your confirmed sign-in email proves (`verifiedCampus`, `universityChoice`), sealed at
+the top; every other says which address it needs; an account no university verifies chooses freely, as before.
 Classes, Saved, Liked and Listings each have a setting (Everyone, Friends, Only me; friends are people you follow who
 follow you back), changed from the line at the top of the tab or in Settings → Privacy; by default Classes is Friends and
 Saved, Liked and Listings are Only me (migration 37). A visitor without access gets no tab for that section at all (the
-pager has one page per tab they get), while you always see all six. Hold one of your own posts or reels in the grid (or use
+pager has one page per tab they get), while you always see all six. A sideways swipe changes tab only when it is meant
+(`intendedSwipe` in `src/components/profile/profile-view.tsx`): dragged at least 18% of the page (56 points at least),
+or flicked at 500 points a second or more over at least 24 points; anything less springs back to the open tab. Each tab
+keeps its page mounted and its grid loaded once. The Profile tab keeps its whole layout as it scrolls, the bottom bar
+included (it never collapses there): the header scrolls up under the floating bar and the tabs row sticks under it. Someone
+else's profile, pushed over the feed, closes with a swipe right from anywhere on its first tab (iOS's own back swipe,
+following the finger, the feed underneath where it was); on its first tab the pager takes no touches, since that swipe
+waits for any sideways scroll view to give up and the pager never does, and a leftward drag moves it under the finger
+instead (`firstTabSwipe`). Your own photo or name on a post, a reel, a comment or a mention opens the Profile tab rather
+than a copy of it (`useOpenProfile` in `src/lib/open-profile.ts`). A square never
+changes under a finger (no dimming: a touch that turns into a scroll or a swipe would flash it), a tap is a touch that
+moved under 10 points (`TAP_SLOP` in `src/components/profile/profile-tile.tsx`: a slide inside a square no longer opens the
+post), and its picture is kept decoded in memory as well as on disk, so a square drawn again shows it at once. Hold one of your own posts or reels in the grid (or use
 its ••• menu) to pin it to the top of your profile, three at most. Someone else's profile has Follow, Message and More
 (block, report) instead. It needs migration 18 (`supabase/migrations/20260927000000_profile_page.sql`: usernames, the
 who-can-see settings, `profile_classes`, likes readable only through functions, `profile_stats`, `post_view_counts` and
@@ -318,7 +381,12 @@ who-can-see settings, `profile_classes`, likes readable only through functions, 
 The Messages tab is the inbox (`src/app/(tabs)/messages.tsx`): the new-message pencil in the top-right corner, the big
 "Messages" title, Chats | Groups with Home's sliding aurora underline, a rounded search box and the All | Unread |
 Requests pills (each with its count; Requests on Chats only), then the two pages side by side in a pager like Home's: a
-swipe or a tap on a label moves between your direct chats and your group chats, silently, as on Home. On Chats the row of
+swipe or a tap on a label moves between your direct chats and your group chats, silently, as on Home. All of that header
+scrolls away with the list, point for point as if it were part of it, and comes back only as the list returns to its
+top (the status bar stays clear: rows pass out of sight under it); only the bottom bar stays, whole. A drag that starts
+on the title or between the controls scrolls the list too. Before the other page comes into view its list is moved to
+match, so the header never jumps between Chats and Groups; a new pill or a search starts both lists at the top, and
+during a search the header holds still with results passing under it. On Chats the row of
 friends online now sits above the chats (photo, name, the time at the right, the last message under it, no line between
 rows; no @usernames anywhere in Messages, names only, though typing a handle still finds the chat). A long press on a row (or Chat
 info) mutes that person's messages everywhere or that group, and a group also offers every group chat at once, each for 1, 8 or
@@ -419,10 +487,10 @@ chats keep "N members". Presence (`src/lib/presence.tsx`) runs only while you sh
 the background it stamps your last-active time and stops showing you online at once, while it still can (a phone runs no
 timer in the background; a glance at Notification Center is not leaving); back in front it stamps first and shows you
 again once that stamp confirms your status is still shown; it stamps the time and reads the block list every minute in
-front, leaves out people blocked either way, and stops at once when you log out. Settings → "Show your activity status"
-turns it off, and then you see nobody's either and your app stops marking messages "Delivered" (people see "Seen" once you
-read something new); Settings reads your profile again whenever it opens, and sends that switch
-(`set_show_active_status()`, the only way to turn it back on) only when you change it. It needs migration 22
+front, leaves out people blocked either way, and stops at once when you log out. Settings → Safety & Security → Activity
+status turns it off, and then you see nobody's either and your app stops marking messages "Delivered" (people see "Seen"
+once you read something new); Settings reads your profile again whenever it opens, and the switch is sent
+(`set_show_active_status()`, the only way to turn it back on) only when you flip it. It needs migration 22
 (`supabase/migrations/20261011000000_activity_status.sql`); without it no green dots show and chat headers have no
 activity line. Builds from before it meet on the old public presence channel, so once it is live they and this version no
 longer see each other online and they show no last-seen times, and their Settings can no longer turn activity status back
@@ -480,14 +548,18 @@ the grid is the newest posts and reels, the suggestions the newest people, and t
 ## Events
 
 The fourth tab (`src/app/(tabs)/events.tsx`) is the campus's calendar: the big "Events" title with Saved at its right,
-For you | All events above a pager (Explore's layout: the labels, the inbox-style search box and one row of pills slide
-up under the title as a page scrolls), and the floating "+" to publish. The pills narrow both pages: when (Upcoming,
-Today, This week, Weekend: `eventDateRange` in packages/shared, on the campus's clock), a hairline, then the categories
-(`EVENT_CATEGORIES`). **For you** (`src/components/events/for-you-events-section.tsx`) ranks the campus's upcoming
+For you | All events above a pager, with Explore's three levels (DiscoveryBar: the labels, one search field with the
+filter button, one row of chips, all sliding up under the title as a page scrolls), and the floating "+" to publish.
+The quick filters narrow both pages with a tap: Today, This week, Weekend (`eventDateRange` in packages/shared, on the
+campus's clock; Upcoming is none of them), then a chip for each event type in force, a tap from being dropped, and
+Clear. The filter button counts the choices in force and opens a sheet (`src/components/events/event-filter-sheet.tsx`)
+with When and Event type: Academic, Career, Social, Sports, Music, Arts, Tech, Wellness, Cultural, Service, Faith and
+Other (`EVENT_CATEGORIES`), any number of them, Reset and "Show results", and Your interests at the bottom. **For you** (`src/components/events/for-you-events-section.tsx`) ranks the campus's upcoming
 events for the person (`rankEvents`: picked interests, the categories they keep saving and opening, the organizations
-they follow, how soon, how many others saved it; signed out, soonest and most saved first), asks what they are into
-the first time (the chips save `event_interests` and re-rank at once) and suggests organizations to follow while they
-follow few. **All events** (`all-events-section.tsx`) is time order under day headings ("Today", "Tomorrow", "Thu,
+they follow, how soon, how many others saved it; signed out, soonest and most saved first), asks once for interests
+in a single line that opens `src/app/events/interests.tsx` and can be dismissed for good (remembered on the phone,
+`src/lib/event-interests.ts`; the filter sheet's Your interests stays; a save re-ranks at once), and suggests
+organizations to follow while they follow few. **All events** (`all-events-section.tsx`) is time order under day headings ("Today", "Tomorrow", "Thu,
 Nov 12"), a page at a time. Each row (`event-card.tsx`) is the picture or the category's glyph, the title, when, where,
 who is holding it and the category, with the bookmark; cancelled events stay, greyed and marked. An event's page
 (`src/app/events/[id].tsx`) adds the organization with a Follow pill, Save | Share | Directions, the registration link
@@ -536,7 +608,8 @@ Buzz, so nothing on the Buzz page shows who is looking) and the Buzz label carri
   cards fold to "Hidden by the community · Tap to view". Under the alias line, the category its author picked ("📚
   Classes"; nothing when none). A day's prompt thread shows "✦ Daily prompt" where the alias
   would be and counts answers; an answer posted as its own buzz has the prompt as its title and "Daily prompt · See all
-  answers" linking to that thread. The FAB (a pen with the mask) and the "+" create sheet's Buzz open the composer.
+  answers" linking to that thread. The FAB (a pen with the mask, at the bottom right; it stays while the feed scrolls and
+  becomes the collapsed bottom bar's twin, opposite it) and the camera's BUZZ open the composer.
 - **Composer.** A full-height sheet (the system's page sheet on iPhone): "You're anonymous", Campus | Global with what
   each means, a category (one row of chips, `BUZZ_CATEGORIES`; optional, tap the chosen one again for none; the line
   under it says what belongs there; a database without `supabase/migrations/20261108000300_buzz_categories.sql` does
@@ -572,8 +645,9 @@ Buzz, so nothing on the Buzz page shows who is looking) and the Buzz label carri
   reasons, a note for "Something else"; the item then leaves your lists) · Delete (your own). Never Block, never a
   profile, never a handle.
 - **Search, My buzzes, Settings, Notifications.** Search Buzz (Newest | Top, Campus | Global, suggestions); My buzzes
-  (Threads | Replies, your private karma) is reached from Settings → Buzz, never from Home, next to "How Buzz anonymity
-  works"; Settings → Safety → Account status lists warnings, removals and restrictions with "Got it" and appeals. Buzz
+  (Threads | Replies, your private karma) is reached from Settings → Privacy → Buzz, never from Home, next to "How Buzz
+  anonymity works"; Settings → Safety & Security → Account status lists warnings, removals and restrictions with "Got it"
+  and appeals. Buzz
   notifications carry the mask, never a photo.
 - **Memory only.** Drafts, folds, the search and every loaded item live in memory (`src/lib/buzz-store.ts`), never in
   AsyncStorage or SecureStore, and are wiped the moment the session ends.
@@ -596,7 +670,7 @@ feel native:
   headings carry a short Aurora bar and its fact icons the Aurora's ink (`auroraInk`); the words keep the theme's own
   colours, so the contrast is the same as anywhere else. A "No longer looking" status keeps its amber.
 
-- **Dark by default.** Until someone picks a theme in Settings → Theme the app is Dark, on iOS and Android alike
+- **Dark by default.** Until someone picks a theme in Settings → Appearance the app is Dark, on iOS and Android alike
   (`DEFAULT_THEME_PREFERENCE` in `src/lib/palette.ts`); Light and System Default stay there, and a choice is remembered.
   Anyone who already picked one keeps it.
 
@@ -620,7 +694,10 @@ feel native:
 - **Scrolling.** The For you, Buzz, Housing and Roommate feeds draw each row through a memoised component with stable
   handlers, so a scroll only redraws the rows whose content changed, and they keep about four screens of rows mounted
   instead of ten. Photos show the tiny blurred preview saved at upload at once and fade the full photo in over it. On
-  Home, a strip in the bar's colour stays under the status bar while the bar slides away, so nothing passes under the clock.
+  Home (For you and Buzz), the feed runs on under the status bar to the screen's top edge once the bar has slid away, as
+  Reddit's does, clearly visible: nothing opaque stays there, only a faint tint of the bar's colour behind the icons (a
+  fifth of its strength at the top, gone by the status bar's bottom edge; Phosphor on Buzz, none over Reels), fading in
+  as the bar's own background leaves the status bar (`statusShade` in `src/lib/theme.ts`).
 - **Motion.** Buttons and glass controls dip under the finger on a spring, the blue thumb of a segmented control slides
   to the chosen option, and the rows of every feed and list fade in once as they first arrive. Reduce Motion turns the
   scaling, sliding, fading and bouncing off, and sheets then fade instead of sliding (`src/lib/accessibility.ts`).
@@ -638,7 +715,7 @@ Haptics and tap-to-top are covered with the comments above.
 - Build profiles: `eas.json` (`production` auto-increments build numbers on EAS)
 - Workflow: `.eas/workflows/create-production-builds.yml` builds both platforms on push to `main`
   once the GitHub repo is linked on expo.dev (set base directory to `apps/mobile`).
-- Backend features the stores require are live: account deletion (Settings), report and
+- Backend features the stores require are live: account deletion (Settings → Account & Profile → Account Management), report and
   block (••• menu on posts, More on profiles), privacy policy and terms (website `/privacy`, `/terms`).
 
 ## Ship to the App Store (first time, needs Xcode + Apple Developer account)

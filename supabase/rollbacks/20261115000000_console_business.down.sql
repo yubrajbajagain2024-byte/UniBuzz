@@ -1,6 +1,6 @@
 -- =============================================================================
--- Rollback of 20261114000000_console_business.sql (migration 62: the staff console's Analytics and Business sections).
--- Run in one transaction, then: delete from public._migrations where name = '20261114000000_console_business.sql';
+-- Rollback of 20261115000000_console_business.sql (migration 63: the staff console's Analytics and Business sections).
+-- Run in one transaction, then: delete from public._migrations where name = '20261115000000_console_business.sql';
 --
 -- It refuses while the team's notes about businesses or the rate card hold anything: they are the UniBuzz team's own
 -- records and exist nowhere else. Export them first (select * from public.business_admin_notes; select * from

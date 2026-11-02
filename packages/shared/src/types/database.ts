@@ -693,6 +693,8 @@ export type Database = {
           sender_id: string | null;
           content: string;
           image_url: string | null;
+          hidden_at: string | null;
+          hidden_reason: string | null;
           shared_post: Json | null;
           /** Migration 20: [{kind, path, name, size, mime, width?, height?, duration?}]; read it with parseAttachments(). */
           attachments: Json;
@@ -715,6 +717,8 @@ export type Database = {
           sender_id?: string | null;
           content: string;
           image_url?: string | null;
+          hidden_at?: string | null;
+          hidden_reason?: string | null;
           shared_post?: Json | null;
           attachments?: Json;
           snap?: Json | null;
@@ -729,6 +733,8 @@ export type Database = {
           sender_id?: string | null;
           content?: string;
           image_url?: string | null;
+          hidden_at?: string | null;
+          hidden_reason?: string | null;
           shared_post?: Json | null;
           attachments?: Json;
           snap?: Json | null;
@@ -1189,6 +1195,20 @@ export type Database = {
         Row: { story_id: string; viewer_id: string; created_at: string };
         Insert: { story_id: string; viewer_id: string; created_at?: string };
         Update: { story_id?: string; viewer_id?: string; created_at?: string };
+        Relationships: [];
+      };
+      // Migration 62: a heart on someone else's story (read by the liker and the author), and the people whose stories
+      // someone has muted (their own to read). The API writes only the ids.
+      story_likes: {
+        Row: { story_id: string; user_id: string; created_at: string };
+        Insert: { story_id: string; user_id: string };
+        Update: { story_id?: string; user_id?: string };
+        Relationships: [];
+      };
+      story_mutes: {
+        Row: { user_id: string; author_id: string; created_at: string };
+        Insert: { user_id: string; author_id: string };
+        Update: { user_id?: string; author_id?: string };
         Relationships: [];
       };
       organizations: {

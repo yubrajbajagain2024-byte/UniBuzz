@@ -54,10 +54,10 @@ apps/web/src/
   components/      UI by area (home, feed, posts, buzz, messages, profile, housing, business, staff, …)
   lib/             actions/ (server actions), supabase/ (clients), buzz-server/ and events-server/
                    (server-only), staff/, business/, mux.ts, env.ts   proxy.ts: auth guard + the portal's host
-apps/web/e2e/      Playwright: home-feed.mjs, release-smoke.mjs (every page of each role), business-sidebar.mjs
-apps/admin/src/    CampConnect Admin, the staff app (port 3001; its own Vercel project, deployed by hand):
-                   overview, reports, flagged, content, users, media, staff, audit, security,
-                   analytics, business (lib/console/: their access checks, fetchers and actions)
+apps/web/e2e/      Playwright: home-feed.mjs, release-smoke.mjs (every page of each role), business-sidebar.mjs,
+                   password-recovery.mjs (sign-up, confirmation, login, Forgot password, the reset page; staging only)
+apps/admin/src/    CampConnect Admin, the staff app (port 3001; its own Vercel project): overview, reports,
+                   flagged, content, users, media, staff, audit, security, analytics, business (lib/console/)
 apps/mobile/       Expo app (expo-router): apps/mobile/CLAUDE.md
 packages/shared/   everything that is not UI: types/ (incl. database.ts), schemas/ (zod), queries/
                    (every read and write), buzz/, trust-safety/, events/ (calendar parsers, the sync
@@ -82,7 +82,7 @@ npm run check               # typecheck + lint + build: run before you call work
 npm run typecheck           # or lint, or build: the same steps one at a time
 npm run test:shared         # packages/shared unit tests, offline
 npm run test:moderation     # packages/moderation unit tests, offline
-npm run db:test             # every supabase/tests suite in PGlite, offline, ~5 min
+npm run db:test             # every supabase/tests suite in PGlite, offline, ~7 min
 ```
 
 Commands against a real Supabase project, and their traps: [supabase/CLAUDE.md](supabase/CLAUDE.md).
@@ -100,8 +100,7 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
 - Website: server-only modules start with `import "server-only"`; writes go through server actions
   in `apps/web/src/lib/actions/`; call `redirect()` and `notFound()` outside `try` blocks; read
   `node_modules/next/dist/docs/` before using a Next.js API you have not checked.
-- Paused features stay behind their flags instead of being deleted (apps/mobile/CLAUDE.md lists
-  them).
+- Paused features stay behind their flags instead of being deleted (apps/mobile/CLAUDE.md lists them).
 - Database changes: follow [supabase/CLAUDE.md](supabase/CLAUDE.md).
 - Settled product and technical choices, with their reasons, are in
   [docs/decisions.md](docs/decisions.md). Do not re-open one without a reason.
@@ -114,10 +113,16 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
 - **Sunil and Ankur (`ProXteller`) each merge their own pull requests** into `main` once the checks
   below pass, without waiting for the other's approval: the author's merge is that deploy's
   approval. The other production writes below still need the owner's approval.
-- Before opening a PR, check what it would bring (`git log origin/main..<branch>`); a branch that
-  is already merged needs none, whatever GitHub's "Compare & pull request" banner suggests. Then
-  run `npm run check`, the tests your change touches (`npm run db:test` for any SQL), and the
-  documentation updates below.
+- **Ankur works on his own, end to end** (Sunil's decision, 2026-11-01). A session working for him
+  writes, refactors and deletes code; builds features; fixes bugs and security issues; changes the
+  UI, the APIs and the schema (as migrations); runs tests; commits, pushes his branches, opens PRs
+  and merges his own once the checks pass; and deploys to development and staging (preview builds,
+  the staging project), all without asking first. Only the production writes below wait, each on
+  Sunil's explicit approval, one at a time, then run with a backup, tests and a rollback ready. It
+  ends with a short summary: the work done, the commits and PRs, and what was deployed where.
+- Before opening a PR, check what it would bring (`git log origin/main..<branch>`); a branch already
+  merged needs none, whatever GitHub's banner suggests. Then run `npm run check`, the tests your
+  change touches (`npm run db:test` for any SQL), and the documentation updates below.
 - Commit messages: a plain-English subject saying what changed; a body with why, the migrations
   (and whether they are on production) and the tests run. AI-written commits end with a
   `Co-Authored-By:` trailer.
@@ -187,9 +192,8 @@ environment variable. Typos, formatting and read-only exploration are not.
 4. **State, not prose: write what is true, the ugly parts included**, and date what can go stale
    ("as of 2026-10-27"). Say where a claim comes from when you have not checked it yourself.
 5. **Verify before you rely on it.** Check that a named file, function, flag or status still holds.
-6. No changelog sections: git history is the record. The old per-branch `CLAUDE.md` copies of
-   2026-10-27 lose to `main`'s in a merge (docs/branches/README.md); resolve any other conflict on
-   its merits.
+6. No changelog sections: git history is the record. Old per-branch `CLAUDE.md` copies (2026-10-27)
+   lose to `main`'s in a merge (docs/branches/README.md); resolve any other conflict on its merits.
 
 On the owner's Mac a local Claude Code `Stop` hook, not in git (`.claude/settings.local.json` →
 `.claude/hooks/claude-md-reminder.sh`), reminds a session when files changed but no documentation

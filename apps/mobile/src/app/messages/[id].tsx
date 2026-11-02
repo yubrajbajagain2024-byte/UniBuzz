@@ -740,6 +740,8 @@ function Chat({
       sender_id: userId,
       content: body,
       image_url: null,
+      hidden_at: null,
+      hidden_reason: null,
       shared_post: null,
       attachments: [],
       reply_to: answering ? replySnapshotOf(answering) : null,

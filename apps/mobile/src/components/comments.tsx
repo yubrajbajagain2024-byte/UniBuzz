@@ -11,6 +11,7 @@ import { radius } from "@/lib/theme";
 import { makeStyles, useAppTheme, useColors } from "@/lib/theme-provider";
 import { Avatar } from "./avatar";
 import { Icon } from "@/components/icon";
+import { useOpenProfile } from "@/lib/open-profile";
 
 /*
  * The thread looks like TikTok's comment sheet: no bubbles, a round avatar, the name in small grey, the comment in
@@ -576,7 +577,7 @@ type RowProps = {
 function CommentRow({ node: c, vote: override, isAuthor, onVoted, onReply, onHold }: RowProps) {
   const colors = useColors();
   const styles = useStyles();
-  const router = useRouter();
+  const openProfile = useOpenProfile();
   const { user } = useSession();
   const { vote, cast } = useVote("comment", c.id, override ?? { score: c.score, likes: c.likes, myVote: c.myVote }, (value) => voteComment(supabase, c.id, value), onVoted);
   const name = c.author.full_name;
@@ -597,7 +598,7 @@ function CommentRow({ node: c, vote: override, isAuthor, onVoted, onReply, onHol
   return (
     // Not one accessibility element: the buttons inside stay reachable one by one (the body text carries the hold hint).
     <Pressable onLongPress={onHold} delayLongPress={350} accessible={false} style={[styles.row, reply && [styles.reply, { marginLeft: REPLY_INDENT + (c.depth - 1) * INDENT }]]}>
-      <Pressable onPress={() => router.push({ pathname: "/profile/[id]", params: { id: c.author.id } })} accessibilityRole="button" accessibilityLabel={`${reply ? "Reply" : "Comment"} from ${name}`} accessibilityHint="Opens their profile">
+      <Pressable onPress={() => openProfile(c.author.id)} accessibilityRole="button" accessibilityLabel={`${reply ? "Reply" : "Comment"} from ${name}`} accessibilityHint="Opens their profile">
         <Avatar name={name} url={c.author.avatar_url} size={reply ? REPLY_AVATAR : AVATAR} />
       </Pressable>
       <View style={{ flex: 1, minWidth: 0 }}>

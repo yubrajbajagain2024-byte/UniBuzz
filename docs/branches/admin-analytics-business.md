@@ -1,8 +1,8 @@
 # admin-analytics-business
 
-- **Owner:** Yubraj. **As of 2026-10-31:** branched from `main` at PR #59 (`a637de6`); `main` merged in up to PR #75
-  (2026-10-31); pushed, draft PR #60, **not to be merged before the launch plan below is approved**. Written by AI
-  sessions.
+- **Owner:** Yubraj. **As of 2026-11-02:** branched from `main` at PR #59 (`a637de6`); `main` merged in up to PR #89
+  (2026-11-02); PR #60, merged with the owner's approval of 2026-11-02 ("merge it if everything is good"). Written by
+  AI sessions.
 - **Purpose:** the owner's brief: two new sections in **CampConnect Admin** (`apps/admin`, the separate staff app), for
   the UniBuzz team to run the whole advertising operation without opening the database. The student website and the
   mobile app are unchanged by the sections; nothing here is on production.
@@ -14,15 +14,17 @@
 - **History:** first built in the website's `/admin` console (commit `63f0083`); the owner then decided (2026-10-30)
   that it belongs in CampConnect Admin, off the student website, so the second commit moves it there and returns
   `apps/web` to `main`'s state exactly. On 2026-10-31 the migration was renamed from `20261112000000` to
-  `20261114000000_console_business.sql` (informally 62), because `main` had meanwhile applied 58 to 60 to production
-  under later names and file order is authoritative; nothing in it changed.
+  `20261114000000_console_business.sql` (informally 62), and on 2026-11-02 again to
+  `20261115000000_console_business.sql` (63: `main`'s 62 is `story_actions`, live since 2026-11-02), because `main`
+  had meanwhile applied 58 to 62 to production under later names and file order is authoritative; nothing in it
+  changed.
 
 ## What it does
 
 How it works, page by page and function by function: docs/technical-reference.md, "CampConnect Admin: Analytics and
 Business". In short: two sections for owners and admins of the staff (Analytics, Business) behind the app's two-factor
-gate; migration 62 adds the `console_*` functions, three closed tables and the `platform-activity` pg_cron job, and
-changes no existing object; the Business section reuses Business v2's review functions; before 62 is applied both
+gate; migration 63 adds the `console_*` functions, three closed tables and the `platform-activity` pg_cron job, and
+changes no existing object; the Business section reuses Business v2's review functions; before 63 is applied both
 sections say they need it.
 
 ## CampConnect Admin brought to `main` (from `step-admin`)
@@ -55,9 +57,9 @@ sections say they need it.
 
 Every result is in docs/testing.md (the suites' one home). In short, on this tree: `npm run db:test`,
 `npm run test:shared` and `npm run check` (see that table for the counts of 2026-10-31); `console-business.test.mjs`
-(95 checks, 62 on this repo's schema and production's); the rollout rehearsal applies and rolls back 62 with the
+(95 checks, 63 on this repo's schema and production's); the rollout rehearsal applies and rolls back 63 with the
 release. On **staging, 2026-10-30 22:20 to 2026-10-31 02:30 UTC**, with the admin and a moderator on the staff with
-authenticators and every session passing the second factor: the rehearsal 11/11 before, the release and 62 applied
+authenticators and every session passing the second factor: the rehearsal 11/11 before, the release and 63 applied
 under traffic with 0 failed requests, 30/30 after, probe 46/46; the business-portal test 58/58; the website's smoke
 63/63 pages (the staff console and the portal's admin pages behind the second factor); CampConnect Admin's browser
 check 9/9 as the admin (all eleven Analytics and Business views) and 8/8 as a moderator (neither section). Rolled
@@ -65,7 +67,7 @@ back and restored on a staging another session was using at the same time (detai
 
 Fixed by those runs: the admin app's browser check waited on URLs that Next 16.4 no longer changes while the Security
 page renders (it now waits for page content); the staging scripts now sign admins in with a second factor
-(`supabase/tests/staging/mfa.mjs`); the rehearsal's `apply` takes a file list, its `check` covers 62, its `cleanup`
+(`supabase/tests/staging/mfa.mjs`); the rehearsal's `apply` takes a file list, its `check` covers 63, its `cleanup`
 reports the release's own tables separately; the smoke test covers the website's console. Not a code defect: the
 Security page renders under the address of the page asked for after sign-in (Next 16.4; `step-admin` ran 16.3.4).
 
@@ -81,42 +83,50 @@ what the business can read, day boundaries and previous-range windows, the cron 
 
 ## Launch plan (each production step needs the owner's explicit approval)
 
-**Order of migrations on production.** 44, 46 and 49 to 57 are pending, as docs/status.md says; 61 (Events) goes
-alone first, as 58 to 60 did; then one `db:setup` run applies 44, 46, 49 to 57 and 62 in file order. 62 needs 49, 50
-and 56 and nothing newer; it is not needed by anything. An unpushed migration on the owner's Mac (`admin-check-1028`,
-to be renamed so it sorts after 62) goes live alone, by hand, whenever the owner decides; the staging run above
+**Order of migrations on production.** 44, 46 and 49 to 57 are pending, as docs/status.md says; 61 (Events) went
+live alone on 2026-11-01 and 62 (story actions) on 2026-11-02, so nothing goes ahead of the release any more: one
+`db:setup` run applies 44, 46, 49 to 57 and 63 in file order. 63 needs 49, 50 and 56 and nothing newer; it is not
+needed by anything. An unpushed migration on the owner's Mac (`admin-check-1028`,
+to be renamed so it sorts after 63) goes live alone, by hand, whenever the owner decides; the staging run above
 rehearsed it first and alone, then the release.
 
-1. **Backup that restores** (production read; the owner runs it): `node scripts/backup.mjs before-migration-62 --full`
+1. **Backup that restores** (production read; the owner runs it): `node scripts/backup.mjs before-migration-63 --full`
    (`main`'s tool since PR #72; its restore, `scripts/restore.mjs`, was rehearsed on staging on 2026-10-30, 5/5). Keep
    the row counts it prints. Supabase's own backups need the Pro plan (production is on Free).
-2. **Dry run:** `DRY_RUN=1 SUPABASE_DB_URL=… npm run db:setup` must list exactly 44, 46, 49 to 57 and 62 (61 once it
-   is live is not listed) and warn that 44 and 46 are out of order.
+2. **Dry run:** `DRY_RUN=1 SUPABASE_DB_URL=… npm run db:setup` must list exactly 44, 46, 49 to 57 and 63 and warn that
+   44 and 46 are out of order.
 3. **Apply:** `ALLOW_OUT_OF_ORDER=1 SUPABASE_DB_URL=… npm run db:setup`, then `verify.mjs --live` (the known 20
-   differences of migration 18 aside) and `npm run db:check`'s read-only parts. Record 62 in docs/migrations.md.
+   differences of migration 18 aside) and `npm run db:check`'s read-only parts. Record 63 in docs/migrations.md.
 4. **Roles:** `select public.grant_role('<user id>', 'admin')` for each staff owner or admin who runs businesses (the
    Business section needs the admin role on top of the staff role; Analytics does not).
-5. **Merge PR #60.** Merging deploys the website: this branch changes two website messages (a suspended account's
-   sign-in, the account-deletion refusal) and nothing a student sees otherwise; `apps/mobile` is untouched.
-6. **Deploy the admin app:** `npm run deploy:admin` from the merged `main` (the project is not connected to Git), or,
-   if the Vercel plan below is approved first, the merge deploys it.
+5. **Merge PR #60** (done 2026-11-02, before the migration: the website needs nothing from 63, and the admin app says
+   both sections need it until it is live). The website deploy carries two messages (a suspended account's sign-in,
+   the account-deletion refusal) and nothing a student sees otherwise; `apps/mobile` gets two null fields on an
+   optimistic message. Until 63 is live the Analytics and Business pages show their "needs migration 63" notice.
+6. **Deploy the admin app:** reconnect `campconnect-admin` to the repository now that `apps/admin` is on `main`
+   (`vercel git connect https://github.com/yubrajbajagain2024-byte/UniBuzz` from a folder linked to that project, as
+   docs/decisions.md records; the next push to `main` then deploys it), or `npm run deploy:admin` by hand.
 7. **Smoke on production, read-only:** the admin app's signed-out gates (`BASE=https://campconnect-admin.vercel.app
    node apps/admin/e2e/admin.mjs` without accounts), then an owner signs in and opens Analytics and Business.
-8. **Rollback, if needed:** 62 first (its rollback refuses while `business_admin_notes` has rows: export the notes,
-   delete them on purpose, then run `rollbacks/20261114000000_console_business.down.sql` with its `_migrations`
-   delete), then 57, 56, 55, 50, 49 as docs/status.md says. 62's rollback drops nothing of Business v2's.
+8. **Rollback, if needed:** 63 first (its rollback refuses while `business_admin_notes` has rows: export the notes,
+   delete them on purpose, then run `rollbacks/20261115000000_console_business.down.sql` with its `_migrations`
+   delete), then 57, 56, 55, 50, 49 as docs/status.md says. 63's rollback drops nothing of Business v2's.
 
-**Vercel plan for `apps/admin` (nothing changed; read-only inspection of 2026-10-30).** Two projects in team `vyass`:
-`apartment-book` (the website, root `apps/web`, connected to Git, every push to `main` deploys) and
-`campconnect-admin` (root `apps/admin`, Next.js preset, Node 24, **not connected to Git**, deployed three times by hand
-with `scripts/deploy-admin.mjs`, last on 2026-10-26). Its environment already separates the secret:
+**Vercel plan for `apps/admin` (nothing changed from here; read-only inspection of 2026-10-30, and `main`'s record of
+2026-11-02).** Two projects in team `vyass`: `apartment-book` (the website, root `apps/web`, connected to Git, every
+push to `main` deploys) and `campconnect-admin` (root `apps/admin`, Next.js preset, Node 24; it was connected to the
+repository for a while and **disconnected on 2026-11-02** because every push without `apps/admin` failed its build and
+left a red check on every PR; it still serves its build of 2026-10-26 from `step-admin`). With `apps/admin` on `main`
+that failure is gone, so the reconnection is safe. The Vercel CLI on this Mac is logged out (403 on 2026-11-02): the
+owner runs the steps below after `vercel login`. Its environment already separates the secret:
 `SUPABASE_SERVICE_ROLE_KEY` is a Sensitive variable for **Production only**; `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_MAIN_SITE_URL` and `NEXT_PUBLIC_GOOGLE_LOGIN` are Production and
 Preview; no Mux, worker or cron variable (the media worker stays off). The website's project is the same shape (its
 service key and Mux secrets Production only; the anon key and URL also for Preview). Proposed, for the owner to apply
 in the Vercel dashboard (none of it can be done from here without changing live settings):
-1. Connect `campconnect-admin` to `yubrajbajagain2024-byte/UniBuzz` (Settings › Git), production branch `main`, root
-   directory `apps/admin` (already set), so an approved merge deploys the admin app the way it deploys the website.
+1. Reconnect `campconnect-admin` to `yubrajbajagain2024-byte/UniBuzz` (`vercel git connect …` from a folder linked to
+   it, or Settings › Git), production branch `main`, root directory `apps/admin` (already set), so an approved merge
+   deploys the admin app the way it deploys the website. Then push once (or redeploy) so it serves `main`'s build.
 2. Ignored Build Step (Settings › Git): `git diff --quiet HEAD^ HEAD -- apps/admin packages/shared package.json
    package-lock.json`, so pushes that touch only the website or the app do not rebuild the admin app.
 3. Previews: keep only the four public variables (the service key stays Production only, so a preview can never send
@@ -125,7 +135,7 @@ in the Vercel dashboard (none of it can be done from here without changing live 
    Bypass for Automation" secret and pass it as `VERCEL_BYPASS` to `apps/admin/e2e/admin.mjs` when checking a preview.
 4. Keep `NEXT_PUBLIC_SITE_URL` unset on the project (`getSiteUrl()` uses `VERCEL_PROJECT_PRODUCTION_URL`) and add the
    production URL's `/auth/callback` and `/auth/confirm` to Supabase's redirect list if they are not there.
-5. Once connected: the root CLAUDE.md's rule that merging deploys applies to the admin app too (62 must be live before
+5. Once connected: the root CLAUDE.md's rule that merging deploys applies to the admin app too (63 must be live before
    the merge, as the website's rule already says), and `scripts/deploy-admin.mjs` becomes the manual fallback.
 The website project and the mobile app are not touched by any of this.
 
@@ -134,18 +144,28 @@ The website project and the mobile app are not touched by any of this.
 | Item | State |
 | --- | --- |
 | Analytics and Business in CampConnect Admin, offline tests, independent review | ready |
-| Staging: the release with 62 under traffic, its console through the API and in the admin app with two-factor sign-in, the website's pages and console, the portal test | ready (2026-10-30/31) |
+| Staging: the release with 63 under traffic, its console through the API and in the admin app with two-factor sign-in, the website's pages and console, the portal test | ready (2026-10-30/31) |
 | `step-admin` reconciled with `main` outside its migrations | ready (commit `f532cf8`); the owner's questions 1 to 3 and 5 remain |
-| `main` merged in (PRs #61 to #75; the migration renamed to 62) | ready |
+| `main` merged in (PRs #61 to #75; the migration renamed to 63) | ready |
 | Review of PR #60 by the owner (and Sunil for the shared package) | **needs the owner** |
 | Production backup (`scripts/backup.mjs --full`), the dry run, the migrations, `grant_role`, the merge, the admin deploy | **each needs the owner's approval**; steps 1 to 8 above |
 | The Vercel Git connection for `campconnect-admin` | **needs the owner** (plan above); until then `npm run deploy:admin` |
-| The unpushed migration on the owner's Mac (`admin-check-1028`): rename so it sorts after 62, apply alone, then push | **needs the owner** |
+| The unpushed migration on the owner's Mac (`admin-check-1028`): rename so it sorts after 63, apply alone, then push | **needs the owner** |
 | Events (61) alone first | Sunil's branch; on staging since 2026-10-31, not on production |
+
+## Note for Sunil: staging on 2026-10-30/31
+
+While this branch's rehearsal ran on `campconnect-staging` (22:20 to 02:30 UTC), another session applied 58 to 61
+there and seeded Events (212 rows, 4 organizations, a `unibuzz-demo…` staff account). This run then removed only its
+own rows (accounts `rh-*`/`*.mvv*`, promotions `RH-*`/`INV-mvv*`, its storage objects, and 277 member-less
+conversations created after 22:23 UTC, unreadable to anyone) and rolled its migrations back; it left staging at
+production's 49 migrations plus 58 to 61 (62 came later, from its own probe), `buzz_posts.category` dropped by hand
+as 54's rollback leaves it. Last read (2026-10-31 02:40 UTC): nothing of this run left; `media_jobs` grows on its own.
+If your counts look off by those conversations, that is why. Please confirm nothing of yours is missing.
 
 ## Pending, in priority order
 
-1. The owner's review of PR #60 and approval of the launch plan.
+1. The launch plan's steps 1 to 4 and the Vercel reconnection, each with the owner's approval.
 2. Staging again, once staging is free of the other session's run: the rehearsal's `rollback` after `cleanup` (its
    order; the console's guard), and row counts compared at the end (not possible on 2026-10-31).
 3. By hand on staging in the admin app, the writes the browser check does not make: approve the rehearsal's ad with

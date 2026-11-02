@@ -2,7 +2,7 @@ import { memo, useMemo, useRef, useState } from "react";
 import { RefreshControl, View, type FlatList, type NativeScrollEvent, type NativeSyntheticEvent, type ListViewToken } from "react-native";
 import { budgetLabel, KM_PER_MILE, listRoommatePosts, listingMedia, videosFor, type PostEngagement, type RoommatePostWithAuthor } from "@apartment-book/shared";
 import { listingPoster } from "@/lib/listing-poster";
-import type { RoommateFilters } from "@/components/housing/filter-sheet";
+import type { RoommateFilterChoice, RoommateType } from "@apartment-book/shared";
 import { OnlineStrip } from "@/components/online-strip";
 import { FEED_HEADER_PADDING, PostCard } from "@/components/post-card";
 import { EmptyState, ErrorBanner, Loading, useAppearingCells } from "@/components/ui";
@@ -16,7 +16,6 @@ import { useTabReselect } from "@/lib/tab-reselect";
 import { refreshWithHaptic } from "@/lib/haptics";
 
 /** The two kinds of roommate post the "Has a room" and "Looking for a room" pills pick between. */
-export type RoommateType = "has_room" | "needs_room";
 
 /**
  * One roommate post, memoised: only a row whose post, save or counts changed draws again as the feed scrolls and loads.
@@ -53,7 +52,7 @@ const RoommateRow = memo(function RoommateRow({ p, saved, engagement, playing }:
  * and pills and reporting its scroll through `onScroll`. The search (`q`), the campus and the kind of post come from the
  * Housing screen's own bar, which also owns the "+" button.
  */
-export function RoommatesSection({ topInset, onScroll, q, campus, type, filters, filtered, active = true }: { topInset: number; onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void; q: string; campus: "mine" | "all"; type: RoommateType | undefined; filters: RoommateFilters; filtered: boolean; active?: boolean }) {
+export function RoommatesSection({ topInset, onScroll, q, campus, type, filters, filtered, active = true }: { topInset: number; onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void; q: string; campus: "mine" | "all"; type: RoommateType | undefined; filters: RoommateFilterChoice; filtered: boolean; active?: boolean }) {
   const { user, profile } = useSession();
   const universityId = campus === "all" ? undefined : (profile?.university_id ?? undefined);
   // The filter sheet's choices; distance needs a campus to measure from, so it is dropped on "every university".

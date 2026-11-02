@@ -24,6 +24,7 @@ import {
   SLEEP_SCHEDULES,
   STAFF_ROLE_VALUES,
 } from "../constants";
+import { PASSWORD_MAX, PASSWORD_MIN } from "../auth";
 import { CLOSE_CLOCK, HOURS_TIMEZONE_VALUES, isHoursDate, MAX_HOURS_RANGES, MAX_SPECIAL_HOURS, OPEN_CLOCK } from "../business-hours";
 import {
   formBoolean,
@@ -55,16 +56,30 @@ export function createSignUpSchema(allowedDomains: string[]) {
       : `Use your university email address (${domains.map((d) => `@${d}`).join(", ")})`;
   return z.object({
     fullName: z.string().trim().min(2, "Enter your name").max(80),
+    // Tidied before it is checked: a space after the address (iOS adds one when it completes an email) is not a mistake.
     email: z
-      .email({ error: "Enter a valid email address" })
+      .string()
       .trim()
       .toLowerCase()
+      .pipe(z.email({ error: "Enter a valid email address" }))
       .refine((email) => domains.length === 0 || domains.includes(email.split("@")[1] ?? ""), { error: hint }),
     password: z.string().min(8, "Password must be at least 8 characters").max(72),
   });
 }
 export const signUpSchema = createSignUpSchema([]);
 export type SignUpInput = z.infer<typeof signUpSchema>;
+
+/** "Forgot password?": an email, tidied as the sign-in form tidies it. */
+export const resetRequestSchema = z.object({ email: z.string().trim().toLowerCase().pipe(z.email({ error: "Enter a valid email address" })) });
+
+/** "Choose a new password": the sign-up rule (8 to 72 characters), typed twice the same. */
+export const newPasswordSchema = z
+  .object({
+    password: z.string().min(PASSWORD_MIN, `Use at least ${PASSWORD_MIN} characters`).max(PASSWORD_MAX, `Use at most ${PASSWORD_MAX} characters`),
+    confirm: z.string(),
+  })
+  .refine((v) => v.password === v.confirm, { error: "The passwords don't match", path: ["confirm"] });
+export type NewPasswordInput = z.infer<typeof newPasswordSchema>;
 
 /** Optional map pin: both coordinates or neither. */
 const coordinateFields = {
@@ -76,7 +91,7 @@ const bothOrNeither = (v: { latitude?: number; longitude?: number }) =>
 const coordinateError = { error: "Pin the location on the map or clear the pin", path: ["latitude"] };
 
 export const signInSchema = z.object({
-  email: z.email({ error: "Enter a valid email address" }).trim().toLowerCase(),
+  email: z.string().trim().toLowerCase().pipe(z.email({ error: "Enter a valid email address" })),
   password: z.string().min(1, "Enter your password"),
 });
 export type SignInInput = z.infer<typeof signInSchema>;

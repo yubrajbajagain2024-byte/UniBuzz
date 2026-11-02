@@ -259,7 +259,7 @@ export default function PublishScreen() {
         const full = { ...created, author: { id: user.id, full_name: profile?.full_name ?? "", avatar_url: profile?.avatar_url ?? null, university: null }, university: null } as unknown as FeedPostWithAuthor;
         // Once the create flow has gone: iOS presents nothing over a screen that is still leaving.
         setTimeout(() => {
-          if (shareFriends) shareSheet.open(sharedPostFromFeedPost(full), { url, restricted: postedTo === "campus" });
+          if (shareFriends) shareSheet.open(sharedPostFromFeedPost(full), { url });
           else void Share.share({ url, message: now.title.trim() || undefined }).catch(() => {});
         }, 700);
       }

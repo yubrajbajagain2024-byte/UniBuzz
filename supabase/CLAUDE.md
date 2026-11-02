@@ -55,7 +55,11 @@ Supabase's `auth` and `storage` schemas.
   fresh connections: test code that depends on one there.
 - `tests/staging/` needs a real Supabase project, the staging one (`STAGING_SUPABASE_REF`; the scripts
   refuse production): `business-portal.mjs`; `stories.mjs`, Stories through Auth, the REST API and
-  Storage; `events.mjs`, Events through the same (it applies 61 on staging when missing); and
+  Storage; `events.mjs`, Events through the same (it applies 61 on staging when missing);
+  `story-actions.mjs`, a story's likes, replies and shares into direct and group chats through the
+  app's own code (it applies 62 on staging when missing); `auth-recovery.mjs`, sign-up, confirmation,
+  login and password recovery through Supabase Auth and the apps' own code (links made with the
+  admin API; staging's built-in mailer allows two emails an hour); and
   `release-rehearsal.mjs`, which rehearses a release step by step (see its header) and expects every
   migration that went live ahead of the release (58 to 61) to be applied on staging first.
   Staging's `media_jobs` grows on its own: leave it out of row-count comparisons.

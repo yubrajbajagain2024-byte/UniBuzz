@@ -4,7 +4,7 @@
 // Optional accounts (their checks are skipped with a note when unset):
 //   ADMIN_E2E_EMAIL + ADMIN_E2E_PASSWORD   a staff account; ADMIN_E2E_TOTP_SECRET is its authenticator key (base32) for the 2FA step.
 //                                          An owner or admin also gets Analytics and Business (migration 59) checked: every view
-//                                          renders, or says it needs migration 62 or the admin role; a moderator must not see them.
+//                                          renders, or says it needs migration 63 or the admin role; a moderator must not see them.
 //   E2E_USER_EMAIL + E2E_USER_PASSWORD     an ordinary (non-staff) account, which must land on /no-access
 //   VERCEL_BYPASS                          bypass secret when Vercel Deployment Protection guards the deployment
 import fs from "node:fs";
@@ -101,7 +101,7 @@ try {
           const text = await D.locator("main").innerText();
           if (!res || res.status() >= 400 || /Something went wrong|Application error/.test(text)) throw new Error(`${path}: ${res?.status()} ${text.slice(0, 120)}`);
           if (new URL(D.url()).pathname === "/security" || /two-factor code/i.test(text)) throw new Error(`${path}: sent back to the Security page (the aal2 session was lost)`);
-          if (!/needs migration 62|need the UniBuzz admin role|Platform|Overview|Advertisers|Campaigns|Payments|Rate card|reports|Nothing logged yet|When/.test(text)) throw new Error(`${path}: unexpected page ${text.slice(0, 160)}`);
+          if (!/needs migration 63|need the UniBuzz admin role|Platform|Overview|Advertisers|Campaigns|Payments|Rate card|reports|Nothing logged yet|When/.test(text)) throw new Error(`${path}: unexpected page ${text.slice(0, 160)}`);
           await D.screenshot({ path: SHOTS + `admin-06${path.replace(/[/?=&]/g, "-")}.png`, fullPage: true });
         }
         const first = D.locator("a[href^='/business/campaigns/']").first();

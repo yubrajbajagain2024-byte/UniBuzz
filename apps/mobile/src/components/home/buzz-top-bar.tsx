@@ -6,6 +6,7 @@ import { Icon } from "@/components/icon";
 import { MaskGlyph } from "@/components/buzz/ui";
 import { buzzState } from "@/lib/buzz-store";
 import { phosphor } from "@/lib/palette";
+import { statusShade } from "@/lib/theme";
 
 /*
  * Home's top bar near Buzz (UniVerse's HomeTopBar on the Buzz pane): the bar turns Phosphor as the pager comes to Buzz,
@@ -112,10 +113,13 @@ export function BuzzBarLayer({ layer }: { layer: BuzzBar["layer"] }) {
   return <Animated.View pointerEvents="none" style={[styles.layer, { opacity: layer }]} />;
 }
 
-/** The same for the strip under the status bar. */
-export function BuzzStatusStripLayer({ layer, height }: { layer: BuzzBar["layer"]; height: number }) {
+/**
+ * Buzz's shade behind the status bar (see HomeTopTabs): Phosphor, as Buzz is near (`layer`), and only as far as the bar
+ * has slid away (`away`).
+ */
+export function BuzzStatusShade({ layer, away, height }: { layer: BuzzBar["layer"]; away: Animated.AnimatedInterpolation<number>; height: number }) {
   if (!layer) return null;
-  return <Animated.View pointerEvents="none" style={[styles.strip, { height, opacity: layer }]} />;
+  return <Animated.View pointerEvents="none" style={[styles.shade, { height, opacity: Animated.multiply(layer, away) }]} />;
 }
 
 /** The neutral person glyph that stands where your photo is while Buzz is on screen. It opens your profile, as the photo does. */
@@ -162,7 +166,7 @@ export function BuzzLabelMask({ layer, fontSize, sidePad }: { layer: BuzzBar["la
 const styles = StyleSheet.create({
   // Opaque: under it sits the bar's own colour (white in Light), which a see-through Phosphor would turn grey.
   layer: { position: "absolute", top: 0, left: 0, right: 0, bottom: -StyleSheet.hairlineWidth, backgroundColor: phosphor.surface1, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: phosphor.line },
-  strip: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 12, backgroundColor: phosphor.surface1 },
+  shade: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 12, experimental_backgroundImage: statusShade(phosphor.surface1) },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   maskRow: { position: "absolute", top: 0, bottom: 0, flexDirection: "row" },
   cell: { flex: 1, alignItems: "center", justifyContent: "center" },

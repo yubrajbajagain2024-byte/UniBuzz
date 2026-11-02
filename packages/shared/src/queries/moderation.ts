@@ -1,7 +1,8 @@
 import type { Client } from "../types/models";
 import { MESSAGE_MEDIA_BUCKET } from "../message-media";
+import { getMyStaffAccess } from "./admin";
 
-export type ReportTargetType = "apartment" | "item" | "roommate" | "profile" | "message" | "comment" | "post" | "buzz" | "buzz_comment";
+export type ReportTargetType = "apartment" | "item" | "roommate" | "profile" | "message" | "comment" | "post" | "buzz" | "buzz_comment" | "story";
 export type ReportReason = "spam" | "scam" | "harassment" | "inappropriate" | "other";
 
 export const REPORT_REASONS: { value: ReportReason; label: string }[] = [
@@ -62,6 +63,19 @@ export async function listBlockedIds(supabase: Client, userId: string): Promise<
   return (data ?? []).map((r) => r.blocked_id);
 }
 
+/** The people I have blocked, for Settings → Blocked accounts: their names and photos, newest block first. */
+export async function listBlockedPeople(supabase: Client, userId: string): Promise<{ id: string; full_name: string; avatar_url: string | null; username: string | null }[]> {
+  const { data, error } = await supabase.from("blocks").select("blocked_id, created_at").eq("blocker_id", userId).order("created_at", { ascending: false });
+  if (error) throw error;
+  const ids = (data ?? []).map((r) => r.blocked_id);
+  if (ids.length === 0) return [];
+  const { data: people, error: peopleError } = await supabase.from("profiles").select("id, full_name, avatar_url, username").in("id", ids);
+  if (peopleError) throw peopleError;
+  const byId = new Map((people ?? []).map((p) => [p.id, p as { id: string; full_name: string; avatar_url: string | null; username: string | null }]));
+  // Someone whose profile cannot be read any more (a deleted account) is left out: there is nothing to unblock.
+  return ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+}
+
 export async function isBlocked(supabase: Client, userId: string, otherId: string): Promise<boolean> {
   const { data, error } = await supabase.from("blocks").select("blocked_id").eq("blocker_id", userId).eq("blocked_id", otherId).maybeSingle();
   if (error) throw error;
@@ -107,8 +121,20 @@ async function removeMyMessageMedia(supabase: Client, userId: string): Promise<v
   }
 }
 
-/** Permanently delete the signed-in user's account, their uploads and everything they posted. Sign out afterwards. */
+/** Shown to the only owner of the staff who tries to delete their account (the database refuses it too, with the same meaning). */
+export const LAST_OWNER_DELETE_MESSAGE = "You are the only owner on the UniBuzz staff. Make someone else an owner in CampConnect Admin before deleting your account.";
+
+/**
+ * Permanently delete the signed-in user's account, their uploads and everything they posted. Sign out afterwards.
+ * Staff accounts are checked first: the database refuses to delete the only owner and asks staff for a verified
+ * second factor (CampConnect Admin's migration 15, live), and that refusal must come before any upload is removed.
+ */
 export async function deleteMyAccount(supabase: Client): Promise<void> {
+  const staff = await getMyStaffAccess(supabase).catch(() => null);
+  if (staff) {
+    if (!staff.mfaVerified) throw new Error("Two-factor authentication required");
+    if (staff.lastOwner) throw new Error(LAST_OWNER_DELETE_MESSAGE);
+  }
   const { data } = await supabase.auth.getUser();
   if (data.user) {
     await removeMyUploads(supabase, data.user.id).catch(() => {});

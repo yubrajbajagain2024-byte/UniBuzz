@@ -1,43 +1,40 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
-import { useRouter } from "expo-router";
+import { Animated, Pressable, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
+import { useIsFocused, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { EVENT_CATEGORIES, EVENT_DATE_FILTERS, EVENT_SECTIONS, type EventCategory, type EventDateFilter, type EventSection } from "@apartment-book/shared";
+import { DEFAULT_EVENT_FILTERS, EVENT_SECTIONS, eventActiveChips, eventFilterCount, eventQuickFilters, type EventFilterChoice, type EventSection } from "@apartment-book/shared";
+import { DISCOVERY_BAR_HEIGHT, DiscoveryBar } from "@/components/discovery-bar";
 import { AllEventsSection } from "@/components/events/all-events-section";
-import { categoryIcon } from "@/components/events/event-glyphs";
+import { EventFilterSheet } from "@/components/events/event-filter-sheet";
 import { ForYouEventsSection } from "@/components/events/for-you-events-section";
 import { Fab } from "@/components/feed-header";
-import { Icon, type IconName } from "@/components/icon";
+import { Icon } from "@/components/icon";
 import { SlidingTabs } from "@/components/sliding-tabs";
 import { useCampusTimeZone } from "@/lib/campus-time-zone";
 import { useCollapsingHeader } from "@/lib/collapsing-header";
+import { useCollapseOnScroll } from "@/lib/tab-bar-collapse";
 import { useSession } from "@/lib/session";
-import { auroraGradient, radius, space, textStyle } from "@/lib/theme";
+import { auroraGradient, space, textStyle } from "@/lib/theme";
 import { makeStyles, useAppTheme } from "@/lib/theme-provider";
 
 const ORDER = EVENT_SECTIONS.map((s) => s.value);
-/** The title row, fixed under the safe area; the labels, the search box and the pills float and slide away like Explore's. */
+/** The title row, fixed under the safe area; the labels, the search field and the quick filters (DiscoveryBar) float and slide away like Explore's. */
 const TITLE_ROW = 52;
-const TABS_ROW = 44;
-const SEARCH_ROW = 46 + space.md * 2;
-const PILLS_ROW = 42;
-const FLOAT = TABS_ROW + SEARCH_ROW + PILLS_ROW;
-/** How much of the next pill stays in sight when the pills row scrolls to the chosen one. */
-const PEEK = 36;
-/** A glyph for each date pill; Upcoming has none, as "All" has none. */
-const DATE_ICONS: Partial<Record<EventDateFilter, IconName>> = { today: "today-outline", week: "calendar-number-outline", weekend: "sunny-outline" };
+const FLOAT = DISCOVERY_BAR_HEIGHT;
 
 /**
- * Events, the fourth tab, laid out like Explore: the big "Events" title with Saved at its right, then For you | All
- * events above a pager with Home's sliding underline, the inbox's search box (it searches events' titles, words and
- * places), and one row of pills that narrow both pages: when (Upcoming, Today, This week, Weekend), a hairline, then
- * the categories. Everything comes from the campus's own calendars and its verified clubs, departments and
- * organizations (migration 61); For you ranks it for the person, All events is time order under day headings. The
- * floating "+" publishes an event for an organization the person belongs to. Everyone's events for someone without a
- * campus; the campus's clock for the times (lib/campus-time-zone).
+ * Events, the fourth tab, laid out like Explore: the big "Events" title with Saved at its right, then the same three
+ * levels (DiscoveryBar): For you | All events above a pager with Home's sliding underline; one search field (events'
+ * titles, words and places) with the filter button beside it; and one row of quick filters that narrow both pages
+ * (Today, This week, Weekend: Upcoming is none of them), a removable chip for each event type picked in the sheet, and
+ * Clear. The button opens EventFilterSheet (When, any number of event types, and Your interests) and counts the choices
+ * in force. Everything comes from the campus's own calendars and its verified clubs, departments and organizations
+ * (migration 61); For you ranks it for the person, All events is time order under day headings. The floating "+"
+ * publishes an event for an organization the person belongs to. Everyone's events for someone without a campus; the
+ * campus's clock for the times (lib/campus-time-zone).
  */
 export default function EventsScreen() {
-  const { colors, isDark } = useAppTheme();
+  const { colors } = useAppTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -56,7 +53,11 @@ export default function EventsScreen() {
   const scrollX = useRef(new Animated.Value(0)).current;
   /** All events is mounted the first time it comes into view, so it does not load until someone looks at it. */
   const [mounted, setMounted] = useState<Set<number>>(() => new Set([0]));
-  const { translateY: floatShift, select: followPage, reveal: revealFloat, onScroll: onPageScroll } = useCollapsingHeader(ORDER.length, FLOAT, 0);
+  // The bottom bar collapses to Events' button as the page on screen scrolls on and comes back as it scrolls back, as
+  // on Home (lib/tab-bar-collapse.ts); the other page starts with the whole bar.
+  const focused = useIsFocused();
+  const trackTabBar = useCollapseOnScroll(focused, index);
+  const { translateY: floatShift, select: followPage, reveal: revealFloat, onScroll: onPageScroll } = useCollapsingHeader(ORDER.length, FLOAT, 0, trackTabBar);
 
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
@@ -65,8 +66,11 @@ export default function EventsScreen() {
     const t = setTimeout(() => setQ(text.trim()), 300);
     return () => clearTimeout(t);
   }, [text]);
-  const [dateFilter, setDateFilter] = useState<EventDateFilter>("any");
-  const [category, setCategory] = useState<EventCategory | null>(null);
+  /** When and which event types: the quick filters set When, the filter sheet both. */
+  const [filters, setFilters] = useState<EventFilterChoice>(DEFAULT_EVENT_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const { dateFilter, categories } = filters;
+  const chips = [...eventQuickFilters(filters), ...eventActiveChips(filters)].map((c) => ({ ...c, onPress: () => setFilters(c.next) }));
   const section: EventSection = ORDER[index] ?? "foryou";
 
   const show = useCallback(
@@ -124,44 +128,7 @@ export default function EventsScreen() {
     if (i !== indexRef.current) show(i);
   }
 
-  // The pills row scrolls just enough to keep the chosen category in full view, Explore's way.
-  const pillsRow = useRef<ScrollViewInstance>(null);
-  const pillBoxes = useRef(new Map<string, { x: number; width: number }>());
-  const pillsOffset = useRef(0);
-  const pillsViewport = useRef(0);
-  const pillsContent = useRef(0);
-  const chosenPill = category ? `c:${category}` : `d:${dateFilter}`;
-  useEffect(() => {
-    const box = pillBoxes.current.get(chosenPill);
-    if (!box || pillsViewport.current <= 0) return;
-    let x = pillsOffset.current;
-    if (box.x - PEEK < x) x = box.x - PEEK;
-    else if (box.x + box.width + PEEK > x + pillsViewport.current) x = box.x + box.width + PEEK - pillsViewport.current;
-    x = Math.max(0, Math.min(x, pillsContent.current - pillsViewport.current));
-    if (Math.abs(x - pillsOffset.current) > 1) pillsRow.current?.scrollTo({ x, animated: true });
-  }, [chosenPill]);
-  const onPillsScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    pillsOffset.current = e.nativeEvent.contentOffset.x;
-  }, []);
-  const pill = (key: string, label: string, selected: boolean, onPress: () => void, icon?: IconName) => (
-    <Pressable
-      key={key}
-      onLayout={(e) => {
-        pillBoxes.current.set(key, { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width });
-      }}
-      onPress={onPress}
-      accessibilityRole="tab"
-      accessibilityLabel={label}
-      accessibilityState={{ selected }}
-      style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && !selected && { opacity: 0.7 }]}
-    >
-      {icon ? <Icon name={icon} size={14} color={selected ? colors.brand : colors.muted} /> : null}
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-  const pageProps = { topInset: FLOAT, universityId, timeZone, q, dateFilter, category };
+  const pageProps = { topInset: FLOAT, universityId, timeZone, q, dateFilter, categories };
 
   return (
     <View style={styles.screen}>
@@ -177,41 +144,18 @@ export default function EventsScreen() {
       </View>
       <View style={styles.body}>
         <Animated.View style={[styles.float, { transform: [{ translateY: floatShift }] }]}>
-          <View style={styles.tabs}>
-            <SlidingTabs sections={EVENT_SECTIONS} section={section} onSelect={select} scrollX={scrollX} pageWidth={width} tint={colors.accent} tintGradient={auroraGradient(colors.auroraGlow, 90)} labelColor={colors.text} dimColor={colors.muted} spread fontSize={16} />
-          </View>
-          <View style={styles.searchRow}>
-            <View style={styles.search}>
-              <View style={styles.searchMark}>{text.trim() !== q ? <ActivityIndicator size="small" color={colors.muted} /> : <Icon name="search" size={18} color={colors.muted} />}</View>
-              <TextInput value={text} onChangeText={setText} placeholder="Search events" placeholderTextColor={colors.faint} keyboardAppearance={isDark ? "dark" : "light"} returnKeyType="search" autoCorrect={false} autoCapitalize="none" accessibilityLabel="Search events" style={styles.input} />
-              {text ? (
-                <Pressable onPress={() => setText("")} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search">
-                  <Icon name="close-circle" size={18} color={colors.faint} />
-                </Pressable>
-              ) : null}
-            </View>
-          </View>
-          <ScrollView
-            ref={pillsRow}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            onScroll={onPillsScroll}
-            scrollEventThrottle={32}
-            onLayout={(e) => {
-              pillsViewport.current = e.nativeEvent.layout.width;
-            }}
-            onContentSizeChange={(w) => {
-              pillsContent.current = w;
-            }}
-            contentContainerStyle={styles.pills}
-            accessibilityRole="tablist"
-          >
-            {EVENT_DATE_FILTERS.map((f) => pill(`d:${f.value}`, f.label, dateFilter === f.value, () => setDateFilter(f.value), DATE_ICONS[f.value]))}
-            <View style={styles.pillDivider} />
-            {pill("c:all", "All", category === null, () => setCategory(null))}
-            {EVENT_CATEGORIES.map((c) => pill(`c:${c.value}`, c.label, category === c.value, () => setCategory(category === c.value ? null : c.value), categoryIcon(c.value).name))}
-          </ScrollView>
+          <DiscoveryBar
+            tabs={<SlidingTabs sections={EVENT_SECTIONS} section={section} onSelect={select} scrollX={scrollX} pageWidth={width} tint={colors.accent} tintGradient={auroraGradient(colors.auroraGlow, 90)} labelColor={colors.text} dimColor={colors.muted} spread fontSize={16} />}
+            query={text}
+            onQuery={setText}
+            placeholder="Search events"
+            searching={text.trim() !== q}
+            filterCount={eventFilterCount(filters)}
+            onOpenFilters={() => setFiltersOpen(true)}
+            filterHint="Pick when, which types of event, and your interests"
+            chips={chips}
+            onClear={() => setFilters(DEFAULT_EVENT_FILTERS)}
+          />
         </Animated.View>
         <Animated.ScrollView
           ref={pager}
@@ -240,6 +184,23 @@ export default function EventsScreen() {
         </Animated.ScrollView>
         <Fab href="/events/new" label="Create event" hint="Publish an event for a club, organization or department you belong to" />
       </View>
+      <EventFilterSheet
+        open={filtersOpen}
+        value={filters}
+        onApply={(next) => {
+          setFilters(next);
+          setFiltersOpen(false);
+        }}
+        onClose={() => setFiltersOpen(false)}
+        onEditInterests={
+          user
+            ? () => {
+                setFiltersOpen(false);
+                router.push("/events/interests" as never);
+              }
+            : undefined
+        }
+      />
     </View>
   );
 }
@@ -250,18 +211,6 @@ const useStyles = makeStyles((colors) => ({
   titleRow: { height: TITLE_ROW, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.md, paddingLeft: 20, paddingRight: space.md },
   title: { flexShrink: 1, ...textStyle.largeTitle, color: colors.text },
   titleButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  searchRow: { height: SEARCH_ROW, flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: 20 },
-  search: { flex: 1, height: 46, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.input, borderRadius: radius.pill, paddingHorizontal: 16 },
-  searchMark: { width: 20, alignItems: "center" },
-  input: { flex: 1, fontSize: 16, color: colors.text, paddingVertical: 0 },
   body: { flex: 1, overflow: "hidden" },
   float: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 2, backgroundColor: colors.bar },
-  tabs: { height: TABS_ROW, flexDirection: "row", marginHorizontal: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  pills: { height: PILLS_ROW, flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: 20 },
-  // The hairline between the date pills and the categories: two choices, one row.
-  pillDivider: { width: StyleSheet.hairlineWidth, height: 22, backgroundColor: colors.border, marginHorizontal: 2 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.input },
-  chipSelected: { backgroundColor: colors.brandSoft },
-  chipText: { fontSize: 13, fontWeight: "600", color: colors.text },
-  chipTextSelected: { color: colors.brand },
 }));

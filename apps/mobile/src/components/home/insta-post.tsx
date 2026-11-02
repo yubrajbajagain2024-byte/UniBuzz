@@ -21,6 +21,7 @@ import { PhotoCarousel } from "../photo-carousel";
 import { POST_FRAME_RADIUS, POST_GUTTER, POST_TEXT, PostActions, PostFrame, PostHeader, PostLink } from "../post-bits";
 import { useShareSheet } from "../share-sheet";
 import { Icon } from "@/components/icon";
+import { useOpenProfile } from "@/lib/open-profile";
 
 export type InstaPostProps = {
   post: FeedPostWithAuthor;
@@ -111,13 +112,15 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
   // Friends-only and selected-people posts cannot go into a chat (see canShareAudience).
   const shareable = canShareAudience(audience);
   const comments = props.comments ?? engagement?.comments ?? 0;
-  const openProfile = (id: string) => router.push({ pathname: "/profile/[id]", params: { id } });
+  // Your own photo or name goes to your Profile tab; anyone else's profile is pushed over the feed.
+  const openProfile = useOpenProfile();
   const openMention = useOpenMention();
   // "Texas State University · Oct 2", or just the date.
   const meta = [subtitle, shortDate(post.created_at)].filter(Boolean).join(" · ");
 
   function doubleTap() {
-    if (!like.liked) void like.toggle();
+    // The tick and the like first (useLike's likeNow: never an unlike), then the big heart.
+    like.likeNow();
     heart.setValue(0);
     Animated.sequence([
       Animated.spring(heart, { toValue: 1, useNativeDriver: true, friction: 5, tension: 140 }),
@@ -151,12 +154,12 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
     const now = Date.now();
     if (now - lastTextTap.current < 260) {
       lastTextTap.current = 0;
-      if (!like.liked) void like.toggle();
+      like.likeNow();
     } else lastTextTap.current = now;
   }
 
   /** The share sheet: send it to friends as a chat card, or "Share to…" the link with the system sheet. */
-  const share = () => shareSheet.open(sharedPostFromFeedPost(post, media), { url: `${SITE_URL}${path}`, label: `${author.full_name} on ${APP_NAME}`, restricted: audience !== "global" });
+  const share = () => shareSheet.open(sharedPostFromFeedPost(post, media), { url: `${SITE_URL}${path}`, label: `${author.full_name} on ${APP_NAME}` });
 
   async function message() {
     if (!user) return needLogin();

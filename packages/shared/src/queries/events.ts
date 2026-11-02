@@ -22,6 +22,8 @@ export type EventFilters = {
   from?: string;
   to?: string;
   category?: EventCategory | null;
+  /** Any of these categories (the app's filter sheet picks several); with `category` too, both must match. */
+  categories?: readonly EventCategory[];
   q?: string;
   organizationId?: string;
   limit?: number;
@@ -32,12 +34,24 @@ export type EventFilters = {
  * Events in time order, as the database lets the caller see them (scheduled and cancelled ones for everyone, an
  * organization's pending ones for its members, hidden ones for staff). On a database without migration 61 there are none.
  */
+/** What anyone reads when they act on Events (save, follow, interests) before the server has them (migration 61). */
+export const EVENTS_NOT_READY = "Events need the latest server update. Try again once it's out.";
+
+/**
+ * A failed Events write, readable: a database without migration 61's tables answers "Could not find the table … in the
+ * schema cache", which says nothing to a student, so it becomes EVENTS_NOT_READY. Any other error goes on as it is.
+ */
+export function eventsError(error: unknown): unknown {
+  return isMissingRelation(error) ? new Error(EVENTS_NOT_READY) : error;
+}
+
 export async function listEvents(supabase: Client, filters: EventFilters = {}): Promise<EventSummary[]> {
   let query = supabase.from("events").select(EVENT_SELECT).order("starts_at", { ascending: true }).order("id", { ascending: true });
   if (filters.universityId) query = query.eq("university_id", filters.universityId);
   if (filters.from) query = query.or(`starts_at.gte.${filters.from},ends_at.gte.${filters.from}`);
   if (filters.to) query = query.lt("starts_at", filters.to);
   if (filters.category) query = query.eq("category", filters.category);
+  if (filters.categories && filters.categories.length > 0) query = query.in("category", [...filters.categories]);
   if (filters.organizationId) query = query.eq("organization_id", filters.organizationId);
   const q = filters.q?.trim();
   if (q) query = query.textSearch("tsv", q, { type: "websearch", config: "simple" });
@@ -47,7 +61,7 @@ export async function listEvents(supabase: Client, filters: EventFilters = {}): 
   const { data, error } = await query;
   if (error) {
     if (isMissingRelation(error)) return [];
-    throw error;
+    throw eventsError(error);
   }
   return ((data ?? []) as unknown as EventQueryRow[]).map(eventOf);
 }
@@ -56,7 +70,7 @@ export async function getEvent(supabase: Client, id: string): Promise<EventSumma
   const { data, error } = await supabase.from("events").select(EVENT_SELECT).eq("id", id).maybeSingle();
   if (error) {
     if (isMissingRelation(error)) return null;
-    throw error;
+    throw eventsError(error);
   }
   return data ? eventOf(data as unknown as EventQueryRow) : null;
 }
@@ -64,7 +78,7 @@ export async function getEvent(supabase: Client, id: string): Promise<EventSumma
 export async function getEventsByIds(supabase: Client, ids: string[]): Promise<EventSummary[]> {
   if (ids.length === 0) return [];
   const { data, error } = await supabase.from("events").select(EVENT_SELECT).in("id", ids);
-  if (error) throw error;
+  if (error) throw eventsError(error);
   const byId = new Map(((data ?? []) as unknown as EventQueryRow[]).map((r) => [r.id, eventOf(r)]));
   return ids.map((id) => byId.get(id)).filter((e): e is EventSummary => Boolean(e));
 }
@@ -75,7 +89,7 @@ export async function getSavedEventIds(supabase: Client, userId: string): Promis
   const { data, error } = await supabase.from("event_saves").select("event_id").eq("user_id", userId);
   if (error) {
     if (isMissingRelation(error)) return new Set();
-    throw error;
+    throw eventsError(error);
   }
   return new Set((data ?? []).map((r) => r.event_id));
 }
@@ -85,7 +99,7 @@ export async function listSavedEvents(supabase: Client, userId: string): Promise
   const { data, error } = await supabase.from("event_saves").select(`created_at, event:events!event_saves_event_id_fkey(${EVENT_SELECT})`).eq("user_id", userId).order("created_at", { ascending: false }).limit(200);
   if (error) {
     if (isMissingRelation(error)) return [];
-    throw error;
+    throw eventsError(error);
   }
   return ((data ?? []) as unknown as { event: EventQueryRow | EventQueryRow[] | null }[])
     .map((r) => (Array.isArray(r.event) ? r.event[0] : r.event))
@@ -96,7 +110,7 @@ export async function listSavedEvents(supabase: Client, userId: string): Promise
 /** Toggle a bookmark; returns the new saved state. */
 export async function toggleEventSave(supabase: Client, userId: string, eventId: string): Promise<boolean> {
   const { data, error } = await supabase.from("event_saves").select("event_id").eq("user_id", userId).eq("event_id", eventId).maybeSingle();
-  if (error) throw error;
+  if (error) throw eventsError(error);
   if (data) {
     const { error: e } = await supabase.from("event_saves").delete().eq("user_id", userId).eq("event_id", eventId);
     if (e) throw e;
@@ -113,7 +127,7 @@ export async function getEventInterests(supabase: Client, userId: string): Promi
   const { data, error } = await supabase.from("event_interests").select("category").eq("user_id", userId);
   if (error) {
     if (isMissingRelation(error)) return [];
-    throw error;
+    throw eventsError(error);
   }
   return (data ?? []).map((r) => r.category as EventCategory);
 }
@@ -122,10 +136,10 @@ export async function getEventInterests(supabase: Client, userId: string): Promi
 export async function setEventInterests(supabase: Client, userId: string, categories: EventCategory[]): Promise<void> {
   const wanted = [...new Set(categories)];
   const { error: del } = await supabase.from("event_interests").delete().eq("user_id", userId);
-  if (del) throw del;
+  if (del) throw eventsError(del);
   if (wanted.length === 0) return;
   const { error } = await supabase.from("event_interests").insert(wanted.map((category) => ({ user_id: userId, category })));
-  if (error) throw error;
+  if (error) throw eventsError(error);
 }
 
 /**
@@ -167,7 +181,7 @@ export async function getOrganization(supabase: Client, id: string): Promise<Org
   const { data, error } = await supabase.from("organizations").select("*").eq("id", id).maybeSingle();
   if (error) {
     if (isMissingRelation(error)) return null;
-    throw error;
+    throw eventsError(error);
   }
   return data;
 }
@@ -181,14 +195,14 @@ export async function listOrganizations(supabase: Client, opts: { universityId?:
   const { data, error } = await query;
   if (error) {
     if (isMissingRelation(error)) return [];
-    throw error;
+    throw eventsError(error);
   }
   return data ?? [];
 }
 
 export async function listOrganizationMembers(supabase: Client, organizationId: string): Promise<OrganizationMemberWithProfile[]> {
   const { data, error } = await supabase.from("organization_members").select("user_id, role, profile:profiles!organization_members_user_id_fkey(id, full_name, avatar_url, username)").eq("organization_id", organizationId).order("role").order("created_at");
-  if (error) throw error;
+  if (error) throw eventsError(error);
   return ((data ?? []) as unknown as { user_id: string; role: string; profile: OrganizationMemberWithProfile["profile"] | OrganizationMemberWithProfile["profile"][] | null }[])
     .map((r) => ({ user_id: r.user_id, role: r.role as "owner" | "editor", profile: Array.isArray(r.profile) ? r.profile[0] : r.profile }))
     .filter((r): r is OrganizationMemberWithProfile => Boolean(r.profile));
@@ -199,7 +213,7 @@ export async function listMyOrganizations(supabase: Client, userId: string): Pro
   const { data, error } = await supabase.from("organization_members").select("role, organization:organizations!organization_members_organization_id_fkey(*)").eq("user_id", userId);
   if (error) {
     if (isMissingRelation(error)) return [];
-    throw error;
+    throw eventsError(error);
   }
   return ((data ?? []) as unknown as { role: string; organization: Organization | Organization[] | null }[])
     .map((r) => {
@@ -217,36 +231,36 @@ function organizationColumns(input: OrganizationFormInput) {
 /** A new organization: the database puts it on the caller's campus, unverified, with the caller as its owner. */
 export async function createOrganization(supabase: Client, input: OrganizationFormInput): Promise<Organization> {
   const { data, error } = await supabase.from("organizations").insert(organizationColumns(input)).select("*").single();
-  if (error) throw error;
+  if (error) throw eventsError(error);
   return data;
 }
 
 export async function updateOrganization(supabase: Client, id: string, input: OrganizationFormInput): Promise<Organization> {
   const { data, error } = await supabase.from("organizations").update(organizationColumns(input)).eq("id", id).select("*").single();
-  if (error) throw error;
+  if (error) throw eventsError(error);
   return data;
 }
 
 export async function deleteOrganization(supabase: Client, id: string): Promise<void> {
   const { error } = await supabase.from("organizations").delete().eq("id", id);
-  if (error) throw error;
+  if (error) throw eventsError(error);
 }
 
 export async function addOrganizationMember(supabase: Client, organizationId: string, userId: string, role: "owner" | "editor" = "editor"): Promise<void> {
   const { error } = await supabase.from("organization_members").upsert({ organization_id: organizationId, user_id: userId, role }, { onConflict: "organization_id,user_id" });
-  if (error) throw error;
+  if (error) throw eventsError(error);
 }
 
 export async function removeOrganizationMember(supabase: Client, organizationId: string, userId: string): Promise<void> {
   const { error } = await supabase.from("organization_members").delete().eq("organization_id", organizationId).eq("user_id", userId);
-  if (error) throw error;
+  if (error) throw eventsError(error);
 }
 
 export async function listFollowedOrganizationIds(supabase: Client, userId: string): Promise<Set<string>> {
   const { data, error } = await supabase.from("organization_follows").select("organization_id").eq("user_id", userId);
   if (error) {
     if (isMissingRelation(error)) return new Set();
-    throw error;
+    throw eventsError(error);
   }
   return new Set((data ?? []).map((r) => r.organization_id));
 }
@@ -254,7 +268,7 @@ export async function listFollowedOrganizationIds(supabase: Client, userId: stri
 /** Toggle a follow; returns the new state. */
 export async function toggleOrganizationFollow(supabase: Client, userId: string, organizationId: string): Promise<boolean> {
   const { data, error } = await supabase.from("organization_follows").select("organization_id").eq("user_id", userId).eq("organization_id", organizationId).maybeSingle();
-  if (error) throw error;
+  if (error) throw eventsError(error);
   if (data) {
     const { error: e } = await supabase.from("organization_follows").delete().eq("user_id", userId).eq("organization_id", organizationId);
     if (e) throw e;
@@ -286,20 +300,20 @@ function eventColumns(input: EventFormInput) {
 /** A member publishes an event for their organization (pending until staff verify the organization). */
 export async function createEvent(supabase: Client, input: EventFormInput): Promise<EventSummary> {
   const { data, error } = await supabase.from("events").insert({ ...eventColumns(input), source: "organization" }).select(EVENT_SELECT).single();
-  if (error) throw error;
+  if (error) throw eventsError(error);
   return eventOf(data as unknown as EventQueryRow);
 }
 
 export async function updateEvent(supabase: Client, id: string, input: EventFormInput): Promise<EventSummary> {
   const { data, error } = await supabase.from("events").update(eventColumns(input)).eq("id", id).select(EVENT_SELECT).single();
-  if (error) throw error;
+  if (error) throw eventsError(error);
   return eventOf(data as unknown as EventQueryRow);
 }
 
 /** Deletes an event; its picture goes too when it is the caller's own upload (the bucket lets owners delete theirs). */
 export async function deleteEvent(supabase: Client, event: Pick<EventSummary, "id" | "image_url">, userId: string | null): Promise<void> {
   const { error } = await supabase.from("events").delete().eq("id", event.id);
-  if (error) throw error;
+  if (error) throw eventsError(error);
   const path = event.image_url && userId ? /\/object\/public\/uploads\/(events\/[^/?#]+\/[^/?#]+)$/.exec(event.image_url)?.[1] : null;
   if (path && path.startsWith(`events/${userId}/`)) await supabase.storage.from("uploads").remove([path]).catch(() => undefined);
 }

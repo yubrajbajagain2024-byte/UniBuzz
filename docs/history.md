@@ -50,6 +50,11 @@ open work is in [status.md](status.md).
   (Events) is written and applied on staging, not on production. PR #74 merges it at 03:43 UTC
   (deployed; 61 still not applied). Sunil and Ankur may merge their own pull requests from then on
   ([decisions.md](decisions.md)).
+- **2026-11-01:** PRs #77 to #81 merge (the app's viewers, bottom bar, Home's top edge, Settings, Explore's and Events'
+  filters); migration 61 (Events) reaches production on its own, ahead of the Business v2 release (23:31 UTC).
+- **2026-11-02:** migration 62 (story actions) reaches production on its own (04:32 UTC). PR #60 merges:
+  CampConnect Admin (`apps/admin`, from `step-admin`) is on `main` with its Analytics and Business sections
+  (migration 63, not on production) and the rest of `step-admin` outside its migration files.
 
 ## The AI documentation
 
@@ -72,6 +77,48 @@ open work is in [status.md](status.md).
 - 2026-10-28 19:03 UTC: PR #52 (`business-v2`'s third and fourth rounds: the fixes to 50, 55 and 56,
   the staging rehearsal and backup tooling, the production checklist) merged into `main`. None of
   49 to 56 is on production.
+
+- 2026-11-02 05:28 UTC: PR #86 (`story-viewer-redesign`) merged into `main` by the owner: the story viewer redesigned.
+  App only; the website's production deployment from it is Ready (its pages answer 200); testers get it with an EAS update.
+
+- 2026-11-02: PR #60 (`admin-analytics-business`) merged into `main` with the owner's approval ("merge it if everything
+  is good"): CampConnect Admin and its Analytics and Business sections, `step-admin`'s tooling, suites and README
+  section, the staging scripts' two-factor sign-in. Migration 63 is not on production; the `campconnect-admin` Vercel
+  project is still disconnected, so the merge deployed the website only (two messages changed there). The branch's
+  file stays until the launch plan in it is carried out.
+  The same day, with the owner's approval, the `campconnect-admin` Vercel project was disconnected from the repository: it
+  builds `apps/admin`, which only `step-admin` has, so every other push failed there (docs/decisions.md).
+
+- 2026-11-02 04:32 UTC: migration 62 (story actions) applied to production on its own, with the owner's approval,
+  after staging (04:02 UTC, `staging/story-actions.mjs` 15/15) and a full backup checked against the live project
+  (`before-migration-62`); one transaction through the Management API, its `_migrations` row with it; every check
+  after passed ([migrations.md](migrations.md)). Story likes, replies and shares stop failing on production.
+
+- 2026-11-02 03:57 UTC: PR #84 (`ankur/dev`) merged into `main` by Ankur: the offline rehearsal for Discover (44, 46)
+  and Buzz (51 to 54) going live ahead of the release in two transactions, and PR #54's fix to 53 (a typed title stays).
+  None of the six is on production. Its rehearsal starts from a production with 62 since `story-actions-fix` merged
+  `main` in.
+
+- 2026-11-01 23:48 UTC: PR #82 (`migration-61-live`) merged into `main` by the owner: migration 61 recorded as live, and
+  the rollout rehearsals starting from a production that has it. Docs and tests only.
+
+- 2026-11-01 23:31 UTC: migration 61 (Events) applied to production on its own, with the owner's approval, after its
+  staging probe (13/13) and a full backup checked against the live project (`before-migration-61`); one transaction
+  through the Management API, its `_migrations` row with it; every check after passed ([migrations.md](migrations.md)).
+  From then on the app's Events writes (interests, saves, follows) work against production.
+
+- 2026-11-01 23:18 UTC: PR #81 (`discovery-redesign`) merged into `main` by the owner: Explore's and Events' search and
+  filters in three levels, Events' readable error before 61, a steady Profile grid. App only; the website redeployed
+  without a change of its own; testers get it with an EAS update (owner's approval).
+
+- 2026-11-01 20:18 UTC: PR #80 (`settings-redesign`, the owner's commit "Update UniBuzz features and UI") merged into
+  `main` by the owner: the app's Settings as a menu of sections, each its own screen. App only; the website redeployed
+  without a change of its own; testers get it with an EAS update (owner's approval).
+
+- 2026-11-01 19:52 – 19:53 UTC: PRs #77 (`viewer-full-bleed`), #78 (`nav-velocity-collapse`) and #79
+  (`home-full-bleed-top`) merged into `main` in that order by the owner: the app's viewers from the top edge over a
+  blurred copy, the bottom bar collapsing by the speed of a scroll, and Home's feeds under the status bar. App only; the
+  website redeployed without a change of its own; testers get them with an EAS update (owner's approval).
 
 - 2026-10-30 21:46 UTC: **migration 60 (every upload folder its owner's to list; a post's photos from and with the
   post) applied to production on its own**, after 58 and 59, with the owner's approval: the first full backup

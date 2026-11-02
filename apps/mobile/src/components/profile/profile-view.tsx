@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElem
 import { ActivityIndicator, Alert, Animated, Keyboard, Linking, Platform, RefreshControl, Text, View, useWindowDimensions, type FlatList, type LayoutChangeEvent, type ListRenderItem, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollView, type ScrollViewInstance } from "react-native";
 import type { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation, useRouter } from "expo-router";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   blockUser,
@@ -46,6 +47,7 @@ import { openCompose } from "@/lib/compose-nav";
 import { hapticTap, alertWithHaptic, refreshWithHaptic } from "@/lib/haptics";
 import { errorText, useQuery } from "@/lib/hooks";
 import { emitPostPinned, onPostPinned, onPostRemoved } from "@/lib/posts-events";
+import { setStoryMuted, useStoryMuted } from "@/lib/stories-store";
 import { useSession } from "@/lib/session";
 import { tabBarInset } from "@/lib/tab-bar";
 import { SITE_URL, supabase } from "@/lib/supabase";
@@ -63,9 +65,14 @@ import { LockedNotice, VisibilityRow } from "./visibility-row";
 import { useTabReselect } from "@/lib/tab-reselect";
 import { Icon } from "@/components/icon";
 
-/** Space between the squares of the grid, across and down, and from the grid to the screen's edges. */
-const GAP = 6;
-const GRID_INSET = 8;
+/**
+ * Space between the tiles of the grid, across and down, and from the grid to the screen's edges: Instagram's grid, edge
+ * to edge with a hairline of the screen between square-cornered 3:4 tiles.
+ */
+const GAP = 2;
+const GRID_INSET = 0;
+/** The tiles' corners: square, as on Instagram (the search screen's grid keeps its rounded ones). */
+const GRID_TILE_RADIUS = 0;
 /** Between the header and the tabs row: part of the header, so it goes up with it. */
 const TABS_GAP = 14;
 const NO_TILES: ProfileTile[] = [];
@@ -110,6 +117,23 @@ function withPages(pages: ReadonlySet<number>, from: number, to: number, count: 
     next.add(i);
   }
   return next ?? pages;
+}
+
+/**
+ * A swipe between tabs counts only when it is meant: dragged at least this share of the page (and never under
+ * INTENT_MIN_DISTANCE), or flicked at INTENT_SPEED (points a millisecond, UIKit's own unit; 0.5 is 500 points a second)
+ * over at least INTENT_FLICK_DISTANCE. A shorter, slower release that iOS's paging would still turn into another tab
+ * springs back, so a nudge, a slight drift of the finger or a tap that slides never changes tab.
+ */
+const INTENT_SHARE = 0.18;
+const INTENT_MIN_DISTANCE = 56;
+const INTENT_SPEED = 0.5;
+const INTENT_FLICK_DISTANCE = 24;
+
+/** Whether a release `dx` points from its page at speed `speed` (either sign) was a deliberate swipe to another tab. */
+function intendedSwipe(dx: number, speed: number, pageWidth: number): boolean {
+  const distance = Math.abs(dx);
+  return distance >= Math.max(INTENT_MIN_DISTANCE, pageWidth * INTENT_SHARE) || (Math.abs(speed) >= INTENT_SPEED && distance >= INTENT_FLICK_DISTANCE);
 }
 
 /**
@@ -195,7 +219,7 @@ type PagerLink = {
   offsetOf: (index: number) => number;
   attach: (index: number, scroller: PageScroller | null) => void;
   /** Every scroll event of page i, on the JS side. Bookkeeping only: never state. */
-  track: (index: number, y: number) => void;
+  track: (index: number, e: NativeScrollEvent) => void;
   /** A finger started scrolling page i up or down: no swipe is going on. */
   dragStart: (index: number) => void;
   /** Page i stopped: a drag ended, or its momentum did. */
@@ -339,8 +363,8 @@ function useProfilePager({ pageWidth, tuck, barHeight, count, onRefresh, onHeade
       attach: (index, scroller) => {
         scrollers.current[index] = scroller;
       },
-      track: (index, y) => {
-        offsets.current[index] = y;
+      track: (index, e) => {
+        offsets.current[index] = e.contentOffset.y;
       },
       dragStart: () => {
         swiping.current = false;
@@ -363,9 +387,9 @@ function useProfilePager({ pageWidth, tuck, barHeight, count, onRefresh, onHeade
 
   // No JS listener: the underline, the tabs row and the copies of the header follow the pager on the UI thread alone.
   const onPagerScroll = useMemo(() => Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: true }), [scrollX]);
-  const onPagerDragBegin = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const inView = pageAt(e.nativeEvent.contentOffset.x, latest.current.pageWidth, latest.current.count);
+  /** A swipe starts with page `inView` on screen (a drag of the pager, or the first tab's own swipe: see ProfileView). */
+  const beginSwipe = useCallback(
+    (inView: number) => {
       // A quick second swipe caught the pager before it settled (no onMomentumScrollEnd came): the page it reached opens
       // now, so its neighbours are there for this swipe. Otherwise the open page leads the others into step.
       if (inView !== activeRef.current) commit(inView);
@@ -375,15 +399,24 @@ function useProfilePager({ pageWidth, tuck, barHeight, count, onRefresh, onHeade
     },
     [sync, commit],
   );
+  const onPagerDragBegin = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => beginSwipe(pageAt(e.nativeEvent.contentOffset.x, latest.current.pageWidth, latest.current.count)), [beginSwipe]);
   const onPagerDragEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { contentOffset, targetContentOffset } = e.nativeEvent;
+      const { contentOffset, targetContentOffset, velocity } = e.nativeEvent;
       const width = latest.current.pageWidth;
       // Let go right on a page: no momentum follows (so no onMomentumScrollEnd), the pager has settled already.
       const onPage = width > 0 && Math.abs(contentOffset.x - Math.round(contentOffset.x / width) * width) < 1;
       if (onPage && targetContentOffset && Math.abs(targetContentOffset.x - contentOffset.x) < 1) return commit(pageAt(contentOffset.x, width, latest.current.count));
+      const from = activeRef.current;
+      const landing = landingPage(e.nativeEvent, width, latest.current.count);
+      // A release the paging would take to another tab that was not meant (see intendedSwipe): back to the open tab.
+      if (landing !== from && !intendedSwipe(contentOffset.x - from * width, velocity?.x ?? 0, width)) {
+        heading.current = from;
+        pager.current?.scrollTo({ x: from * width, animated: true });
+        return;
+      }
       // It glides on to a page and commits when it gets there; until then the open tab is not at rest (see `select`).
-      heading.current = landingPage(e.nativeEvent, width, latest.current.count);
+      heading.current = landing;
     },
     [commit],
   );
@@ -421,7 +454,7 @@ function useProfilePager({ pageWidth, tuck, barHeight, count, onRefresh, onHeade
   // The floating bar's background and the name on it: clear while the cover shows, solid by the time the tabs row reaches the bar.
   const barOpacity = useMemo(() => tabsShift.interpolate({ inputRange: [barHeight, barHeight + 56], outputRange: [1, 0], extrapolate: "clamp" }), [tabsShift, barHeight]);
 
-  return { pager, scrollX, link, active, mounted, select, relocate, onPagerScroll, onPagerDragBegin, onPagerDragEnd, onPagerSettle, onPagerLayout, tabsShift, barOpacity };
+  return { pager, scrollX, link, active, mounted, select, relocate, beginSwipe, commit, onPagerScroll, onPagerDragBegin, onPagerDragEnd, onPagerSettle, onPagerLayout, tabsShift, barOpacity };
 }
 
 /** What a visitor may see of Classes, Saved, Liked or Listings: still asking, could not ask, a lock, or the tab itself. */
@@ -465,7 +498,7 @@ function usePageScroll({ index, link, minHeight, bottomPad }: PageFrame, scrollT
     () =>
       Animated.event<NativeScrollEvent>([{ nativeEvent: { contentOffset: { y: link.scrollYs[index] } } }], {
         useNativeDriver: true,
-        listener: (e) => link.track(index, e.nativeEvent.contentOffset.y),
+        listener: (e) => link.track(index, e.nativeEvent),
       }),
     [link, index],
   );
@@ -528,9 +561,9 @@ type TilesPageProps = PageFrame & {
 };
 
 /**
- * Posts, Reels, Saved, Liked or Listings: the squares three to a row, loading more as you scroll, and under them a lock,
- * a spinner, an empty tab, an error or "loading more". Listings show their kind and title on the square (as on the
- * website); the other tabs keep TikTok's plain squares.
+ * Posts, Reels, Saved, Liked or Listings: the tiles three to a row, edge to edge (Instagram's grid: 3:4 tiles, 9:16 on
+ * Reels), loading more as you scroll, and under them a lock, a spinner, an empty tab, an error or "loading more".
+ * Listings show only their kind's icon on the picture (ListingGridTile); the other tabs keep plain picture tiles.
  */
 const TilesPage = memo(function TilesPage(props: TilesPageProps) {
   const { index, link, header, pageWidth, tabsHeight, active, refreshing, topInset, tab, grid, own, tileWidth, onOpen, onPin, gate, gateMessage, onRetryGate, visibility, savingVisibility, onChangeVisibility } = props;
@@ -548,7 +581,7 @@ const TilesPage = memo(function TilesPage(props: TilesPageProps) {
   tiles.current = grid.tiles;
   const openInGrid = useCallback((tile: ProfileTile, origin?: ViewerOrigin) => onOpen(tile, tiles.current, origin), [onOpen]);
   const renderTile = useCallback<ListRenderItem<ProfileTile>>(
-    ({ item }) => (tab === "listings" ? <ListingGridTile tile={item} width={tileWidth} onOpen={onOpen} /> : <ProfileGridTile tile={item} width={tileWidth} aspect={tab === "reels" ? REEL_ASPECT : TILE_ASPECT} onOpen={openInGrid} onLongPress={onPin} />),
+    ({ item }) => (tab === "listings" ? <ListingGridTile tile={item} width={tileWidth} radius={GRID_TILE_RADIUS} onOpen={onOpen} /> : <ProfileGridTile tile={item} width={tileWidth} aspect={tab === "reels" ? REEL_ASPECT : TILE_ASPECT} radius={GRID_TILE_RADIUS} onOpen={openInGrid} onLongPress={onPin} />),
     [tab, tileWidth, onOpen, openInGrid, onPin],
   );
 
@@ -702,6 +735,7 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
   const viewerId = user?.id ?? null;
   const own = viewerId === userId;
   const needLogin = useCallback(() => router.push("/(auth)/login"), [router]);
+  // Read through a ref: the tracker is made below, once the open page is known, and starts over on each tab.
 
   // Your own profile follows the session's copy, which Settings and the photo button refresh.
   const profileQ = useQuery(() => getProfile(supabase, userId), [userId]);
@@ -715,6 +749,8 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
   const classesOpen = own || accessQ.data?.classes === true;
   const classesQ = useQuery(() => listProfileClasses(supabase, userId), [userId, viewerId, classesOpen]);
   const blockedQ = useQuery(() => (viewerId && !own ? isBlocked(supabase, viewerId, userId) : Promise.resolve(false)), [viewerId, userId, own]);
+  /** Whether you have muted this person's stories (lib/stories-store.ts): More offers the other choice. */
+  const storiesMuted = useStoryMuted(own ? null : userId);
 
   const access = own ? OWNER_ACCESS : accessQ.data;
   const canSee = (section: ProfileSection) => own || access?.[section] === true;
@@ -739,7 +775,7 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
   const tuck = Math.max(0, headerHeight - barHeight);
   /** The page whose pull started the refresh: only its spinner shows. */
   const [refreshingPage, setRefreshingPage] = useState<number | null>(null);
-  const { pager, scrollX, link, active, mounted, select, relocate, onPagerScroll, onPagerDragBegin, onPagerDragEnd, onPagerSettle, onPagerLayout, tabsShift, barOpacity } = useProfilePager({
+  const { pager, scrollX, link, active, mounted, select, relocate, beginSwipe, commit, onPagerScroll, onPagerDragBegin, onPagerDragEnd, onPagerSettle, onPagerLayout, tabsShift, barOpacity } = useProfilePager({
     pageWidth: body.width,
     tuck,
     barHeight,
@@ -747,6 +783,42 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
     onRefresh: (index) => void refreshAll(index),
     onHeaderHeight: (height) => setHeaderHeight((h) => (h === height ? h : height)),
   });
+  // The Profile tab keeps the whole bottom bar however it scrolls (the owner's choice, 2026-11-02): the profile's header,
+  // its tabs row and the bar under it stay their size, the header simply scrolling up under the floating bar. The other
+  // tabs still collapse it on a flick (lib/tab-bar-collapse.ts).
+  // A profile pushed over a screen closes with a swipe right from anywhere, as every pushed screen on iOS does (the system's
+  // own full-screen back swipe, following the finger). On iOS 26 that swipe waits for any sideways scroll view under it
+  // to give up, and the pager never does, even on its first tab where it cannot go right: so on the first tab the pager
+  // takes no touches at all (a scroll view disabled when the finger lands is out of the way; one disabled later is not),
+  // the system's swipe has the rightward drags, and a leftward drag moves the pager here instead, under the finger, to
+  // the next tab or back by the same rule as the pager's own swipes (intendedSwipe). Every other tab, your own Profile
+  // tab, and Android (no such swipe there) keep the pager as it is.
+  const firstTabHeld = Platform.OS === "ios" && !topBar && active === 0 && tabs.length > 1;
+  const firstTabSwipe = useMemo(
+    () =>
+      Gesture.Pan()
+        .runOnJS(true)
+        .enabled(firstTabHeld)
+        // Leftward only: a rightward drag fails at once and is the system's back swipe; a vertical one is the page's scroll.
+        .activeOffsetX(-10)
+        .failOffsetX(10)
+        .failOffsetY([-12, 12])
+        .onStart(() => beginSwipe(0))
+        .onUpdate((e) => {
+          const width = body.width;
+          pager.current?.scrollTo({ x: Math.min(width, Math.max(0, -e.translationX)), animated: false });
+        })
+        .onEnd((e, success) => {
+          const width = body.width;
+          if (success && width > 0 && intendedSwipe(Math.max(0, -e.translationX), -e.velocityX / 1000, width)) {
+            select(1);
+            return;
+          }
+          pager.current?.scrollTo({ x: 0, animated: true });
+          commit(0);
+        }),
+    [firstTabHeld, beginSwipe, select, commit, pager, body.width],
+  );
   // For the one render after the tabs change (the pager is moved right after it), the index may point past the end.
   const tab = tabs[Math.min(active, tabs.length - 1)]?.key ?? "posts";
 
@@ -961,6 +1033,12 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
     if (!user) return needLogin();
     const me = user.id;
     show([
+      // Muting hides their stories from your tray; they are not told. The tray changes at once and goes back on an error.
+      {
+        label: storiesMuted ? "Unmute stories" : "Mute stories",
+        icon: storiesMuted ? "volume-high-outline" : "volume-mute-outline",
+        onPress: () => void setStoryMuted(me, userId, !storiesMuted).then(hapticTap, (e) => alertWithHaptic("error", storiesMuted ? "Could not unmute" : "Could not mute", errorText(e))),
+      },
       {
         label: blocked ? "Unblock" : "Block",
         icon: "ban-outline",
@@ -1001,7 +1079,7 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
   const onOpenFollows = useStableCallback((kind: "followers" | "following") => router.push({ pathname: "/follows/[id]", params: { id: userId, kind, name } }));
   const onShare = useStableCallback(() => setSharing(true));
   const onChangePhoto = useStableCallback(() => void changePhoto());
-  const onEditProfile = useStableCallback(() => router.push("/settings"));
+  const onEditProfile = useStableCallback(() => router.push("/settings/edit-profile"));
   const onFindFriends = useStableCallback(() => router.push("/find-people"));
   const onMessage = useStableCallback(() => void message());
   const onMore = useStableCallback(more);
@@ -1173,6 +1251,7 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
 
   return (
     <View style={styles.screen}>
+      <GestureDetector gesture={firstTabSwipe}>
       <View
         style={styles.body}
         onLayout={(e) => {
@@ -1194,7 +1273,7 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             // While a pull-to-refresh spinner shows, that page sits lower than the others, so a swipe would split the header.
-            scrollEnabled={refreshingPage === null}
+            scrollEnabled={refreshingPage === null && !firstTabHeld}
             scrollEventThrottle={16}
             onScroll={onPagerScroll}
             onScrollBeginDrag={onPagerDragBegin}
@@ -1240,6 +1319,7 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
           />
         </Animated.View>
       </View>
+      </GestureDetector>
       {/* Over the pages and the tabs row: the round buttons sit on the cover, and the bar fills in as the cover scrolls away. */}
       <ProfileFloatingBar topInset={topInset} name={name} left={leftAction} right={rightActions} opacity={barOpacity} />
       <ShareProfileSheet visible={sharing} onClose={() => setSharing(false)} profileId={userId} name={name} username={handle} avatarUrl={profile.avatar_url} own={own} />

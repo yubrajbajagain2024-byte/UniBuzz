@@ -29,6 +29,10 @@ export type Story = {
   seen: boolean;
   /** How many people have seen it: the author's own count; 0 for anyone else's story (the database tells them only about themselves). */
   views: number;
+  /** Whether the person looking has liked it (migration 62; always false for their own, and before 62). */
+  liked: boolean;
+  /** How many people have liked it: the author's own count, like `views`; 0 for anyone else's story. */
+  likes: number;
 };
 
 /** One person's stories in the tray, oldest first, as Instagram plays them. */
@@ -92,4 +96,71 @@ export function storyAge(createdAt: string, now: number = Date.now()): string {
   if (minutes < 1) return "now";
   if (minutes < 60) return `${minutes}m`;
   return `${Math.floor(minutes / 60)}h`;
+}
+
+/** The few words after a story's age in the viewer's header: who it was shared with, said only when it is not everyone. */
+export function storyAudienceNote(audience: PostAudience): string | null {
+  return audience === "campus" ? "Campus" : audience === "friends" ? "Friends" : audience === "selected" ? "Selected people" : null;
+}
+
+/** The viewer's action bar: a 44-point row (the reply pill, the heart, the paper plane) with 8 points above and below. */
+export const STORY_ACTION_BAR = 60;
+/** How much of a whole 9:16 picture a screen must leave room for, beside the bar, for the story to sit in a card. */
+const FRAME_MIN = 0.94;
+
+/**
+ * Where the viewer puts a story on a screen `width` × `height` with these safe-area insets. On a tall phone, as iOS's own
+ * viewers and Instagram's do, the story is a rounded 9:16 card from just under the status bar, and the action bar sits
+ * below it on black: the actions never lie over the picture (always legible), and a tap that misses one never lands on
+ * the story. A shorter screen (an iPhone SE) has no room for that: the story fills the screen (`framed` false, from the
+ * top edge) and the bar floats over a deeper shade. The card is never taller than 9:16 nor than the room above the bar.
+ */
+export function storyFrame(width: number, height: number, insetTop: number, insetBottom: number): { framed: boolean; top: number; height: number } {
+  const whole = (width * 16) / 9;
+  const room = height - insetTop - insetBottom - STORY_ACTION_BAR;
+  if (room >= whole * FRAME_MIN) return { framed: true, top: insetTop, height: Math.min(whole, room) };
+  return { framed: false, top: 0, height };
+}
+
+/**
+ * What a heart's requests came to: `value` is what the database now holds, `attempted` the heart the last request tried
+ * to set (a like or an unlike, for the error's title), `error` why it failed (null when nothing did).
+ */
+export type LikeSyncOutcome = { value: boolean; error: unknown | null; attempted: boolean };
+
+/**
+ * The story heart's requests, one at a time and the last tap winning. Two quick taps (like, unlike) would otherwise be
+ * two requests racing, and the like arriving last would leave a filled heart in the database under an empty one on
+ * screen. `set` records what the person wants now; while a request is out, later taps only change what is wanted, and
+ * when it returns the next request (if any) brings the database to it. The caller that started the run gets its
+ * outcome (what the database holds at the end, and the error that stopped it); taps that joined a running request get
+ * null, so a failure is reported once. `saved` is what the database held when the viewer opened.
+ */
+export function createLikeSync(send: (liked: boolean) => Promise<void>, saved: boolean): { set: (liked: boolean) => Promise<LikeSyncOutcome | null>; wanted: () => boolean } {
+  let held = saved;
+  let wanted = saved;
+  let running = false;
+  return {
+    wanted: () => wanted,
+    async set(liked) {
+      wanted = liked;
+      if (running) return null;
+      running = true;
+      try {
+        while (held !== wanted) {
+          const next = wanted;
+          try {
+            await send(next);
+            held = next;
+          } catch (error) {
+            wanted = held;
+            return { value: held, error, attempted: next };
+          }
+        }
+        return { value: held, error: null, attempted: held };
+      } finally {
+        running = false;
+      }
+    },
+  };
 }
