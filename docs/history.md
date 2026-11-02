@@ -76,6 +76,11 @@ open work is in [status.md](status.md).
   the staging rehearsal and backup tooling, the production checklist) merged into `main`. None of
   49 to 56 is on production.
 
+- 2026-11-02 05:28 UTC: PR #86 (`story-viewer-redesign`) merged into `main` by the owner: the story viewer redesigned.
+  App only; the website's production deployment from it is Ready (its pages answer 200); testers get it with an EAS update.
+  The same day, with the owner's approval, the `campconnect-admin` Vercel project was disconnected from the repository: it
+  builds `apps/admin`, which only `step-admin` has, so every other push failed there (docs/decisions.md).
+
 - 2026-11-02 04:32 UTC: migration 62 (story actions) applied to production on its own, with the owner's approval,
   after staging (04:02 UTC, `staging/story-actions.mjs` 15/15) and a full backup checked against the live project
   (`before-migration-62`); one transaction through the Management API, its `_migrations` row with it; every check
