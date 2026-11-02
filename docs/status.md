@@ -57,6 +57,18 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   Still to do, each with the owner's approval: `CRON_SECRET` in Vercel's Production environment, Texas State's
   calendar feed added in `/admin/events`, an EAS update so testers get the tab (and PR #81's filters and readable
   Events error).
+- **The story viewer, redesigned** (`story-viewer-redesign`, 2026-11-02, pushed; its PR to merge): on a tall phone the
+  story is a rounded 9:16 card under the status bar and its actions sit on black below it (`storyFrame`), so they are
+  always legible and a tap that misses one never moves the story on; on a short screen (iPhone SE) the story fills it
+  and the bar floats over a deeper shade. The reply pill says "Reply to Ann…" with a round send arrow inside it once
+  there are words; the heart and the paper plane are 46-point targets (SF Symbols), hidden while typing; your own story
+  has Activity (views and likes, a tap lists them), Send and Delete with their words under them (Delete moved down from
+  the header). The header: thinner bars, the name, "1h · Friends" (who it was shared with unless everyone), More and
+  Close without plates. Holding a story fades every control away. Also fixed: a tap on the story now always puts the
+  reply away (with a hardware keyboard `Keyboard.dismiss()` alone left the field focused), and the list of views was
+  dark text on the dark sheet. Checked on the iOS Simulator (iPhone 17 Pro) against staging: someone else's story, Like
+  and Unlike, typing, the hold, your own story, Activity and its list, Send's share sheet. Not checked: the short-screen
+  layout (no simulator of that size here) and a real iPhone. App only, no migration; testers get it with an EAS update.
 - **Story likes, replies and sharing** (`story-actions-fix`, 2026-11-02): on production a like answered "Could not find
   the table 'public.story_likes' in the schema cache", a reply "violates check constraint messages_shared_post_check",
   and a share "Some people in this chat can't see this story". One root cause, **migration 62 was not on production**
@@ -186,7 +198,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   flash in video mode need checking there.
 - **Stories** (PR #69, merged 2026-10-30 17:26 UTC; **migration 58 live since 2026-10-30 19:30 UTC**, applied on its
   own ahead of the release above, so it leaves that release): a row of story rings under Home's tabs with "Your story",
-  a full-screen viewer (tap, hold, swipe, pull down; your own views with who), "Your story" beside Post on the publish
+  a full-screen viewer (tap, hold, swipe, pull down; your own views with who; redesigned on `story-viewer-redesign`,
+  2026-11-02, not merged yet: a rounded card with the actions on black below it, below), "Your story" beside Post on the publish
   screen with the post's own audience choice; the database keeps the audience, the 24 hours and blocks. Shared from
   the owner's iPhone in Expo Go against production on 2026-10-30: a Texas State story, seen from a second account, and a
   Selected people story, both with exactly 24 hours (a read-only count of production; deleting one on the device and

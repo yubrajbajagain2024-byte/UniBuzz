@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, runOnJS, useAnimatedKeyboard, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming, type SharedValue } from "react-native-reanimated";
+import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, runOnJS, useAnimatedKeyboard, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming, ZoomIn, ZoomOut, type SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   blockUser,
@@ -20,21 +20,24 @@ import {
   reportContent,
   sendStoryReply,
   sharedPostFromStory,
+  STORY_ACTION_BAR,
   storyAge,
+  storyAudienceNote,
   storyDurationMs,
+  storyFrame,
   unlikeStory,
   type StoryGroup,
   type StoryViewer,
 } from "@apartment-book/shared";
 import { useActionSheet } from "@/components/action-sheet";
 import { Avatar } from "@/components/avatar";
-import { GlassIconButton } from "@/components/glass";
-import { Icon } from "@/components/icon";
+import { Icon, type IconName } from "@/components/icon";
 import { ShareSheetProvider, useShareSheet } from "@/components/share-sheet";
 import { Sheet, SheetHeader } from "@/components/sheet";
 import { alertWithHaptic, hapticLike, hapticSelect, hapticSuccess, hapticTap } from "@/lib/haptics";
 import { errorText } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
+import { useColors } from "@/lib/theme-provider";
 import { findStoryGroup, getStoryGroups, markStoriesStale, noteStoryAuthorBlocked, noteStoryDeleted, noteStoryLiked, noteStorySeen, refreshStories, setStoryMuted, takeStories, useStoryGroups, useStoryMuted } from "@/lib/stories-store";
 import { supabase } from "@/lib/supabase";
 import { VIDEO_AUDIO_MODE } from "@/lib/video-sound";
@@ -50,11 +53,13 @@ const PULL_VELOCITY = 900;
  * a pull down closes. A story's bar starts once its photo has loaded or its video can play, and stops while a video
  * buffers, so a slow connection never runs a story out behind a blank screen; the next photo loads ahead. Each story is
  * marked seen as it shows (mark_story_seen, the database refusing anything the person may not see), so its ring greys
- * in the tray. Your own stories carry the eye with how many people have seen each (and a heart with how many liked
- * them), a tap on which lists them (the database tells only the author), a paper plane to send one to friends, and a bin
- * to take one down. Someone else's carry Instagram's row along the bottom: "Send message" (a reply in a chat with them,
- * carrying the story), a heart, and the paper plane; and a "⋯" at the top for Report, Mute and Block (migration 62).
- * Typing, a sheet or a menu holds the story where it is. Opened from the tray with the groups it showed (handStories),
+ * in the tray. On a tall phone the story is a rounded card from under the status bar and its actions sit below it on
+ * black (storyFrame): always legible, and a tap that misses one never moves the story on; on a short screen the story
+ * fills it and the actions float over a deeper shade. Your own stories carry Activity (how many have seen each, and
+ * liked it: a tap lists them, the database telling only the author), Send (to friends and groups) and Delete. Someone
+ * else's carry the reply pill ("Reply to Ann…", a round send arrow inside it once there are words), a heart and a paper
+ * plane, each a full 44-point target, and a "⋯" at the top for Report, Mute and Block (migration 62). Holding the story
+ * pauses it and fades every control away, so the picture is seen whole. Typing, a sheet or a menu holds the story too. Opened from the tray with the groups it showed (handStories),
  * so nothing loads first; opened cold it reads the store. Opened by a story's id (a story card in a chat) or for a
  * person the tray leaves out (muted), it shows that person's stories alone, from the story named.
  */
@@ -189,6 +194,8 @@ function StoriesViewer() {
 /** One person's stories, playing while `active` (the page on screen). `keyboard` is the keyboard's height, for the reply row. */
 function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack, onClose }: { group: StoryGroup; active: boolean; width: number; height: number; me: string | null; keyboard: SharedValue<number>; onDone: () => void; onBack: () => void; onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  // The list of views is a sheet in the app's theme; everything else on this screen is on black.
+  const colors = useColors();
   const show = useActionSheet();
   const shareSheet = useShareSheet();
   const [at, setAt] = useState(group.startAt);
@@ -410,9 +417,16 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
     );
   }
 
-  /** While the reply box has the keyboard, a tap on the story puts the keyboard away instead of moving on. */
-  const onTapBack = () => (typing ? Keyboard.dismiss() : retreat());
-  const onTapNext = () => (typing ? Keyboard.dismiss() : advance());
+  /**
+   * While the reply box is focused, a tap on the story puts it away instead of moving on: the field itself is blurred too,
+   * since Keyboard.dismiss() alone leaves it focused when there is no on-screen keyboard (a hardware keyboard).
+   */
+  const putAway = () => {
+    input.current?.blur();
+    Keyboard.dismiss();
+  };
+  const onTapBack = () => (typing ? putAway() : retreat());
+  const onTapNext = () => (typing ? putAway() : advance());
 
   async function openViewers() {
     if (!mine) return;
@@ -447,85 +461,103 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
     ]);
   }
 
+  // The card and the bar (storyFrame), and the controls fading away while the story is held to be looked at.
+  const frame = storyFrame(width, height, insets.top, insets.bottom);
+  const barBottom = insets.bottom + (frame.framed ? 0 : 4);
+  const chrome = useSharedValue(1);
+  useEffect(() => {
+    chrome.value = withTiming(held ? 0 : 1, { duration: held ? 160 : 240, easing: Easing.out(Easing.quad) });
+  }, [held, chrome]);
+  const chromeStyle = useAnimatedStyle(() => ({ opacity: chrome.value }));
+  const audienceNote = storyAudienceNote(story.audience);
+  const views = `${story.views} ${story.views === 1 ? "view" : "views"}`;
+  const likes = story.likes > 0 ? `, ${story.likes} ${story.likes === 1 ? "like" : "likes"}` : "";
+
   return (
     <View style={{ width, height, backgroundColor: "#000" }}>
-      {story.kind === "photo" && story.photo ? <Image key={story.id} source={{ uri: story.photo.url }} placeholder={story.photo.blur ? { blurhash: story.photo.blur } : undefined} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} onLoad={onPhoto} onError={onPhoto} accessibilityIgnoresInvertColors /> : null}
-      {story.kind === "video" && story.video ? <StoryVideo key={story.id} playbackId={story.video.playback_id} playing={wanted} onReady={onVideo} /> : null}
-      {/* Only when loading takes a moment: a cached photo shows before this would. */}
-      {active && !ready ? (
-        <Animated.View entering={FadeIn.delay(300).duration(200)} pointerEvents="none" style={styles.loading}>
-          <ActivityIndicator color="#fff" />
+      <View style={[styles.card, { top: frame.top, height: frame.height }, frame.framed && styles.cardFramed]}>
+        {story.kind === "photo" && story.photo ? <Image key={story.id} source={{ uri: story.photo.url }} placeholder={story.photo.blur ? { blurhash: story.photo.blur } : undefined} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} onLoad={onPhoto} onError={onPhoto} accessibilityIgnoresInvertColors /> : null}
+        {story.kind === "video" && story.video ? <StoryVideo key={story.id} playbackId={story.video.playback_id} playing={wanted} onReady={onVideo} /> : null}
+        {/* Only when loading takes a moment: a cached photo shows before this would. */}
+        {active && !ready ? (
+          <Animated.View entering={FadeIn.delay(300).duration(200)} pointerEvents="none" style={styles.loading}>
+            <ActivityIndicator color="#fff" />
+          </Animated.View>
+        ) : null}
+        <Animated.View pointerEvents="none" style={[styles.topShade, chromeStyle]} />
+        {/* Over the picture, the bar needs a deeper shade; framed, it sits on black. */}
+        {!frame.framed ? <Animated.View pointerEvents="none" style={[styles.bottomShade, chromeStyle]} /> : null}
+
+        {/* The taps: the left third goes back, the rest goes on; a hold anywhere pauses. Never under the action bar. */}
+        <View style={[StyleSheet.absoluteFill, !frame.framed && { bottom: barBottom + STORY_ACTION_BAR }]} pointerEvents="box-none">
+          <Pressable style={styles.leftZone} onPress={onTapBack} onLongPress={() => setHeld(true)} onPressOut={() => setHeld(false)} delayLongPress={180} accessibilityRole="button" accessibilityLabel="Previous story" />
+          <Pressable style={styles.rightZone} onPress={onTapNext} onLongPress={() => setHeld(true)} onPressOut={() => setHeld(false)} delayLongPress={180} accessibilityRole="button" accessibilityLabel="Next story" />
+        </View>
+        {/* Typing a reply dims the story, as Instagram does. */}
+        {typing ? <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(150)} pointerEvents="none" style={styles.typingShade} /> : null}
+
+        <Animated.View style={[styles.header, { paddingTop: frame.framed ? 10 : insets.top + 8 }, chromeStyle]} pointerEvents="box-none">
+          <View style={styles.bars} accessible accessibilityLabel={`Story ${at + 1} of ${group.stories.length}`}>
+            {group.stories.map((s, i) => (
+              <Bar key={s.id} state={i < at ? 1 : i > at ? 0 : null} progress={progress} />
+            ))}
+          </View>
+          <View style={styles.who} pointerEvents="box-none">
+            <Avatar name={author.full_name} url={author.avatar_url} size={32} online={false} />
+            <View style={styles.whoText} accessible accessibilityLabel={`${mine ? "Your story" : author.full_name}, ${storyAge(story.createdAt)}${audienceNote ? `, ${audienceNote}` : ""}`}>
+              <Text style={styles.name} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                {mine ? "Your story" : author.full_name}
+              </Text>
+              <Text style={styles.age} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                {storyAge(story.createdAt)}
+                {audienceNote ? ` · ${audienceNote}` : ""}
+              </Text>
+            </View>
+            {!mine && me ? <ChromeButton icon="ellipsis-horizontal" label="More" onPress={more} /> : null}
+            <ChromeButton icon="close" label="Close" onPress={onClose} />
+          </View>
         </Animated.View>
-      ) : null}
-      <View pointerEvents="none" style={styles.topShade} />
-      <View pointerEvents="none" style={styles.bottomShade} />
-
-      {/* The taps: the left third goes back, the rest goes on; a hold anywhere pauses. */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-        <Pressable style={styles.leftZone} onPress={onTapBack} onLongPress={() => setHeld(true)} onPressOut={() => setHeld(false)} delayLongPress={180} accessibilityRole="button" accessibilityLabel="Previous story" />
-        <Pressable style={styles.rightZone} onPress={onTapNext} onLongPress={() => setHeld(true)} onPressOut={() => setHeld(false)} delayLongPress={180} accessibilityRole="button" accessibilityLabel="Next story" />
-      </View>
-      {/* Typing a reply dims the story, as Instagram does. */}
-      {typing ? <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(150)} pointerEvents="none" style={styles.typingShade} /> : null}
-
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
-        <View style={styles.bars} accessible accessibilityLabel={`Story ${at + 1} of ${group.stories.length}`}>
-          {group.stories.map((s, i) => (
-            <Bar key={s.id} state={i < at ? 1 : i > at ? 0 : null} progress={progress} />
-          ))}
-        </View>
-        <View style={styles.who} pointerEvents="box-none">
-          <Avatar name={group.author.full_name} url={group.author.avatar_url} size={32} online={false} />
-          <Text style={styles.name} numberOfLines={1}>
-            {mine ? "Your story" : group.author.full_name}
-          </Text>
-          <Text style={styles.age}>{storyAge(story.createdAt)}</Text>
-          <View style={{ flex: 1 }} />
-          {mine ? <GlassIconButton icon="trash-outline" label="Delete this story" onPress={confirmDelete} variant="media" size={36} iconSize={17} haptic={false} /> : null}
-          {!mine && me ? <GlassIconButton icon="ellipsis-horizontal" label="More" onPress={more} variant="media" size={36} iconSize={18} haptic={false} /> : null}
-          <GlassIconButton icon="close" label="Close" onPress={onClose} variant="media" size={36} iconSize={18} haptic={false} />
-        </View>
       </View>
 
       {mine ? (
-        <>
+        <Animated.View pointerEvents="box-none" style={[styles.actionBar, { bottom: barBottom }, chromeStyle]}>
           <Pressable
             onPress={() => void openViewers()}
-            style={({ pressed }) => [styles.views, { bottom: insets.bottom + 18 }, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.activity, pressed && styles.pressed]}
             accessibilityRole="button"
-            accessibilityLabel={`${story.views} ${story.views === 1 ? "view" : "views"}${story.likes > 0 ? `, ${story.likes} ${story.likes === 1 ? "like" : "likes"}` : ""}`}
+            accessibilityLabel={`Activity: ${views}${likes}`}
             accessibilityHint="Shows who has seen it"
           >
             <Icon name="eye-outline" size={18} color="#fff" />
-            <Text style={styles.viewsText}>{story.views}</Text>
+            <Text style={styles.count}>{story.views}</Text>
             {story.likes > 0 ? (
               <>
-                <Icon name="heart" size={16} color={LIKE_RED} />
-                <Text style={styles.viewsText}>{story.likes}</Text>
+                <Icon name="heart" size={15} color={LIKE_RED} />
+                <Text style={styles.count}>{story.likes}</Text>
               </>
             ) : null}
           </Pressable>
-          <Pressable onPress={share} hitSlop={8} style={({ pressed }) => [styles.ownShare, { bottom: insets.bottom + 18 }, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Send your story to friends">
-            <Icon name="paper-plane-outline" size={24} color="#fff" style={styles.iconShadow} />
-          </Pressable>
-        </>
+          <View style={styles.spacer} />
+          <LabeledAction icon="paper-plane-outline" caption="Send" label="Send your story to friends and groups" onPress={share} />
+          <LabeledAction icon="trash-outline" caption="Delete" label="Delete this story" onPress={confirmDelete} />
+        </Animated.View>
       ) : me ? (
-        <Animated.View pointerEvents="box-none" style={[styles.replyRow, { bottom: insets.bottom + 10 }, replyRowStyle]}>
+        <Animated.View pointerEvents="box-none" style={[styles.actionBar, { bottom: barBottom }, replyRowStyle, chromeStyle]}>
           {sentAt ? (
-            <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(200)} pointerEvents="none" style={styles.sent}>
+            <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(220)} pointerEvents="none" style={styles.sent}>
               <Icon name="checkmark-circle" size={16} color="#fff" />
-              <Text style={styles.sentText}>Sent</Text>
+              <Text style={styles.sentText}>Sent to {firstName}</Text>
             </Animated.View>
           ) : null}
-          <View style={styles.replyField}>
+          <View style={[styles.replyField, !frame.framed && styles.replyFieldOver, typing && styles.replyFieldActive]}>
             <TextInput
               ref={input}
               value={draft}
               onChangeText={setDraft}
               onFocus={() => setTyping(true)}
               onBlur={() => setTyping(false)}
-              placeholder="Send message"
-              placeholderTextColor="rgba(255,255,255,0.85)"
+              placeholder={`Reply to ${firstName}…`}
+              placeholderTextColor="rgba(255,255,255,0.62)"
               keyboardAppearance="dark"
               returnKeyType="send"
               onSubmitEditing={() => void sendReply()}
@@ -535,30 +567,34 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
               accessibilityLabel={`Reply to ${firstName}`}
               style={styles.replyInput}
             />
+            {draft.trim() ? (
+              <Animated.View entering={ZoomIn.duration(160)} exiting={ZoomOut.duration(120)}>
+                <Pressable onPress={() => void sendReply()} disabled={sending} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Send reply to ${firstName}`} accessibilityState={{ disabled: sending, busy: sending }} style={({ pressed }) => [styles.sendButton, pressed && styles.pressed]}>
+                  {sending ? <ActivityIndicator size="small" color="#000" /> : <Icon name="arrow-up" size={17} weight="bold" color="#000" />}
+                </Pressable>
+              </Animated.View>
+            ) : null}
           </View>
-          {typing || draft.trim() ? (
-            <Pressable onPress={() => void sendReply()} disabled={!draft.trim() || sending} hitSlop={8} accessibilityRole="button" accessibilityLabel="Send" accessibilityState={{ disabled: !draft.trim() || sending }} style={({ pressed }) => [styles.sendButton, (!draft.trim() || pressed) && { opacity: 0.5 }]}>
-              {sending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.sendText}>Send</Text>}
-            </Pressable>
-          ) : (
-            <>
-              <Pressable onPress={() => void toggleLike()} hitSlop={8} accessibilityRole="button" accessibilityLabel={liked ? "Unlike" : "Like"} accessibilityState={{ selected: liked }} style={styles.rowButton}>
+          {/* While typing the pill takes the row; the heart and the plane come back with the keyboard gone. */}
+          {!typing ? (
+            <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)} style={styles.actions}>
+              <Pressable onPress={() => void toggleLike()} accessibilityRole="button" accessibilityLabel={liked ? "Unlike" : "Like"} accessibilityState={{ selected: liked }} style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
                 <Animated.View style={heartStyle}>
-                  <Icon name={liked ? "heart" : "heart-outline"} size={28} color={liked ? LIKE_RED : "#fff"} style={styles.iconShadow} />
+                  <Icon name={liked ? "heart" : "heart-outline"} size={27} weight="medium" color={liked ? LIKE_RED : "#fff"} style={!frame.framed && styles.iconShadow} />
                 </Animated.View>
               </Pressable>
-              <Pressable onPress={share} hitSlop={8} accessibilityRole="button" accessibilityLabel="Share story" style={({ pressed }) => [styles.rowButton, pressed && { opacity: 0.6 }]}>
-                <Icon name="paper-plane-outline" size={26} color="#fff" style={styles.iconShadow} />
+              <Pressable onPress={share} accessibilityRole="button" accessibilityLabel="Share story" accessibilityHint="Send it to friends or a group" style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+                <Icon name="paper-plane-outline" size={25} weight="medium" color="#fff" style={!frame.framed && styles.iconShadow} />
               </Pressable>
-            </>
-          )}
+            </Animated.View>
+          ) : null}
         </Animated.View>
       ) : null}
 
       <Sheet visible={viewers !== null} onClose={() => setViewers(null)} closeLabel="Close the list of views">
         <SheetHeader title={viewers && viewers.length > 0 ? `${viewers.length} ${viewers.length === 1 ? "view" : "views"}` : "Views"} onClose={() => setViewers(null)} />
         {viewers && viewers.length === 0 ? (
-          <Text style={styles.noViews}>No views yet</Text>
+          <Text style={[styles.noViews, { color: colors.muted }]}>No views yet</Text>
         ) : (
           <FlatList
             data={viewers ?? []}
@@ -566,11 +602,11 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
             renderItem={({ item }) => (
               <View style={styles.viewerRow} accessible accessibilityLabel={`${item.viewer.full_name}${item.liked ? ", liked it" : ""}, ${formatMessageTime(item.at)}`}>
                 <Avatar name={item.viewer.full_name} url={item.viewer.avatar_url} size={40} online={false} />
-                <Text style={styles.viewerName} numberOfLines={1}>
+                <Text style={[styles.viewerName, { color: colors.text }]} numberOfLines={1}>
                   {item.viewer.full_name}
                 </Text>
                 {item.liked ? <Icon name="heart" size={16} color={LIKE_RED} /> : null}
-                <Text style={styles.viewerTime}>{formatMessageTime(item.at)}</Text>
+                <Text style={[styles.viewerTime, { color: colors.muted }]}>{formatMessageTime(item.at)}</Text>
               </View>
             )}
             contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
@@ -578,6 +614,27 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
         )}
       </Sheet>
     </View>
+  );
+}
+
+/** A control in the story's header: a white glyph in a full 44-point target, no plate, over the top shade. */
+function ChromeButton({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.chromeButton, pressed && styles.pressed]}>
+      <Icon name={icon} size={21} weight="semibold" color="#fff" style={styles.iconShadow} />
+    </Pressable>
+  );
+}
+
+/** An action on your own story: its glyph with a word under it, so Send and Delete say what they do. */
+function LabeledAction({ icon, caption, label, onPress }: { icon: IconName; caption: string; label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.labeled, pressed && styles.pressed]}>
+      <Icon name={icon} size={23} weight="medium" color="#fff" />
+      <Text style={styles.caption} maxFontSizeMultiplier={1.2}>
+        {caption}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -621,34 +678,46 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   backdrop: { backgroundColor: "#000" },
   pages: { overflow: "hidden", backgroundColor: "#000" },
-  topShade: { position: "absolute", top: 0, left: 0, right: 0, height: 140, experimental_backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%)" },
-  bottomShade: { position: "absolute", bottom: 0, left: 0, right: 0, height: 120, experimental_backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 100%)" },
+  // The story: the whole screen, or (storyFrame) a card with Apple's continuous corners.
+  card: { position: "absolute", left: 0, right: 0, overflow: "hidden", backgroundColor: "#0b0b0c" },
+  cardFramed: { borderRadius: 16, borderCurve: "continuous" },
+  topShade: { position: "absolute", top: 0, left: 0, right: 0, height: 150, experimental_backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.18) 55%, rgba(0,0,0,0) 100%)" },
+  bottomShade: { position: "absolute", bottom: 0, left: 0, right: 0, height: 230, experimental_backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.66) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0) 100%)" },
   loading: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, alignItems: "center", justifyContent: "center" },
   leftZone: { position: "absolute", top: 0, bottom: 0, left: 0, width: "32%" },
   rightZone: { position: "absolute", top: 0, bottom: 0, right: 0, width: "68%" },
-  header: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 10, gap: 10 },
-  bars: { flexDirection: "row", gap: 4 },
-  bar: { flex: 1, height: 2.5, borderRadius: 1.25, backgroundColor: "rgba(255,255,255,0.35)", overflow: "hidden" },
-  barFill: { height: "100%", backgroundColor: "#fff" },
-  who: { flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 2 },
-  name: { color: "#fff", fontSize: 15, fontWeight: "600", flexShrink: 1, ...shadow },
-  age: { color: "rgba(255,255,255,0.75)", fontSize: 14, ...shadow },
-  views: { position: "absolute", left: 16, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.35)" },
-  ownShare: { position: "absolute", right: 18, height: 36, justifyContent: "center" },
+  typingShade: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.5)" },
+  // The header: the bars, then who and when, then More and Close.
+  header: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 10, gap: 8 },
+  bars: { flexDirection: "row", gap: 3, paddingHorizontal: 2 },
+  bar: { flex: 1, height: 2, borderRadius: 1, backgroundColor: "rgba(255,255,255,0.32)", overflow: "hidden" },
+  barFill: { height: "100%", borderRadius: 1, backgroundColor: "#fff" },
+  who: { flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 4 },
+  whoText: { flex: 1, flexDirection: "row", alignItems: "baseline", gap: 8 },
+  name: { color: "#fff", fontSize: 14, fontWeight: "600", letterSpacing: -0.1, flexShrink: 1, ...shadow },
+  age: { color: "rgba(255,255,255,0.72)", fontSize: 13, fontWeight: "500", flexShrink: 0, ...shadow },
+  chromeButton: { width: 40, height: 44, alignItems: "center", justifyContent: "center" },
   iconShadow: shadow,
-  typingShade: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.45)" },
-  // Instagram's row: a clear pill with a white hairline, then the heart and the paper plane.
-  replyRow: { position: "absolute", left: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 14 },
-  replyField: { flex: 1, minHeight: 46, justifyContent: "center", paddingHorizontal: 18, borderRadius: 23, borderWidth: 1, borderColor: "rgba(255,255,255,0.7)", backgroundColor: "rgba(0,0,0,0.12)" },
-  replyInput: { color: "#fff", fontSize: 15, paddingVertical: 11 },
-  rowButton: { width: 34, height: 46, alignItems: "center", justifyContent: "center" },
-  sendButton: { height: 46, minWidth: 48, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
-  sendText: { color: "#fff", fontSize: 16, fontWeight: "700", ...shadow },
-  sent: { position: "absolute", left: 0, right: 0, bottom: 58, flexDirection: "row", alignSelf: "center", justifyContent: "center", alignItems: "center", gap: 6 },
-  sentText: { color: "#fff", fontSize: 14, fontWeight: "700", ...shadow },
-  viewsText: { color: "#fff", fontSize: 14, fontWeight: "700", fontVariant: ["tabular-nums"] },
-  noViews: { textAlign: "center", paddingVertical: 32, fontSize: 15, color: "#8e8e93" },
+  pressed: { opacity: 0.55, transform: [{ scale: 0.92 }] },
+  // The action bar: under the card on black, or floating over the bottom shade.
+  actionBar: { position: "absolute", left: 0, right: 0, height: STORY_ACTION_BAR, flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 6 },
+  replyField: { flex: 1, height: 44, flexDirection: "row", alignItems: "center", paddingLeft: 18, paddingRight: 6, borderRadius: 22, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.08)" },
+  replyFieldOver: { borderColor: "rgba(255,255,255,0.45)", backgroundColor: "rgba(0,0,0,0.28)" },
+  replyFieldActive: { borderColor: "rgba(255,255,255,0.5)", backgroundColor: "rgba(28,28,30,0.92)" },
+  replyInput: { flex: 1, height: 44, color: "#fff", fontSize: 16, paddingVertical: 0 },
+  sendButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
+  actions: { flexDirection: "row", alignItems: "center" },
+  action: { width: 46, height: 46, alignItems: "center", justifyContent: "center" },
+  sent: { position: "absolute", alignSelf: "center", left: 0, right: 0, bottom: STORY_ACTION_BAR + 4, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6 },
+  sentText: { color: "#fff", fontSize: 14, fontWeight: "600", ...shadow },
+  // Your own story: Activity on the left, Send and Delete on the right.
+  activity: { flexDirection: "row", alignItems: "center", gap: 6, height: 40, paddingHorizontal: 14, borderRadius: 20, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.08)" },
+  count: { color: "#fff", fontSize: 14, fontWeight: "600", fontVariant: ["tabular-nums"], marginRight: 2 },
+  spacer: { flex: 1 },
+  labeled: { minWidth: 56, height: 52, alignItems: "center", justifyContent: "center", gap: 3 },
+  caption: { color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: "500" },
+  noViews: { textAlign: "center", paddingVertical: 32, fontSize: 15 },
   viewerRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
   viewerName: { flex: 1, fontSize: 15, fontWeight: "600" },
-  viewerTime: { fontSize: 13, color: "#8e8e93" },
+  viewerTime: { fontSize: 13, fontVariant: ["tabular-nums"] },
 });

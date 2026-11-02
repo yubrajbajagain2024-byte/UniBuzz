@@ -78,3 +78,29 @@ test("nextStoryGroup and storyAge", () => {
   assert.equal(storyAge("2026-10-30T11:25:00Z", now), "35m");
   assert.equal(storyAge("2026-10-30T09:10:00Z", now), "2h");
 });
+
+test("storyFrame: a card under the status bar with the bar below it where a 9:16 story fits; full screen where it does not", async () => {
+  const { storyFrame, STORY_ACTION_BAR } = await import("../src/stories.ts");
+  // iPhone 17 Pro (402 × 874, insets 62 and 34): the whole 9:16 picture, the bar under it.
+  const pro = storyFrame(402, 874, 62, 34);
+  assert.equal(pro.framed, true);
+  assert.equal(pro.top, 62);
+  assert.ok(Math.abs(pro.height - (402 * 16) / 9) < 0.01, `${pro.height}`);
+  assert.ok(pro.top + pro.height <= 874 - 34 - STORY_ACTION_BAR, "the card runs into the bar");
+  // iPhone 16e (390 × 844, insets 47 and 34): framed too.
+  assert.equal(storyFrame(390, 844, 47, 34).framed, true);
+  // A screen a little short of the whole picture still frames it, cropped a touch (never taller than the room).
+  const tight = storyFrame(390, 820, 47, 34);
+  assert.equal(tight.framed, true);
+  assert.equal(tight.height, 820 - 47 - 34 - STORY_ACTION_BAR);
+  // iPhone SE (375 × 667, insets 20 and 0): no room, so the story fills the screen from the top edge.
+  assert.deepEqual(storyFrame(375, 667, 20, 0), { framed: false, top: 0, height: 667 });
+});
+
+test("storyAudienceNote: said for campus, friends and selected stories, nothing for global ones", async () => {
+  const { storyAudienceNote } = await import("../src/stories.ts");
+  assert.equal(storyAudienceNote("global"), null);
+  assert.equal(storyAudienceNote("campus"), "Campus");
+  assert.equal(storyAudienceNote("friends"), "Friends");
+  assert.equal(storyAudienceNote("selected"), "Selected people");
+});

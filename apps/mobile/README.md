@@ -208,7 +208,11 @@ never black or a flat colour (`BlurredBackdrop` in `src/components/blurred-backd
 then blurred and stretched, since a blur on a full-size photo barely shows once scaled to the screen). A video uploaded
 without its size takes its poster's shape once that loads. The chat's photo and video viewer
 (`src/components/messages/media-viewer.tsx`) and a Snap's (`src/app/snap/[id].tsx`) lay out the same way, a video's
-shape and blurred frame read from its own player; Stories already fill the screen. Over every page, one top row with Back at the left and the
+shape and blurred frame read from its own player. Stories have their own layout (`src/app/stories/[id].tsx`, `storyFrame` in
+`packages/shared/src/stories.ts`): on a tall phone a rounded 9:16 card under the status bar with the reply pill, the heart
+and the paper plane (or, on your own, Activity, Send and Delete) on black below it, so they are always legible and a near
+miss never moves the story on; on a short screen the story fills it and the bar floats over a deeper shade. Holding a
+story fades every control away. Over every page, one top row with Back at the left and the
 Campus | Global toggle in the middle (for reels and For you, while the toggle is shown); the creator's name, the words and the heart, comments, share,
 save and "…" rail sit at the bottom (as on the Reels page, the rail a little nearer the right edge: `railRight`), over a
 video's shades (gradients only, as Instagram's: a blur under the words was re-drawn every frame the video played or the

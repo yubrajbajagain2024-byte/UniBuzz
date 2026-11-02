@@ -98,6 +98,30 @@ export function storyAge(createdAt: string, now: number = Date.now()): string {
   return `${Math.floor(minutes / 60)}h`;
 }
 
+/** The few words after a story's age in the viewer's header: who it was shared with, said only when it is not everyone. */
+export function storyAudienceNote(audience: PostAudience): string | null {
+  return audience === "campus" ? "Campus" : audience === "friends" ? "Friends" : audience === "selected" ? "Selected people" : null;
+}
+
+/** The viewer's action bar: a 44-point row (the reply pill, the heart, the paper plane) with 8 points above and below. */
+export const STORY_ACTION_BAR = 60;
+/** How much of a whole 9:16 picture a screen must leave room for, beside the bar, for the story to sit in a card. */
+const FRAME_MIN = 0.94;
+
+/**
+ * Where the viewer puts a story on a screen `width` × `height` with these safe-area insets. On a tall phone, as iOS's own
+ * viewers and Instagram's do, the story is a rounded 9:16 card from just under the status bar, and the action bar sits
+ * below it on black: the actions never lie over the picture (always legible), and a tap that misses one never lands on
+ * the story. A shorter screen (an iPhone SE) has no room for that: the story fills the screen (`framed` false, from the
+ * top edge) and the bar floats over a deeper shade. The card is never taller than 9:16 nor than the room above the bar.
+ */
+export function storyFrame(width: number, height: number, insetTop: number, insetBottom: number): { framed: boolean; top: number; height: number } {
+  const whole = (width * 16) / 9;
+  const room = height - insetTop - insetBottom - STORY_ACTION_BAR;
+  if (room >= whole * FRAME_MIN) return { framed: true, top: insetTop, height: Math.min(whole, room) };
+  return { framed: false, top: 0, height };
+}
+
 /**
  * What a heart's requests came to: `value` is what the database now holds, `attempted` the heart the last request tried
  * to set (a like or an unlike, for the error's title), `error` why it failed (null when nothing did).
