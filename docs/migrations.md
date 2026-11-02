@@ -30,7 +30,7 @@ The README's statement that 41 and 42 are not live is out of date.
 | 50 | `20261107000100_business_ads.sql` (merged in PR #49): business posts, ads and their review, serving, students' hide/report/block, events and analytics, Fair Housing screen, v1 promotions migrated to ads, the `ads-sweep` pg_cron job | ❌ **not applied** |
 | 51 | `20261108000000_buzz_reply_tree.sql` (merged in PR #50): each Buzz reply says which reply it answers at any depth (`treeParentId`), for the app's Reddit-style thread | ❌ **not applied** |
 | 52 | `20261108000100_buzz_top_reply.sql` (merged in PR #50): a feed card's "Top reply" (`topReply` in `buzz_v2_feed`), with a partial index | ❌ **not applied** |
-| 53 | `20261108000200_buzz_prompt_threads.sql` (merged in PR #50): one thread per day's prompt per campus and one on Global (`buzz_prompt_threads`, `buzz_v2_prompt_thread()`); a prompt's answer always titled with the prompt, existing ones included | ❌ **not applied** |
+| 53 | `20261108000200_buzz_prompt_threads.sql` (merged in PR #50): one thread per day's prompt per campus and one on Global (`buzz_prompt_threads`, `buzz_v2_prompt_thread()`); a new prompt answer titled with the prompt, an earlier one only where its title is blank (a title its author wrote stays: Yubraj's fix from PR #54) | ❌ **not applied** |
 | 54 | `20261108000300_buzz_categories.sql` (merged in PR #50): an optional category on a buzz (`buzz_posts.category`, a fixed list), read by `buzz_v2_create` and shown by `buzz_root_json` | ❌ **not applied** |
 | 55 | `20261109000000_media_server_fields.sql` (merged in PR #51; its fix on `business-v2`): a video's processing details are written by the server only; 30 new videos a day per person; ready videos 10 minutes at most | ❌ **not applied** |
 | 56 | `20261109000100_business_hardening.sql` (merged in PR #51; its fixes on `business-v2`): Business v2 hardening after an independent review: ads show the reviewed copy of what they promote and pause when it changes, every ad screened for Fair Housing, ad photos from this project's storage, chats visible to a business once the student writes, blocks stop chats, server-set dates, payments kept, stricter event counting | ❌ **not applied** |
@@ -88,6 +88,17 @@ without them the app shows two levels of replies, no top reply and prompt answer
 their own, and a picked category is simply not kept, so the `ankur/dev` PR can merge first. Each
 rollback restores the functions it replaced verbatim; 53's keeps the prompt threads as ordinary
 buzzes and 54's keeps the categories (nothing reads them).
+
+**44, 46 and 51 to 54 ahead of the release:** they need only what production has, and none of them
+creates or replaces a function, view, table or trigger that 49, 50, 55 to 57 or 58 to 62 does, so
+they may go live on their own, as 58 to 61 did (supabase/CLAUDE.md), in two transactions: Discover
+(44, its `_migrations` row, 46, its row; never 44 alone, because 44 ends by ranking posts of every
+audience and 46 re-ranks Global posts only before the transaction ends), then Buzz (51 to 54, each
+with its row). Rehearsed offline by `tests/discover-buzz-rollout.test.mjs` (2026-11-01): production's
+state, the two transactions, a failure part-way that applies nothing, Discover and Buzz through the
+API roles, the rest of the release and 62 after them, the documented undo, and both again. Still to
+do: the staging rehearsal, a full backup and Sunil's approval; afterwards, take the six out of the
+release lists.
 
 **Numbering quirk:** both `20261103000300_discover.sql` and `20261104000000_post_details.sql` call
 themselves "migration 44" in their header comments. File order (timestamps) is authoritative;
