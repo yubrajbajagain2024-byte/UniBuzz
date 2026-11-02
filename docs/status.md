@@ -57,6 +57,20 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   Still to do, each with the owner's approval: `CRON_SECRET` in Vercel's Production environment, Texas State's
   calendar feed added in `/admin/events`, an EAS update so testers get the tab (and PR #81's filters and readable
   Events error).
+- **Story likes, replies and sharing** (`story-actions-fix`, 2026-11-02): on production a like answered "Could not find
+  the table 'public.story_likes' in the schema cache", a reply "violates check constraint messages_shared_post_check",
+  and a share "Some people in this chat can't see this story". One root cause, **migration 62 is not on production**
+  (no `story_likes`; the card check still refuses a story card), and a second for the share's words: the share sheet
+  and the website's share dialog guessed that reason for any failed send of a non-Global card, and `sendSharedPost`
+  dropped the real one. Reproduced offline on production's state. Fixed on the branch: `sendSharedPost` returns each
+  failure's reason (`shareFailureOf`) and both sheets say it, naming the friend or group; the app's share sheet offers
+  group chats as well as friends; the heart's requests go one at a time with the last tap winning (`createLikeSync`);
+  a like, reply or mute on a database without 62 says so in words (`STORY_ACTIONS_NOT_READY`). 62 itself needed no
+  change: its offline suite now covers group chats and every audience (46 checks). On staging, 62 applied and
+  `staging/story-actions.mjs` 15/15; the website on staging (a story reply in Ann's inbox and chat, a story shared
+  into a group, nothing in the group with someone who may not see it, no request to production). **Not checked in
+  the app on an iPhone** (the Mac's iOS Simulator stopped drawing within a minute of each boot). Still to do, each
+  with the owner's approval: a full backup and 62 alone on production, then an EAS update for the app's part.
 - **Apply the pending migrations.** One run of `db:setup` from `main` in database-URL mode
   ([supabase/CLAUDE.md](../supabase/CLAUDE.md)), after a backup, applies them in file order: 44 and
   46 together, 49 and 50 (Business v2), 51 to 54 (Buzz), 55 and 56 (Business v2, PR #51), once

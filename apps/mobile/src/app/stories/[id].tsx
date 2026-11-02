@@ -9,16 +9,16 @@ import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, runOnJS, useAnimate
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   blockUser,
+  createLikeSync,
   deleteStory,
   formatMessageTime,
-  getOrCreateDirectConversation,
   likeStory,
   listStoryViewers,
   markStorySeen,
   muxPlaybackUrl,
   REPORT_REASONS,
   reportContent,
-  sendMessage,
+  sendStoryReply,
   sharedPostFromStory,
   storyAge,
   storyDurationMs,
@@ -206,6 +206,8 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
   const [sentAt, setSentAt] = useState(0);
   /** Hearts changed here, by story id: the groups the viewer was handed are a snapshot. */
   const [likedNow, setLikedNow] = useState<Record<string, boolean>>({});
+  /** Each story's heart requests, one at a time with the last tap winning (createLikeSync). */
+  const likeSyncs = useRef(new Map<string, ReturnType<typeof createLikeSync>>());
   const input = useRef<TextInputInstance>(null);
   const progress = useSharedValue(0);
   const duration = storyDurationMs(story);
@@ -280,7 +282,11 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
   const heartScale = useSharedValue(1);
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
 
-  /** The heart: shows at once, goes back if the server says no (the story expired, a block). */
+  /**
+   * The heart: shows at once, and the database follows the last tap (two quick taps never leave it the other way). If the
+   * server says no (the story expired, a block, a database without migration 62), it goes back to what the database
+   * holds, with the reason.
+   */
   async function toggleLike() {
     if (!me || mine) return;
     const next = !liked;
@@ -291,23 +297,26 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
     if (next) heartScale.value = withSequence(withTiming(1.3, { duration: 110 }), withSpring(1, { damping: 9, stiffness: 260 }));
     setLikedNow((m) => ({ ...m, [id]: next }));
     noteStoryLiked(id, next);
-    try {
-      await (next ? likeStory(supabase, me, id) : unlikeStory(supabase, me, id));
-    } catch (e) {
-      setLikedNow((m) => ({ ...m, [id]: !next }));
-      noteStoryLiked(id, !next);
-      alertWithHaptic("error", next ? "Couldn't like this story" : "Couldn't unlike this story", errorText(e));
+    let sync = likeSyncs.current.get(id);
+    if (!sync) {
+      const viewer = me;
+      sync = createLikeSync((value) => (value ? likeStory(supabase, viewer, id) : unlikeStory(supabase, viewer, id)), story.liked);
+      likeSyncs.current.set(id, sync);
     }
+    const outcome = await sync.set(next);
+    if (!outcome?.error) return;
+    setLikedNow((m) => ({ ...m, [id]: outcome.value }));
+    noteStoryLiked(id, outcome.value);
+    alertWithHaptic("error", outcome.attempted ? "Couldn't like this story" : "Couldn't unlike this story", errorText(outcome.error));
   }
 
-  /** "Send message": a reply in a chat with the author, carrying the story (the database checks it and sends the picture). */
+  /** "Send message": a reply in the direct chat with the author, carrying the story (the database checks it and sends the picture). */
   async function sendReply() {
     const text = draft.trim();
     if (!me || mine || !text || sending) return;
     setSending(true);
     try {
-      const conversationId = await getOrCreateDirectConversation(supabase, author.id);
-      await sendMessage(supabase, { conversationId, senderId: me, content: text, sharedPost: sharedPostFromStory(story, true) });
+      await sendStoryReply(supabase, { senderId: me, story, text });
       hapticSuccess();
       setDraft("");
       setSentAt(Date.now());
@@ -319,12 +328,12 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
     }
   }
 
-  /** The paper plane: the story as a card to friends; the database refuses anyone who may not see it. */
+  /** The paper plane: the story as a card to friends and group chats; the database refuses a chat with anyone who may not see it. */
   function share() {
     if (!me) return;
     hapticTap();
     setSharing(true);
-    shareSheet.open(sharedPostFromStory(story), { restricted: story.audience !== "global", noun: "story", onClosed: () => setSharing(false) });
+    shareSheet.open(sharedPostFromStory(story), { onClosed: () => setSharing(false) });
   }
 
   function report() {

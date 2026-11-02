@@ -476,7 +476,7 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
         image_url: poster || null,
         author: { id: reel.author.id, name: reel.author.name, avatar_url: reel.author.avatarUrl },
       },
-      { url, label, restricted: (reel.audience ?? "global") !== "global" },
+      { url, label },
     );
   }
 

@@ -149,6 +149,43 @@ await expectOk("cards: other cards are as before (a post card keeps its words)",
   const m = await send(CARA, convAnn, JSON.stringify({ target_type: "post", target_id: post.id, kind: "post", path: `/posts/${post.id}`, title: "Mine", caption: "words", image_url: null, author: { id: ANN, name: "Ann", avatar_url: null } }));
   check(m.shared_post.title === "Mine" && m.shared_post.kind === "post", JSON.stringify(m.shared_post));
 });
+// --- Group chats and every audience: each member must be able to see the story, the sender included ---------------------
+const group = (owner, name, members) => as(owner, () => val("select public.create_group_conversation($1, $2::uuid[]) as id", [name, members]));
+const follow = async (a, b) => { await db.query("insert into public.follows (follower_id, followee_id) values ($1, $2), ($2, $1) on conflict do nothing", [a, b]); };
+await expectOk("groups: a campus story goes into a group whose members are all on the campus, as one message, named in its inbox line", async () => {
+  const g = await group(CARA, "Study group", [DEV, ANN]);
+  const m = await send(CARA, g, card(campus.id));
+  check(m.conversation_id === g && m.shared_post.kind === "story" && m.shared_post.author.id === ANN, JSON.stringify(m.shared_post));
+  check((await val("select last_message_preview from public.conversations where id = $1", [g])) === "Sent a story", "inbox line");
+  check((await val("select count(*)::int from public.messages where conversation_id = $1", [g])) === 1, "not one message");
+});
+await expectRefused("groups: a campus story into a group with someone from another campus is refused, naming no one", async () => send(CARA, await group(CARA, "Mixed", [DEV, OLI]), card(campus.id)), "Some people in this chat can't see this story.");
+await expectOk("groups: a global story goes into any group", async () => { await send(CARA, await group(CARA, "Anyone", [DEV, OLI]), card(global.id)); });
+const friendsOnly = await story(ANN, "friends");
+await follow(ANN, CARA);
+await follow(ANN, DEV);
+await follow(CARA, OLI);
+await expectOk("friends: Ann's friend shares her friends-only story with another of Ann's friends, and into a group with Ann in it", async () => {
+  await send(CARA, await dm(CARA, DEV), card(friendsOnly.id));
+  await send(CARA, await group(CARA, "Ann's friends", [DEV, ANN]), card(friendsOnly.id));
+});
+await expectRefused("friends: not with Cara's own friend who is not Ann's", async () => send(CARA, await dm(CARA, OLI), card(friendsOnly.id)), "Some people in this chat can't see this story.");
+await expectRefused("friends: nor into a group with them", async () => send(CARA, await group(CARA, "Cara's friends", [DEV, OLI]), card(friendsOnly.id)), "Some people in this chat can't see this story.");
+await expectRefused("friends: someone who is not Ann's friend cannot share it at all", async () => send(OLI, await dm(OLI, CARA), card(friendsOnly.id)), "This story is no longer available.");
+const picked = await story(ANN, "selected");
+await as(ANN, () => db.query("select public.set_story_viewers($1, $2::uuid[])", [picked.id, [CARA, DEV]]));
+await expectOk("selected: someone Ann picked shares it with someone else she picked", async () => { await send(CARA, await dm(CARA, DEV), card(picked.id)); });
+await expectRefused("selected: not with anyone she did not pick", async () => send(CARA, await dm(CARA, BLK), card(picked.id)), "Some people in this chat can't see this story.");
+await expectOk("selected: Ann herself shares it only where everyone was picked", async () => {
+  await send(ANN, await group(ANN, "Picked", [CARA, DEV]), card(picked.id));
+  try { await send(ANN, await dm(ANN, BLK), card(picked.id)); throw new Error("sent to someone not picked"); } catch (e) { check(e.message.includes("can't see this story"), e.message); }
+});
+await expectOk("groups: a reply under a story goes to the direct chat with the author, never a group without her", async () => {
+  try { await send(CARA, await group(CARA, "No Ann", [DEV]), card(campus.id, "story_reply"), "hi"); throw new Error("a reply went into a group without the author"); } catch (e) { check(e.message.includes("A reply to a story goes to the person who shared it."), e.message); }
+  const m = await send(CARA, await dm(CARA, ANN), card(campus.id, "story_reply"), "so good");
+  check(m.shared_post.kind === "story_reply" && (await val("select last_message_preview from public.conversations where id = $1", [m.conversation_id])) === "so good", "the reply's inbox line");
+});
+
 await expectOk("cards and likes: across a block, neither goes through", async () => {
   await as(BLK, () => db.query("insert into public.story_likes (story_id, user_id) values ($1, $2)", [global.id, BLK]));
   const conv = await dm(BLK, DEV);

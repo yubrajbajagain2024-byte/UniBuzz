@@ -13,7 +13,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { APP_NAME, listFriends, sendSharedPost, type FeedMedia, type ProfileSummary, type SharedPost } from "@apartment-book/shared";
+import { APP_NAME, listConversations, listFriends, sendSharedPost, sharedPostNoun, shareFailureSummary, type ConversationSummary, type FeedMedia, type ProfileSummary, type SharedPost } from "@apartment-book/shared";
 import { hapticSuccess, hapticTap, alertWithHaptic } from "@/lib/haptics";
 import { errorText } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
@@ -21,17 +21,18 @@ import { supabase } from "@/lib/supabase";
 import { auroraGradient, radius } from "@/lib/theme";
 import { makeStyles, useAppTheme } from "@/lib/theme-provider";
 import { Avatar } from "./avatar";
+import { InboxAvatar } from "./messages/inbox-row";
+import { matchConversations } from "./messages/inbox-utils";
 import { Icon } from "@/components/icon";
 import { Sheet, SheetFooter, SheetHeader } from "./sheet";
 
-/** Besides the snapshot, the sheet needs the website link for "Share to…" and, optionally, the words that go before it. */
 /**
- * `restricted`: the post is not Global (a campus post). The database refuses its card in a chat with anyone who cannot
- * see it, and sendSharedPost reports only who missed out, not why, so a failed send names that reason first. `noun`
- * names the thing in that reason ("post" unless given). Without `url` (a story, which has no page on the website) the
- * sheet sends to friends only, with no "Share to…".
+ * Besides the snapshot, the sheet needs the website link for "Share to…" and, optionally, the words that go before it.
+ * Without `url` (a story, which has no page on the website) the sheet sends only into chats, with no "Share to…". Who
+ * may receive a card is the database's rule (a campus post, a listing or a story reaches only a chat whose members may
+ * all see it): a refusal comes back with its reason, and the sheet says it.
  */
-export type ShareOptions = { url?: string; label?: string; restricted?: boolean; noun?: string; onClosed?: () => void };
+export type ShareOptions = { url?: string; label?: string; onClosed?: () => void };
 type ShareRequest = { shared: SharedPost; options: ShareOptions; seq: number };
 type ShareSheetApi = {
   /** Opens the sheet over whatever is on screen. Selection, note and search start empty every time. */
@@ -53,8 +54,10 @@ export function firstImageOf(media: FeedMedia[]): string | null {
 /**
  * Instagram's share sheet, mounted in the root layout: `useShareSheet().open(sharedPost, { url })` from any Share button.
  * A screen that iOS presents modally (the full-screen viewer) mounts its own: a sheet is presented by the screen on top,
- * and the root one, under that screen, could not appear over it. Friends (people you follow who follow you back) show as a grid; pick some, add a note, Send, and each one gets a
- * direct message carrying the post as a card. "Share to…" at the bottom is the system share sheet, as before.
+ * and the root one, under that screen, could not appear over it. Your group chats (the most recent first) and your
+ * friends (people you follow who follow you back) show as a grid; pick some, add a note, Send, and each friend gets a
+ * direct message carrying the post as a card, each group one message in the group. "Share to…" at the bottom is the
+ * system share sheet, as before.
  */
 export function ShareSheetProvider({ children }: { children: ReactNode }) {
   const [request, setRequest] = useState<ShareRequest | null>(null);
@@ -123,6 +126,10 @@ function ShareSheet({ request, onClose }: { request: ShareRequest | null; onClos
 }
 
 type SendStatus = "idle" | "sending" | "sent";
+/** Someone or somewhere the card can go: a friend (their direct chat) or one of your group chats. */
+type Recipient = { key: string; name: string; personId?: string; conversationId?: string };
+/** Group chats shown before a search: the most recently active. A search looks through all of them. */
+const RECENT_GROUPS = 9;
 
 /** One opening of the sheet: remounted (fresh search, selection and note) each time it opens. */
 function SheetBody({ shared, options, onClose, closeThen }: { shared: SharedPost; options: ShareOptions; onClose: () => void; closeThen: (fn: () => void) => void }) {
@@ -135,9 +142,12 @@ function SheetBody({ shared, options, onClose, closeThen }: { shared: SharedPost
   const [friends, setFriends] = useState<ProfileSummary[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Your group chats, newest activity first; null while loading. */
+  const [groups, setGroups] = useState<ConversationSummary[] | null>(null);
+  const [groupsError, setGroupsError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  /** Who gets it, by id. A Map so names survive a search that no longer lists them. */
-  const [picked, setPicked] = useState<Map<string, ProfileSummary>>(new Map());
+  /** Who gets it, by key. A Map so names survive a search that no longer lists them. */
+  const [picked, setPicked] = useState<Map<string, Recipient>>(new Map());
   const [note, setNote] = useState("");
   const [status, setStatus] = useState<SendStatus>("idle");
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -177,18 +187,37 @@ function SheetBody({ shared, options, onClose, closeThen }: { shared: SharedPost
       clearTimeout(t);
     };
   }, [q, userId, attempt]);
+  // The group chats load once per opening (the inbox's own list); a search filters them here, by name and members.
+  useEffect(() => {
+    if (!userId) return;
+    let stale = false;
+    setGroupsError(null);
+    listConversations(supabase, userId)
+      .then((rows) => {
+        if (!stale) setGroups(rows.filter((c) => c.type === "group"));
+      })
+      .catch((e) => {
+        if (stale) return;
+        setGroups((g) => g ?? []);
+        setGroupsError(errorText(e, "Could not load your group chats."));
+      });
+    return () => {
+      stale = true;
+    };
+  }, [userId, attempt]);
+  const shownGroups = useMemo(() => (!groups ? [] : q.trim() ? matchConversations(groups, q, () => null) : groups.slice(0, RECENT_GROUPS)), [groups, q]);
 
   // Three tiles per row on a phone (390pt), more on a tablet.
   const columns = Math.max(3, Math.floor((width - 24) / 118));
   const busy = status !== "idle";
 
-  function toggle(p: ProfileSummary) {
+  function toggle(r: Recipient) {
     if (busy) return;
     hapticTap();
     setPicked((prev) => {
       const next = new Map(prev);
-      if (next.has(p.id)) next.delete(p.id);
-      else next.set(p.id, p);
+      if (next.has(r.key)) next.delete(r.key);
+      else next.set(r.key, r);
       return next;
     });
   }
@@ -198,15 +227,22 @@ function SheetBody({ shared, options, onClose, closeThen }: { shared: SharedPost
     const recipients = [...picked.values()];
     setStatus("sending");
     try {
-      const { failed } = await sendSharedPost(supabase, { senderId: user.id, recipientIds: recipients.map((p) => p.id), sharedPost: shared, note: note.trim() });
+      const { failed, reasons } = await sendSharedPost(supabase, {
+        senderId: user.id,
+        recipientIds: recipients.flatMap((r) => (r.personId ? [r.personId] : [])),
+        conversationIds: recipients.flatMap((r) => (r.conversationId ? [r.conversationId] : [])),
+        sharedPost: shared,
+        note: note.trim(),
+      });
       // Closed while it was sending: no timer, alert or state for a sheet that is gone.
       if (!alive.current) return;
       if (failed.length > 0) {
-        // The ones who did not get it stay picked, so Send again reaches just them.
-        const missed = recipients.filter((p) => failed.includes(p.id));
-        setPicked(new Map(missed.map((p) => [p.id, p])));
+        // The ones that did not get it stay picked, so Send again reaches just them; the alert says why for each.
+        const missed = recipients.filter((r) => failed.includes(r.personId ?? r.conversationId ?? ""));
+        setPicked(new Map(missed.map((r) => [r.key, r])));
         setStatus("idle");
-        alertWithHaptic("error", `Could not send to ${missed.map((p) => p.full_name).join(", ")}`, options.restricted ? `Some people in this chat can't see this ${options.noun ?? "post"}. If they should, check your connection and try again.` : "Check your connection and try again.");
+        const why = missed.map((r) => ({ name: r.name, group: Boolean(r.conversationId), ...reasons[r.personId ?? r.conversationId ?? ""] }));
+        alertWithHaptic("error", `Could not send to ${missed.map((r) => r.name).join(", ")}`, shareFailureSummary(why, sharedPostNoun(shared)));
         return;
       }
       hapticSuccess();
@@ -232,7 +268,7 @@ function SheetBody({ shared, options, onClose, closeThen }: { shared: SharedPost
   }
 
   const sendLabel = status === "sending" ? "Sending…" : status === "sent" ? "Sent" : "Send";
-  const names = [...picked.values()].map((p) => p.full_name);
+  const names = [...picked.values()].map((r) => r.name);
   const toLine = names.length <= 2 ? names.join(" and ") : `${names.slice(0, 2).join(", ")} and ${names.length - 2} more`;
 
   let body: ReactNode;
@@ -259,51 +295,61 @@ function SheetBody({ shared, options, onClose, closeThen }: { shared: SharedPost
         <ActivityIndicator color={colors.brand} />
       </View>
     );
-  } else if (friends.length === 0 && !q.trim()) {
-    body = (
-      <View style={styles.empty}>
-        <Icon name="people-outline" size={44} color={colors.faint} />
-        <Text style={styles.emptyTitle}>Friends you follow back show up here.</Text>
-        <Pressable onPress={() => closeThen(() => router.push("/find-people"))} accessibilityRole="button" accessibilityLabel="Find people" style={styles.ghostButton}>
-          <Text style={styles.ghostButtonText}>Find people</Text>
-        </Pressable>
-      </View>
-    );
-  } else if (friends.length === 0) {
-    body = (
-      <View style={styles.empty}>
-        <Text style={styles.emptyBody}>No friends match “{q.trim()}”.</Text>
-      </View>
-    );
   } else {
-    body = (
-      <View style={styles.grid}>
-        {friends.map((p) => {
-          const selected = picked.has(p.id);
-          return (
-            <Pressable
-              key={p.id}
-              onPress={() => toggle(p)}
-              accessibilityRole="button"
-              accessibilityLabel={p.full_name}
-              accessibilityState={{ selected }}
-              style={({ pressed }) => [styles.tile, { width: `${100 / columns}%` }, pressed && { opacity: 0.7 }]}
-            >
-              <View>
-                <Avatar name={p.full_name} url={p.avatar_url} size={64} userId={p.id} ringColor={colors.elevated} />
-                {selected ? (
-                  <View style={styles.check}>
-                    <Icon name="checkmark" size={14} color={colors.onBrand} />
-                  </View>
-                ) : null}
+    /** A friend or a group as a tile: the photo with a tick when picked, the name under it. */
+    const tile = (r: Recipient, photo: ReactNode) => {
+      const selected = picked.has(r.key);
+      return (
+        <Pressable
+          key={r.key}
+          onPress={() => toggle(r)}
+          accessibilityRole="button"
+          accessibilityLabel={r.conversationId ? `${r.name}, group chat` : r.name}
+          accessibilityState={{ selected }}
+          style={({ pressed }) => [styles.tile, { width: `${100 / columns}%` }, pressed && { opacity: 0.7 }]}
+        >
+          <View>
+            {photo}
+            {selected ? (
+              <View style={styles.check}>
+                <Icon name="checkmark" size={14} color={colors.onBrand} />
               </View>
-              <Text style={[styles.tileName, selected && { color: colors.brand }]} numberOfLines={2}>
-                {p.full_name}
-              </Text>
+            ) : null}
+          </View>
+          <Text style={[styles.tileName, selected && { color: colors.brand }]} numberOfLines={2}>
+            {r.name}
+          </Text>
+        </Pressable>
+      );
+    };
+    const noFriends = friends.length === 0;
+    body = (
+      <>
+        {shownGroups.length > 0 ? (
+          <>
+            <Text style={styles.sectionLabel}>Groups</Text>
+            <View style={styles.grid}>{shownGroups.map((c) => tile({ key: `group:${c.id}`, name: c.title, conversationId: c.id }, <InboxAvatar conversation={c} size={64} />))}</View>
+            {!noFriends ? <Text style={styles.sectionLabel}>Friends</Text> : null}
+          </>
+        ) : null}
+        {!noFriends ? (
+          <View style={styles.grid}>{friends.map((p) => tile({ key: `person:${p.id}`, name: p.full_name, personId: p.id }, <Avatar name={p.full_name} url={p.avatar_url} size={64} userId={p.id} ringColor={colors.elevated} />))}</View>
+        ) : q.trim() ? (
+          shownGroups.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyBody}>No friends or groups match “{q.trim()}”.</Text>
+            </View>
+          ) : null
+        ) : (
+          <View style={styles.empty}>
+            <Icon name="people-outline" size={44} color={colors.faint} />
+            <Text style={styles.emptyTitle}>Friends you follow back show up here.</Text>
+            <Pressable onPress={() => closeThen(() => router.push("/find-people"))} accessibilityRole="button" accessibilityLabel="Find people" style={styles.ghostButton}>
+              <Text style={styles.ghostButtonText}>Find people</Text>
             </Pressable>
-          );
-        })}
-      </View>
+          </View>
+        )}
+      </>
     );
   }
 
@@ -316,10 +362,10 @@ function SheetBody({ shared, options, onClose, closeThen }: { shared: SharedPost
           <TextInput
             value={q}
             onChangeText={setQ}
-            placeholder="Search friends"
+            placeholder="Search friends and groups"
             placeholderTextColor={colors.faint}
             keyboardAppearance={isDark ? "dark" : "light"}
-            accessibilityLabel="Search friends"
+            accessibilityLabel="Search friends and groups"
             autoCorrect={false}
             autoCapitalize="none"
             returnKeyType="search"
@@ -332,9 +378,9 @@ function SheetBody({ shared, options, onClose, closeThen }: { shared: SharedPost
       ) : null}
       <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.list}>
         {/* A search that failed once a list was showing: that list stays, with the error and Retry above it. */}
-        {user && error && friends ? (
+        {user && ((error && friends) || groupsError) ? (
           <View style={styles.banner}>
-            <Text style={styles.bannerText}>{error}</Text>
+            <Text style={styles.bannerText}>{error && friends ? error : groupsError}</Text>
             <Pressable onPress={() => setAttempt((n) => n + 1)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Retry" style={({ pressed }) => [pressed && { opacity: 0.7 }]}>
               <Text style={styles.bannerRetry}>Retry</Text>
             </Pressable>
@@ -398,6 +444,7 @@ const useStyles = makeStyles((colors) => ({
   // The ring is the sheet's own colour, cutting the tick out of the photo.
   check: { position: "absolute", right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.brand, borderWidth: 2, borderColor: colors.elevated, alignItems: "center", justifyContent: "center" },
   tileName: { fontSize: 12, lineHeight: 15, color: colors.text, textAlign: "center" },
+  sectionLabel: { fontSize: 13, fontWeight: "600", color: colors.muted, marginTop: 4, marginBottom: 2, marginLeft: 4 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 32, paddingHorizontal: 24 },
   emptyTitle: { fontSize: 15, fontWeight: "600", color: colors.text, textAlign: "center" },
   emptyBody: { fontSize: 14, color: colors.muted, textAlign: "center" },

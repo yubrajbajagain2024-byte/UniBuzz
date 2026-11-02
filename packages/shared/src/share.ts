@@ -158,3 +158,58 @@ export function sharedPostPreview(shared: Pick<SharedPost, "kind">): string {
 export function sharedPostLabel(shared: Pick<SharedPost, "kind">): string {
   return LABELS[shared.kind] ?? LABELS.post;
 }
+
+/** What a story's like, reply or share reads while the database lacks migration 62 (story_likes, the story card). */
+export const STORY_ACTIONS_NOT_READY = "Likes, replies and sharing for stories need the latest server update. Try again once it's out.";
+
+/** The word for what a card carries, as the database's own refusals use it ("can't see this story"). */
+export function sharedPostNoun(shared: Pick<SharedPost, "target_type" | "kind">): string {
+  if (shared.target_type === "story") return "story";
+  return shared.kind === "reel" ? "reel" : shared.kind === "listing" ? "listing" : "post";
+}
+
+/**
+ * Why a card did not reach one chat, read from the database's answer rather than guessed:
+ *   * "audience": someone in that chat may not see it (guard_message_story_card, migration 62; migrations 45 and 47 for
+ *     posts and listings). The people who may not see it are never named by the database, so the chat is.
+ *   * "gone": the story expired, was deleted, or its author and the sender are blocked either way.
+ *   * "not_ready": a story card on a database without migration 62 (its card check, or no story_likes).
+ *   * "other": anything else (no network, a rate limit), with the error's own words.
+ */
+export type ShareFailureKind = "audience" | "gone" | "not_ready" | "other";
+export type ShareFailure = { kind: ShareFailureKind; message: string };
+
+const MISSING_TABLE = new Set(["42P01", "PGRST205"]);
+const errorCode = (e: unknown): string => String((e as { code?: unknown } | null)?.code ?? "");
+const errorWords = (e: unknown): string => (e instanceof Error ? e.message : typeof e === "string" ? e : String((e as { message?: unknown } | null)?.message ?? ""));
+
+export function shareFailureOf(error: unknown, shared: Pick<SharedPost, "target_type">): ShareFailure {
+  const message = errorWords(error).trim();
+  if (/can['’]t see this/i.test(message)) return { kind: "audience", message };
+  if (/no longer available/i.test(message)) return { kind: "gone", message };
+  if (shared.target_type === "story" && (MISSING_TABLE.has(errorCode(error)) || (errorCode(error) === "23514" && message.includes("messages_shared_post_check")))) {
+    return { kind: "not_ready", message: STORY_ACTIONS_NOT_READY };
+  }
+  return { kind: "other", message: message || "Check your connection and try again." };
+}
+
+/** A chat a card was sent to: a friend (a direct chat) or a group, by the name the sheet showed. */
+export type ShareTarget = { name: string; group: boolean };
+
+/**
+ * The words under "Could not send to …": one line per reason, naming who or which group, so a refusal for privacy is
+ * never mistaken for a network failure (or the other way round). `noun` is sharedPostNoun's word.
+ */
+export function shareFailureSummary(failures: readonly (ShareTarget & ShareFailure)[], noun: string): string {
+  const lines: string[] = [];
+  const list = (names: string[]) => (names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
+  const people = failures.filter((f) => f.kind === "audience" && !f.group).map((f) => f.name);
+  const groups = failures.filter((f) => f.kind === "audience" && f.group).map((f) => f.name);
+  if (people.length) lines.push(`${list(people)} can't see this ${noun}.`);
+  if (groups.length) lines.push(`Some people in ${list(groups)} can't see this ${noun}.`);
+  if (failures.some((f) => f.kind === "gone")) lines.push(`This ${noun} is no longer available.`);
+  if (failures.some((f) => f.kind === "not_ready")) lines.push(STORY_ACTIONS_NOT_READY);
+  const other = failures.filter((f) => f.kind === "other");
+  if (other.length) lines.push(`${list(other.map((f) => f.name))}: ${other[0].message}`);
+  return lines.join("\n");
+}
