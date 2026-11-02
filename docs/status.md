@@ -57,7 +57,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   Still to do, each with the owner's approval: `CRON_SECRET` in Vercel's Production environment, Texas State's
   calendar feed added in `/admin/events`, an EAS update so testers get the tab (and PR #81's filters and readable
   Events error).
-- **The story viewer, redesigned** (`story-viewer-redesign`, 2026-11-02, pushed; its PR to merge): on a tall phone the
+- **The story viewer, redesigned** (PR #86, merged 2026-11-02 05:28 UTC, the website redeployed without a change of its own): on a tall phone the
   story is a rounded 9:16 card under the status bar and its actions sit on black below it (`storyFrame`), so they are
   always legible and a tap that misses one never moves the story on; on a short screen (iPhone SE) the story fills it
   and the bar floats over a deeper shade. The reply pill says "Reply to Ann…" with a round send arrow inside it once
@@ -198,8 +198,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   flash in video mode need checking there.
 - **Stories** (PR #69, merged 2026-10-30 17:26 UTC; **migration 58 live since 2026-10-30 19:30 UTC**, applied on its
   own ahead of the release above, so it leaves that release): a row of story rings under Home's tabs with "Your story",
-  a full-screen viewer (tap, hold, swipe, pull down; your own views with who; redesigned on `story-viewer-redesign`,
-  2026-11-02, not merged yet: a rounded card with the actions on black below it, below), "Your story" beside Post on the publish
+  a full-screen viewer (tap, hold, swipe, pull down; your own views with who; redesigned in PR #86,
+  2026-11-02: a rounded card with the actions on black below it, below), "Your story" beside Post on the publish
   screen with the post's own audience choice; the database keeps the audience, the 24 hours and blocks. Shared from
   the owner's iPhone in Expo Go against production on 2026-10-30: a Texas State story, seen from a second account, and a
   Selected people story, both with exactly 24 hours (a read-only count of production; deleting one on the device and
