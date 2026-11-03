@@ -289,13 +289,6 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 - **Security fix pending.** A security fix for a live part of the database is ready on a local,
   unpushed branch (2026-10-27) and is **not applied to production**. Its details stay out of this
   repository until production is patched, because the repository is public.
-- **CampConnect Admin's nine sections (branch `admin-sections`, 2026-11-03).** The sidebar is Dashboard, Users,
-  Moderation, Content, Business & Ads, Analytics, Operations, Support and Administration, each with its pages as tabs
-  (docs/technical-reference.md, "CampConnect Admin: sections"). New pages: Appeals, Events, System health, Email,
-  Support requests, Issues, Settings; the Users list gains Verification; the dashboard gains Alerts and Pending
-  decisions. Migration 65 (System health, the Verification filter) is **not on production**: those two say
-  "Database update needed" until it is applied, with the owner's approval. See
-  [branches/admin-sections.md](branches/admin-sections.md).
 - **Decide and merge `step-admin`.** `admin-analytics-business` (draft PR #60) brings its app, scripts, suites,
   README section and website hunks to `main`'s tree (as of 2026-10-31); what still waits is its migration files'
   placement, production's `_migrations` rows, migration 18 and the `hidden_at` message types: the owner's questions
