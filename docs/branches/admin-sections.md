@@ -25,6 +25,6 @@
 
 ## Pending
 
-- [ ] `npm run check`, `npm run db:test`, docs/testing.md; PR, merge.
+- [x] `npm run check` 9/9, `npm run db:test` 60 suites, 2135 checks, 0 failures, `test:shared` 295/295 (docs/testing.md); PR #95 open.
 - [ ] Owner's approval, then apply 65 alone on production (full backup, `verify.mjs --live`, one transaction with its
       `_migrations` row, `notify pgrst`), and record it in docs/migrations.md.
