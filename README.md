@@ -446,6 +446,14 @@ The staging project (`campconnect-staging`) is built like production: this repo'
 
 ## Admin app (CampConnect Admin)
 
+**Sections (2026-11-03).** The sidebar lists nine sections, each with what it holds; a section's pages show as tabs
+under the page title: **Dashboard** (KPIs, alerts, pending decisions), **Users** (accounts, suspensions, verification,
+staff accounts), **Moderation** (reports, appeals, automatic hiding), **Content** (hidden content, events), **Business &
+Ads** and **Analytics** (owners and admins), **Operations** (media jobs, system health, email), **Support** (requests:
+organizations awaiting verification; appeals; issues: failing media jobs and calendar feeds) and **Administration**
+(staff, audit log, security, settings: the Buzz rule packs, who can sign up). Routes did not move; the sections are
+groupings (`apps/admin/src/lib/sections.ts`). System health and the Verification filter need migration 65.
+
 Staff run UniBuzz from **CampConnect Admin**, a separate Next.js app in `apps/admin` that talks to the **same Supabase project** as the website and the mobile app: whatever staff change there applies to both at once, and the admin app has no student features. The website keeps one staff console of its own, the Buzz Trust & Safety console at `/admin` (see [Buzz (anonymous)](#buzz-anonymous)); where CampConnect Admin's tables exist, the two share the staff list and the two-factor rule.
 
 ```bash

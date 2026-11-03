@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { getMediaJobStats, listMediaJobs } from "@apartment-book/shared";
-import { requireStaff } from "@/lib/admin";
+import { hasRole, requireStaff } from "@/lib/admin";
 import { workerStatus } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { cn, firstParam } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { MediaJobsTable } from "@/components/media/media-jobs-table";
 import { RunWorkerButton } from "@/components/media/run-worker-button";
 import { StatCard } from "@/components/overview/stat-card";
 import { PageHeader } from "@/components/shell/page-header";
+import { SectionTabs } from "@/components/shell/section-tabs";
 
 export const metadata: Metadata = { title: "Media" };
 
@@ -26,7 +27,7 @@ function Check({ ok, label, detail }: { ok: boolean; label: string; detail: stri
 }
 
 export default async function MediaPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  await requireStaff("/media");
+  const access = await requireStaff("/media");
   const params = await searchParams;
   const showAll = firstParam(params.view) === "all";
   const supabase = await createClient();
@@ -39,6 +40,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
         title="Media"
         description="Photos and videos of hidden or deleted content. The database queues the work; this app's worker moves photos to the private quarantine bucket, deletes files and turns video playback off and on."
       />
+      <SectionTabs section="operations" admin={hasRole(access, "admin")} />
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard label="Pending" value={stats.pending} hint="waiting or retrying" icon={Clock} tone={stats.pending > 0 ? "amber" : "gray"} />
         <StatCard label="Failing" value={stats.failing} hint="three or more attempts" icon={AlertTriangle} tone={stats.failing > 0 ? "red" : "gray"} />

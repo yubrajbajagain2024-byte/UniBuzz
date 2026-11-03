@@ -8,6 +8,7 @@ import { InvitesList } from "@/components/staff/invites-list";
 import { RolesLegend } from "@/components/staff/roles-legend";
 import { StaffTable } from "@/components/staff/staff-table";
 import { PageHeader } from "@/components/shell/page-header";
+import { SectionTabs } from "@/components/shell/section-tabs";
 
 export const metadata: Metadata = { title: "Staff" };
 
@@ -22,6 +23,7 @@ export default async function StaffPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Staff" description="Who can open this app and what each person may do. Every change is re-checked in the database and written to the audit log." />
+      <SectionTabs section="administration" admin={hasRole(access, "admin")} />
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-4">
           <StaffTable members={members} me={access} emailsEnabled={emailsEnabled} />

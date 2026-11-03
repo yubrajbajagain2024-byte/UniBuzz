@@ -2,25 +2,27 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { isMissingFunctionError, listRestrictions, listUsers, searchUsers, type AdminUserRow, type UsersFilter } from "@apartment-book/shared";
-import { requireStaff } from "@/lib/admin";
+import { hasRole, requireStaff } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/server";
-import { cn, firstParam } from "@/lib/utils";
+import { errorMessage, firstParam } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SetupNotice } from "@/components/ui/setup-notice";
 import { UsersList } from "@/components/users/users-list";
 import { PageHeader } from "@/components/shell/page-header";
+import { SectionTabs } from "@/components/shell/section-tabs";
 
 export const metadata: Metadata = { title: "Users" };
 
 const FILTERS: { value: UsersFilter; label: string }[] = [
   { value: "all", label: "Everyone" },
   { value: "suspended", label: "Suspended" },
+  { value: "unverified", label: "Verification" },
   { value: "staff", label: "Staff" },
 ];
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  await requireStaff("/users");
+  const access = await requireStaff("/users");
   const params = await searchParams;
   const q = (firstParam(params.q) ?? "").trim();
   const filter = FILTERS.find((f) => f.value === firstParam(params.filter))?.value ?? "all";
@@ -28,16 +30,21 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
 
   let rows: AdminUserRow[] = [];
   let needsMigration = false;
+  // The Verification filter is migration 65's; before it the list function refuses the filter by name.
+  let needsHealthMigration = false;
   if (q) {
     rows = (await searchUsers(supabase, q, 50)).map((u) => ({ ...u, lastSeenAt: null }));
   } else {
     try {
       rows = await listUsers(supabase, { filter, limit: 50 });
     } catch (error) {
-      if (!isMissingFunctionError(error)) throw error;
+      if (filter === "unverified" && /Invalid filter/i.test(errorMessage(error, ""))) {
+        needsHealthMigration = true;
+      } else if (!isMissingFunctionError(error)) throw error;
+      else needsMigration = true;
       needsMigration = true;
       // Older database: at least the suspended people are listable through migration 15.
-      rows = (await listRestrictions(supabase, { activeOnly: true, limit: 200 })).map((r) => ({
+      if (needsMigration) rows = (await listRestrictions(supabase, { activeOnly: true, limit: 200 })).map((r) => ({
         userId: r.userId,
         fullName: r.fullName,
         email: r.email,
@@ -53,7 +60,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Users" description="Find a person, see what they posted and were reported for, and suspend or unsuspend their account. Suspensions apply to the website and the app at once." />
+      <PageHeader title="Users" description="Find a person, see what they posted and were reported for, and suspend or unsuspend their account. Suspensions apply to the website and the app at once. Verification lists people whose email is unconfirmed or whose campus is unset." />
+      <SectionTabs section="users" admin={hasRole(access, "admin")} />
       <form action="/users" className="flex gap-2">
         <Input name="q" defaultValue={q} placeholder="Search by name or email" aria-label="Search people" className="max-w-md" />
         <Button type="submit" variant="secondary">
@@ -70,26 +78,21 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         <UsersList key={`q:${q}`} initial={rows} filter="all" pageable={false} emptyTitle={`Nobody matches “${q}”`} emptyDescription="Try part of the name or the exact email address." />
       ) : (
         <>
-          <nav aria-label="People filter" className="flex gap-1 self-start rounded-lg bg-gray-200/60 p-1">
-            {FILTERS.map((f) => (
-              <Link
-                key={f.value}
-                href={f.value === "all" ? "/users" : `/users?filter=${f.value}`}
-                aria-current={f.value === filter ? "page" : undefined}
-                className={cn("rounded-md px-3 py-1.5 text-sm font-medium", f.value === filter ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
-              >
-                {f.label}
-              </Link>
-            ))}
-          </nav>
           {needsMigration ? <SetupNotice migration="16" what="Browsing everyone (search and the suspended list still work)" /> : null}
+          {needsHealthMigration ? <SetupNotice migration="20261117000000_console_health" what="The Verification filter" /> : null}
           <UsersList
             key={filter}
             initial={rows}
             filter={filter}
             pageable={!needsMigration}
-            emptyTitle={filter === "suspended" ? "No suspended accounts" : filter === "staff" ? "No staff" : "No people yet"}
-            emptyDescription={filter === "suspended" ? "Suspend someone from their account page; they show up here while it lasts." : "People appear here as they sign up."}
+            emptyTitle={filter === "suspended" ? "No suspended accounts" : filter === "staff" ? "No staff" : filter === "unverified" ? "Everyone is verified" : "No people yet"}
+            emptyDescription={
+              filter === "suspended"
+                ? "Suspend someone from their account page; they show up here while it lasts."
+                : filter === "unverified"
+                  ? "Every account has a confirmed university email and a campus. Someone who signed up but never confirmed the email shows up here."
+                  : "People appear here as they sign up."
+            }
           />
         </>
       )}
