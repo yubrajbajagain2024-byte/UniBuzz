@@ -160,8 +160,12 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   so those feeds never asked for an ad on their first page, and a campus with fewer than 9 posts never showed one; and
   the app's Reels had no ads at all. Now the first ad follows the 3rd row, then one per 9 at most; a feed that has ended
   with 1 or 2 rows ends with its ad ([decisions.md](decisions.md)); the app's Reels shows Sponsored reels. The website's
-  part goes live with the merge; the app's needs an EAS update (owner's approval). **Not yet seen in a browser or on an
-  iPhone with a real ad.**
+  part goes live with the merge; the app's needs a new native build before any EAS update (see the EAS row under
+  "Blockers and known risks"). The live website and portal (their public JavaScript), EAS's production, preview and
+  development variables and the local settings all name the same live project, with the same anon key (2026-11-03).
+  Draft PR from `ads-delivery`. **Not yet run on staging, in a browser or on an iPhone**: the owner runs
+  `supabase/tests/staging/ad-delivery.mjs --keep`, `apps/web/e2e/sponsored-ads.mjs` and the app in Expo Go
+  ([testing.md](testing.md)).
 - **UniBuzz Business v2 is on `main` without its migrations.** PR #49 was merged on 2026-10-28 at
   04:07 UTC (and #51 at 07:06 UTC), so production's website runs Business v2 code while neither
   migration 49 nor 50 is applied (production's `_migrations`, read-only, 2026-10-28). Until they are, the code
@@ -336,6 +340,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | Supabase CDN may serve a just-deleted Snap to the same viewer for ~1 minute | README §"Snaps" |
 | Supabase free projects pause after a week idle (Pro, USD 25/mo, before real users); built-in auth email is rate-limited (custom SMTP needed) | README §"Production checklist" |
 | Vercel Hobby optimizes 5,000 source images a month | README §"Photos" |
+| An EAS update from `main` would reach a build that cannot run it (read-only check, 2026-11-03): the app's runtime policy is `sdkVersion`, so every SDK 58 build takes any SDK 58 update, and the only one, the Android preview build of 2026-10-26 07:12 UTC (`2e0e4458`), predates `expo-camera`, `expo-media-library`, `expo-video-thumbnails` and `react-native-view-shot` (added 20:28 UTC that day, used by the create flow). No update has been published since. A new native build has to come first; a `fingerprint` runtime policy would stop this from recurring. No EAS build exists for an iPhone (the iOS build is an SDK 57 simulator build); iPhones run the app in Expo Go | "Ads reach students" above |
 | The README still says the Vercel project is not connected to Git, and that 41 and 42 are not live; both are out of date | this file, [migrations.md](migrations.md) |
 
 ## Future plans
