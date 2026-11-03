@@ -192,7 +192,17 @@ open work is in [status.md](status.md).
   (`20261109000000_media_server_fields.sql`, `20261109000100_business_hardening.sql`): now 55 and
   56.
 
+- 2026-11-03: PR #53 (`auto-hide-reports`: content 10 different people report is hidden, flagged for
+  CampConnect Admin's Flagged page, its owner told, the hide audited) merged into `main` with its
+  migration renamed from `20261110000000_…` (57, a timestamp `main` had taken for the business hours)
+  to `20261116000000_report_auto_hide.sql` (64), after a merge of `main` that kept migration 62's
+  story branches in the two Trust & Safety functions it replaces. **64 is not on production**: the
+  admin app's Flagged page says "Database update needed" until it is applied (status.md).
+
 ## Retired branches
 
-None deleted yet. When a branch is merged and deleted, add a line here (name, what it delivered,
-its PRs) and delete its file in `branches/`.
+When a branch is merged and deleted, add a line here (name, what it delivered, its PRs) and delete
+its file in `branches/`.
+
+- `auto-hide-reports` (Yubraj, 2026-10-28 to 2026-11-03): the report auto-hide backstop, migration 64
+  and its PGlite suite, the console's limitation note U1. PR #53. Deleted after the merge.
