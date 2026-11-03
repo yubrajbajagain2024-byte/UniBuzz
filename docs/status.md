@@ -289,13 +289,6 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 - **Security fix pending.** A security fix for a live part of the database is ready on a local,
   unpushed branch (2026-10-27) and is **not applied to production**. Its details stay out of this
   repository until production is patched, because the repository is public.
-- **Apply migration 64, report auto-hide (merged in PR #53, 2026-11-03; not on production).** Content
-  10 different legitimate people report is hidden, flagged for review in CampConnect Admin's Flagged
-  page, its owner told and the hide audited. The code is deployed; the admin app shows "Database
-  update needed" on Flagged until the migration is live. Needs the owner's approval, then: a full
-  backup, a read-only `verify.mjs --live`, the file in one transaction with its `_migrations` row,
-  `notify pgrst, 'reload schema'`; check `report_auto_hides`, its triggers and the `admin_auto_*`
-  functions after, and record it in docs/migrations.md (its row says how). Rehearsed offline only.
 - **Decide and merge `step-admin`.** `admin-analytics-business` (draft PR #60) brings its app, scripts, suites,
   README section and website hunks to `main`'s tree (as of 2026-10-31); what still waits is its migration files'
   placement, production's `_migrations` rows, migration 18 and the `hidden_at` message types: the owner's questions
