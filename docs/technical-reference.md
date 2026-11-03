@@ -454,3 +454,27 @@ npx supabase gen types typescript --project-id <your-project-ref> > packages/sha
 ## Ideas for later
 
 Map view with pins (Google Maps or Mapbox), university email verification badges, reporting/blocking users, saved searches with email alerts, push notifications, ratings for sellers, and an admin dashboard for moderation.
+
+## CampConnect Admin: sections
+
+The admin app (`apps/admin`) is organised in nine sections, defined once in `apps/admin/src/lib/sections.ts` and
+rendered by the sidebar (`components/shell/admin-nav.tsx`: title and what the section holds) and by the tab strip under
+each page title (`components/shell/section-tabs.tsx`). A section is a grouping of existing routes, not a route: every
+page keeps its path, so deep links and the browser check (`apps/admin/e2e/admin.mjs`) still work.
+
+| Section | Pages | Reads and writes |
+| --- | --- | --- |
+| Dashboard `/` | KPIs, alerts (failing media jobs, failing feeds, staff without a second factor, the last owner, an ad over 48 h in review), pending decisions (reports, auto-hidden items, appeals, organizations, businesses, ads) | migrations 16, 41 (`console_queue_counts`), 61 (`events_console_counts`), 63 (`console_business_overview`, admins with the business role), 64 |
+| Users `/users` | Accounts, Suspensions, Verification (`?filter=unverified`: email unconfirmed or campus unset; migration 65), Staff accounts | `admin_users_list` |
+| Moderation | Reports `/reports`, Appeals `/appeals` (blind review: `console_appeals`, `console_decide_appeal`; never one's own action; suspensions and bans for admins), Automatic hiding `/flagged` | migrations 15, 16, 41, 64 |
+| Content | Hidden content `/content`, Events `/events` (hide, cancel, restore: `events_console_events`, `events_console_set_event`) | migrations 16, 61 |
+| Business & Ads `/business` | unchanged (its own tabs) | migration 63 and Business v2 |
+| Analytics `/analytics` | unchanged (Platform = growth and engagement, Ads, Revenue) | migration 63 |
+| Operations | Media jobs `/media`, System health `/operations/health` (`console_system_health`, migration 65), Email `/operations/email` (whether invitations can be sent, the invitations and their emails) | CampConnect Admin's media and staff functions, migration 65 |
+| Support | Requests `/support` (organizations awaiting verification: `events_console_organizations`, `events_console_set_organization`; businesses and appeals counted), Appeals, Issues `/support/issues` (failing media jobs, calendar feeds failing to sync) | migrations 15, 61, 63 |
+| Administration | Staff `/staff`, Audit log `/audit`, Security `/security`, Settings `/settings` (admins: the Buzz rule packs through `console_rule_packs` / `console_set_rule_pack`; the sign-up domains, read-only; where the rest lives) | migrations 14, 15, 41 |
+
+The staff console functions are called through `apps/admin/src/lib/console/server.ts` (reads) and
+`lib/console/staff-actions.ts` (writes, each checked in the app and again in SQL, where the audit rows are written).
+A page whose function the database lacks shows "Database update needed" with the migration's name instead of failing.
+

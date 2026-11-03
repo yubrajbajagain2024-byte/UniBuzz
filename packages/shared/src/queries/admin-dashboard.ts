@@ -48,7 +48,8 @@ export async function getOverviewStats(supabase: Client): Promise<OverviewStats>
   };
 }
 
-export type UsersFilter = "all" | "suspended" | "staff";
+/** "unverified" (email unconfirmed or campus unset) needs migration 65; older databases refuse it with "Invalid filter". */
+export type UsersFilter = "all" | "suspended" | "staff" | "unverified";
 
 /** Browse people newest first (moderator+, aal2). Pass the oldest createdAt you have as `before` for older rows. Up to 200. */
 export async function listUsers(supabase: Client, opts: { filter?: UsersFilter; limit?: number; before?: string | null } = {}): Promise<AdminUserRow[]> {

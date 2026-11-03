@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Building2, EyeOff, Film, Flag, MessagesSquare, ShieldCheck, UserCog, Users, UserX } from "lucide-react";
+import { AlertTriangle, ArrowRight, BadgeCheck, Building2, CheckCircle2, EyeOff, Film, Flag, Megaphone, MessagesSquare, Scale, ShieldCheck, UserCog, Users, UserX } from "lucide-react";
 import {
   getAutoHiddenCounts,
   getMediaJobStats,
@@ -13,9 +13,10 @@ import {
   STAFF_ROLES,
   type OverviewStats,
 } from "@apartment-book/shared";
-import { requireStaff } from "@/lib/admin";
+import { hasRole, requireStaff } from "@/lib/admin";
 import { getCurrentProfile, getCurrentUser } from "@/lib/auth";
 import { PRODUCT_NAME } from "@/lib/brand";
+import { fetchBusinessOpsOverview, fetchEventsCounts, fetchQueueCounts, hasBusinessRole, maybeDeployed } from "@/lib/console/server";
 import { createClient } from "@/lib/supabase/server";
 import { firstParam, plural } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
@@ -29,7 +30,7 @@ import { ReportRowSummary } from "@/components/reports/report-list";
 import { PageHeader } from "@/components/shell/page-header";
 import { RoleBadge } from "@/components/staff/role-badge";
 
-export const metadata: Metadata = { title: "Overview" };
+export const metadata: Metadata = { title: "Dashboard" };
 
 const cardLink = "inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline";
 
@@ -56,7 +57,8 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       throw error;
     },
   );
-  const [user, profile, openReports, media, staff, recent, suspended] = await Promise.all([
+  const admin = hasRole(access, "admin");
+  const [user, profile, openReports, media, staff, recent, suspended, queue, events, business] = await Promise.all([
     getCurrentUser(),
     getCurrentProfile(),
     listReports(supabase, { status: "open", limit: 5 }),
@@ -64,14 +66,35 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     listStaff(supabase),
     listAuditLog(supabase, { limit: 8 }),
     stats ? [] : listRestrictions(supabase, { activeOnly: true, limit: 200 }),
+    // Trust & Safety's queue counts (appeals), the events console's (organizations, feeds) and, for admins who run
+    // businesses, what waits under Business: each null where the database does not have the function.
+    maybeDeployed(fetchQueueCounts()),
+    maybeDeployed(fetchEventsCounts()),
+    admin && (await hasBusinessRole()) ? maybeDeployed(fetchBusinessOpsOverview()) : Promise.resolve(null),
   ]);
+  const staffWithoutFactor = staff.filter((m) => m.mfaEnrolled === false).length;
+
+  // Alerts: something is wrong or at risk. Pending decisions: someone is waiting for the team.
+  const alerts: { tone: "red" | "amber"; text: string; href: string }[] = [];
+  if (media.failing > 0) alerts.push({ tone: "red", text: `${plural(media.failing, "media job")} failing`, href: "/support/issues" });
+  if (events && events.feeds_failing > 0) alerts.push({ tone: "red", text: `${plural(events.feeds_failing, "calendar feed")} failing to sync`, href: "/support/issues" });
+  if (staffWithoutFactor > 0) alerts.push({ tone: "amber", text: `${plural(staffWithoutFactor, "staff member")} without a second factor`, href: "/staff" });
+  if (access.lastOwner) alerts.push({ tone: "amber", text: "You are the only owner", href: "/staff" });
+  if (business && business.ads.oldestInReviewAt && business.generatedAt - business.ads.oldestInReviewAt > 48 * 3_600_000) alerts.push({ tone: "amber", text: "An ad has waited over 48 hours for review", href: "/business/campaigns" });
+  const decisions: { count: number; label: string; href: string; icon: typeof Flag }[] = [
+    { count: stats?.reportsOpen ?? openReports.length, label: "open reports", href: "/reports", icon: Flag },
+    { count: flaggedPending ?? 0, label: "items hidden by reports, waiting for review", href: "/flagged", icon: EyeOff },
+    { count: queue?.appeals ?? 0, label: "open appeals", href: "/appeals", icon: Scale },
+    { count: events?.organizations_pending ?? 0, label: "organizations awaiting verification", href: "/support", icon: BadgeCheck },
+    ...(business ? [{ count: business.businesses.pending, label: "businesses awaiting review", href: "/business/advertisers?status=pending", icon: Building2 }, { count: business.ads.inReview, label: "ads in review", href: "/business/campaigns", icon: Megaphone }] : []),
+  ].filter((d) => d.count > 0);
   const name = profile?.full_name || user?.email?.split("@")[0] || "You";
   const myRole = STAFF_ROLES.find((r) => r.value === access.role);
   const reportsOpen = stats?.reportsOpen ?? openReports.length;
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="Overview" description={`What needs attention on ${PRODUCT_NAME} right now. Everything here changes the same database the website and the app read.`} />
+      <PageHeader title="Dashboard" description={`What needs attention on ${PRODUCT_NAME} right now: the numbers, what is wrong, and who is waiting for a decision. Everything here changes the same database the website and the app read.`} />
       {denied ? <FormMessage error={`That page needs the ${denied.label.toLowerCase()} role.`} /> : null}
       {needsMigration ? <SetupNotice migration="16" what="The overview counts, people browsing and the hidden-content list" /> : null}
 
@@ -91,6 +114,60 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         <StatCard label="Listings" value={stats?.listingsTotal ?? "–"} hint="apartments, items and roommate posts" icon={Building2} />
         <StatCard label="Posts and Buzz" value={stats ? `${stats.postsTotal} · ${stats.buzzTotal}` : "–"} hint="posts and reels · Buzz threads" icon={MessagesSquare} />
         <StatCard label="Staff" value={staff.length} hint={STAFF_ROLES.map((r) => `${staff.filter((m) => m.role === r.value).length} ${r.label.toLowerCase()}`).join(" · ")} href="/staff" icon={UserCog} tone="brand" />
+      </div>
+
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Alerts</CardTitle>
+          </CardHeader>
+          {alerts.length === 0 ? (
+            <CardBody className="flex items-center gap-2 text-sm text-gray-600">
+              <CheckCircle2 className="h-4 w-4 text-green-600" aria-hidden="true" />
+              Nothing is failing: media jobs, calendar feeds and staff second factors are all in order.
+            </CardBody>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {alerts.map((a) => (
+                <li key={a.text}>
+                  <Link href={a.href} className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-gray-50">
+                    <AlertTriangle className={`h-4 w-4 shrink-0 ${a.tone === "red" ? "text-red-600" : "text-amber-600"}`} aria-hidden="true" />
+                    <span className="flex-1 text-gray-900">{a.text}</span>
+                    <ArrowRight className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending decisions</CardTitle>
+          </CardHeader>
+          {decisions.length === 0 ? (
+            <CardBody className="flex items-center gap-2 text-sm text-gray-600">
+              <CheckCircle2 className="h-4 w-4 text-green-600" aria-hidden="true" />
+              Nobody is waiting for the team.
+            </CardBody>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {decisions.map((d) => {
+                const Icon = d.icon;
+                return (
+                  <li key={d.href}>
+                    <Link href={d.href} className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-gray-50">
+                      <Icon className="h-4 w-4 shrink-0 text-brand-600" aria-hidden="true" />
+                      <span className="flex-1 text-gray-900">
+                        <span className="font-semibold tabular-nums">{d.count}</span> {d.label}
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">

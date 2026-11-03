@@ -41,7 +41,7 @@ async function newPage() { const ctx = await browser.newContext({ viewport: { wi
 try {
   const D = await newPage();
   await step("signed out: every page goes to /login with next= pointing back", async () => {
-    for (const path of ["/", "/users", "/reports", "/flagged", "/content", "/media", "/staff", "/audit", "/security"]) { await D.goto(BASE + path); await D.waitForURL((u) => u.pathname === "/login"); expectLogin(D, path); }
+    for (const path of ["/", "/users", "/reports", "/appeals", "/flagged", "/content", "/events", "/media", "/operations/health", "/operations/email", "/support", "/support/issues", "/staff", "/audit", "/security", "/settings"]) { await D.goto(BASE + path); await D.waitForURL((u) => u.pathname === "/login"); expectLogin(D, path); }
     await D.waitForLoadState("networkidle"); await D.getByRole("heading", { name: "CampConnect Admin" }).waitFor();
     if (await D.getByText(/create an account/i).count()) throw new Error("a sign-up link is offered");
     await D.screenshot({ path: SHOTS + "admin-01-login.png" });
@@ -84,8 +84,8 @@ try {
         await code.fill(totp(process.env.ADMIN_E2E_TOTP_SECRET)); await code.press("Enter");
         // The code's verification sets the aal2 session cookie and the action redirects to the page asked for: wait for that page.
         await D.getByRole("heading", { name: "Reports", exact: true }).first().waitFor(); await D.screenshot({ path: SHOTS + "admin-04-reports.png" });
-        const pages = [["/", "Overview"], ["/users", "Users"], ["/flagged", "Flagged"], ["/content", "Content"], ["/media", "Media"], ["/staff", "Staff"], ["/audit", "Audit log"]];
-        for (const [path, heading] of pages) { await D.goto(BASE + path); await D.getByRole("heading", { name: heading, exact: true }).first().waitFor(); await D.screenshot({ path: SHOTS + `admin-05${path.replace(/\//g, "-") || "-overview"}.png` }); }
+        const pages = [["/", "Dashboard"], ["/users", "Users"], ["/users?filter=unverified", "Users"], ["/appeals", "Appeals"], ["/flagged", "Flagged"], ["/content", "Content"], ["/events", "Events"], ["/media", "Media"], ["/operations/health", "System health"], ["/operations/email", "Email"], ["/support", "Support"], ["/support/issues", "Issues"], ["/staff", "Staff"], ["/audit", "Audit log"]];
+        for (const [path, heading] of pages) { await D.goto(BASE + path); await D.getByRole("heading", { name: heading, exact: true }).first().waitFor(); await D.screenshot({ path: SHOTS + `admin-05${path.replace(/[\/?=]/g, "-") || "-dashboard"}.png` }); }
       });
       await step("Analytics and Business: shown to owners and admins only, and every view renders", async () => {
         await D.goto(BASE + "/"); await D.waitForLoadState("networkidle");
@@ -95,7 +95,7 @@ try {
         if (/moderator/.test(role)) { if (shown) throw new Error("a moderator sees Business"); note("Analytics and Business skipped: this account is a moderator"); return; }
         if (!shown) throw new Error("no Business link for an owner or admin");
         const views = ["/analytics", "/analytics?view=ads", "/analytics?view=revenue&range=90", "/business", "/business/advertisers", "/business/campaigns", "/business/campaigns?status=all",
-          "/business/payments", "/business/pricing", "/business/reports", "/business/audit"];
+          "/business/payments", "/business/pricing", "/business/reports", "/business/audit", "/settings"];
         for (const path of views) {
           const res = await D.goto(BASE + path); await D.waitForLoadState("networkidle");
           const text = await D.locator("main").innerText();

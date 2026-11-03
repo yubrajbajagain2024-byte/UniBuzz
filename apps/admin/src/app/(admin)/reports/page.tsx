@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listReports, type ReportStatus } from "@apartment-book/shared";
-import { requireStaff } from "@/lib/admin";
+import { hasRole, requireStaff } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/server";
 import { cn, firstParam } from "@/lib/utils";
 import { ReportList } from "@/components/reports/report-list";
 import { PageHeader } from "@/components/shell/page-header";
+import { SectionTabs } from "@/components/shell/section-tabs";
 
 export const metadata: Metadata = { title: "Reports" };
 
@@ -17,7 +18,7 @@ const TABS: { value: ReportStatus | "all"; label: string }[] = [
 ];
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  await requireStaff("/reports");
+  const access = await requireStaff("/reports");
   const params = await searchParams;
   const requested = firstParam(params.status);
   const status = TABS.find((t) => t.value === requested)?.value ?? "open";
@@ -26,6 +27,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Reports" description="What people flagged on the website and in the app. Open the report to see the content, act on it and record a decision." />
+      <SectionTabs section="moderation" admin={hasRole(access, "admin")} />
       <nav aria-label="Report status" className="flex gap-1 overflow-x-auto rounded-lg bg-gray-200/60 p-1">
         {TABS.map((tab) => (
           <Link
