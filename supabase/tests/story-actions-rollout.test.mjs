@@ -25,9 +25,13 @@ const REST = [
   "20261110000000_business_hours.sql",
   "20261115000000_console_business.sql",
 ];
+// Migrations written after 62 went live (2026-11-02), left out so the rehearsal keeps to production's state as it
+// was; 64 replaces ts_snapshot() and ts_set_content_status() again, so 62's rollback would not restore its schema
+// under it (rollbacks run newest first).
+const AHEAD = ["20261116000000_report_auto_hide.sql"];
 const check = (cond, message) => { if (!cond) throw new Error(message); };
 
-const { db, mk, as } = await boot({ live: true, skip: [...REST, ACTIONS] });
+const { db, mk, as } = await boot({ live: true, skip: [...REST, ACTIONS, ...AHEAD] });
 const one = async (p) => (await p).rows[0];
 const rows = async (p) => (await p).rows;
 const val = async (q, params = []) => { const r = await one(db.query(q, params)); return r[Object.keys(r)[0]]; };
@@ -76,7 +80,7 @@ await expectOk("62's rollback (story cards and reports deleted first) leaves exa
   await db.query("delete from public.messages where shared_post ->> 'target_type' = 'story'");
   await db.query("delete from public.reports where target_type = 'story'");
   await db.exec(read(ROLLBACK));
-  const reference = await boot({ live: true, skip: [ACTIONS] });
+  const reference = await boot({ live: true, skip: [ACTIONS, ...AHEAD] });
   const changed = diffCatalogs(await catalog(async (q) => (await reference.db.query(q)).rows), await catalog(async (q) => (await db.query(q)).rows));
   await reference.db.close();
   check(changed.length === 0, changed.join("; "));
