@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
-import { ADS_EVERY, adSlotCount, getPostEngagementMany, getPostPreviewsMany, homeSectionHref, interleaveAds, listFeedAds, listForYou, type FeedAd, type ForYouFilters, type ForYouItem, type PostEngagement, type PostPreview } from "@apartment-book/shared";
+import { ADS_EVERY, ADS_FIRST_AFTER, adSlotCount, getPostEngagementMany, getPostPreviewsMany, homeSectionHref, interleaveAds, listFeedAds, listForYou, type FeedAd, type ForYouFilters, type ForYouItem, type PostEngagement, type PostPreview } from "@apartment-book/shared";
 import { createClient } from "@/lib/supabase/client";
 import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -47,8 +47,9 @@ export function ForYouFeed({ initial, hasMore: initialHasMore, filters, savedIds
   const busy = useRef(false);
   const page = useRef(1);
   const saved = new Set(savedIds);
-  // Sponsored posts: at most one after every ADS_EVERY posts, only as many as the feed has room for, in the campus's
-  // daily rotation (the database picks them by campus alone). Signed-out visitors get none.
+  // Sponsored posts: the first after ADS_FIRST_AFTER posts (or at the end of a shorter feed), then at most one after
+  // every ADS_EVERY, only as many as the feed has room for, in the campus's daily rotation (the database picks them by
+  // campus alone). Signed-out visitors get none.
   const [ads, setAds] = useState<FeedAd[]>([]);
   const adsDone = useRef(false);
   const adsBusy = useRef(false);
@@ -123,7 +124,7 @@ export function ForYouFeed({ initial, hasMore: initialHasMore, filters, savedIds
 
   useEffect(() => {
     if (!signedIn || adsDone.current || adsBusy.current) return;
-    const need = adSlotCount(items.length, ADS_EVERY) - ads.length;
+    const need = adSlotCount(items.length, ADS_EVERY, { first: ADS_FIRST_AFTER, ended: !hasMore }) - ads.length;
     if (need <= 0) return;
     adsBusy.current = true;
     listFeedAds(createClient(), "for_you", need, ads.length)
@@ -134,7 +135,7 @@ export function ForYouFeed({ initial, hasMore: initialHasMore, filters, savedIds
       .finally(() => {
         adsBusy.current = false;
       });
-  }, [items.length, ads.length, signedIn]);
+  }, [items.length, ads.length, signedIn, hasMore]);
 
   const filtered = Boolean(filters.universityId);
   const everyCampus = homeSectionHref("foryou", { university: "all" });
@@ -170,7 +171,7 @@ export function ForYouFeed({ initial, hasMore: initialHasMore, filters, savedIds
         </div>
       ) : (
         <>
-          {interleaveAds(items, ads, ADS_EVERY).map((row) =>
+          {interleaveAds(items, ads, ADS_EVERY, { first: ADS_FIRST_AFTER, ended: !hasMore }).map((row) =>
             row.kind === "ad" ? (
               <SponsoredPost key={`ad-${row.ad.id}`} ad={row.ad} />
             ) : (

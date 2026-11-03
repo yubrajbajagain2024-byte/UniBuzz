@@ -383,8 +383,8 @@ release is **44, 46 and 49 to 57**, eleven files.
    Preview key decision. (The fourth-round PR is merged: #52.)
 3. When everything is live, update the rows in migrations.md, move a short summary of this file to
    docs/history.md, and delete the file.
-4. **Mobile Reels ads.** The app's Reels pager has fixed-height pages and its own viewer, so it does not show ads yet.
-   The website does.
+4. **Mobile Reels ads.** Done on `ads-delivery` (2026-11-03): a Sponsored reel is a page of its own in the app's Reels
+   pager, as on the website.
 5. **Saved ads on the Saved page.** `my_saved_ads()` and `listSavedAds()` exist; no screen lists them yet.
 6. **Email and push for business notifications.** Today they appear in the portal only. Push reaches a business account
    only if it ever signed in on the app.

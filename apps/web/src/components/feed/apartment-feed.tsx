@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ADS_EVERY, adSlotCount, formatDistance, formatPrice, inquiryPrefill, interleaveAds, isVerifiedPoster, listApartments, listFeedAds, listingMedia, listingPoster, businessLabel, type ApartmentFilters, type ApartmentWithOwner, type FeedAd } from "@apartment-book/shared";
+import { ADS_EVERY, ADS_FIRST_AFTER, adSlotCount, formatDistance, formatPrice, inquiryPrefill, interleaveAds, isVerifiedPoster, listApartments, listFeedAds, listingMedia, listingPoster, businessLabel, type ApartmentFilters, type ApartmentWithOwner, type FeedAd } from "@apartment-book/shared";
 import { createClient } from "@/lib/supabase/client";
 import { PostCard } from "@/components/posts/post-card";
 import { PostFeed } from "@/components/posts/post-feed";
@@ -31,13 +31,14 @@ export function ApartmentFeed({
   const load = useCallback(async (page: number) => (await listApartments(createClient(), { ...filters, page })).data, [filters]);
   const feed = useInfinitePages({ initial, totalPages, load });
   const saved = new Set(savedIds);
-  // Housing ads (only housing ads run here): at most one after every ADS_EVERY listings, for the student's campus.
+  // Housing ads (only housing ads run here): the first after ADS_FIRST_AFTER listings (or at the end of a shorter feed),
+  // then at most one after every ADS_EVERY, for the student's campus.
   const [ads, setAds] = useState<FeedAd[]>([]);
   const adsDone = useRef(false);
   const adsBusy = useRef(false);
   useEffect(() => {
     if (!signedIn || adsDone.current || adsBusy.current) return;
-    const need = adSlotCount(feed.items.length, ADS_EVERY) - ads.length;
+    const need = adSlotCount(feed.items.length, ADS_EVERY, { first: ADS_FIRST_AFTER, ended: feed.done }) - ads.length;
     if (need <= 0) return;
     adsBusy.current = true;
     listFeedAds(createClient(), "housing", need, ads.length)
@@ -48,8 +49,8 @@ export function ApartmentFeed({
       .finally(() => {
         adsBusy.current = false;
       });
-  }, [feed.items.length, ads.length, signedIn]);
-  const rows: (ApartmentWithOwner | { id: string; ad: FeedAd })[] = interleaveAds(feed.items, ads, ADS_EVERY).map((r) => (r.kind === "ad" ? { id: `ad-${r.ad.id}`, ad: r.ad } : r.item));
+  }, [feed.items.length, ads.length, signedIn, feed.done]);
+  const rows: (ApartmentWithOwner | { id: string; ad: FeedAd })[] = interleaveAds(feed.items, ads, ADS_EVERY, { first: ADS_FIRST_AFTER, ended: feed.done }).map((r) => (r.kind === "ad" ? { id: `ad-${r.ad.id}`, ad: r.ad } : r.item));
 
   return (
     <PostFeed
