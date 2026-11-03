@@ -147,6 +147,261 @@ export function canManageMember(myRole: string | null | undefined, theirRole: st
   return them !== "admin" || me === "owner";
 }
 
+// --- The portal's sidebar -----------------------------------------------------------------------------------------
+
+/** The portal's sections, top to bottom; Settings sits apart at the bottom of the sidebar. The inbox comes right after
+ * Overview: students waiting for an answer come first. */
+export const PORTAL_SECTIONS = ["overview", "inbox", "ads", "products", "analytics", "billing"] as const;
+export type PortalSection = (typeof PORTAL_SECTIONS)[number];
+
+/**
+ * Who sees Billing: the owner and admins, who decide ad spend, and analysts, who read the numbers. Editors draft ads
+ * but never pay for them. (Every member can read the business's payments in the database; this keeps the portal lean.)
+ */
+export function canSeeBilling(role: string | null | undefined): boolean {
+  return teamRoleAllows(role, "manage_ads") || teamRoleOf(role) === "analyst";
+}
+
+/**
+ * The sections a member's sidebar shows, in PORTAL_SECTIONS's order, and whether Settings is there: everything their
+ * role allows, whether the business is approved or still pending (a pending business's inbox says it opens on
+ * approval, since students write only to an approved business); when it is rejected, the front page and Settings (to
+ * fix the profile); when suspended, nothing. Analysts never get the inbox: they do not read students' messages.
+ */
+export function portalSectionsFor(business: { role: string | null | undefined; standing: BusinessStanding }): { main: PortalSection[]; settings: boolean } {
+  if (business.standing === "suspended") return { main: [], settings: false };
+  if (business.standing === "rejected") return { main: ["overview"], settings: true };
+  const main = PORTAL_SECTIONS.filter((s) => {
+    if (s === "inbox") return teamRoleAllows(business.role, "reply");
+    if (s === "billing") return canSeeBilling(business.role);
+    return true;
+  });
+  return { main, settings: true };
+}
+
+/**
+ * What a complete business profile has, as Settings › Verification lists it: the UniBuzz team reads the profile first
+ * when it reviews a business and when it decides on Verified Partner.
+ */
+export function businessProfileChecklist(b: {
+  logo_url: string | null;
+  description: string | null;
+  website: string | null;
+  address: string | null;
+  city: string | null;
+  contact_email: string | null;
+  phone: string | null;
+  university_ids: string[];
+}): { key: string; label: string; done: boolean }[] {
+  return [
+    { key: "logo", label: "A logo", done: Boolean(b.logo_url) },
+    { key: "description", label: "A description of at least 40 characters", done: (b.description ?? "").trim().length >= 40 },
+    { key: "website", label: "A website", done: Boolean(b.website) },
+    { key: "place", label: "Where you are: an address or a city", done: Boolean(b.address || b.city) },
+    { key: "contact", label: "A way to reach you: an email or a phone number", done: Boolean(b.contact_email || b.phone) },
+    { key: "campuses", label: "The campuses you serve", done: b.university_ids.length > 0 },
+  ];
+}
+
+// --- The inbox --------------------------------------------------------------------------------------------------------
+
+/** What a student opened an inquiry from (conversations.inquiry_target_type): a listing, a post, an ad or the profile. */
+export type InquiryKind = "listing" | "post" | "ad" | "profile";
+export function inquiryKindOf(targetType: string | null | undefined): InquiryKind | null {
+  switch (targetType) {
+    case "apartment":
+      return "listing";
+    case "deal":
+      return "post";
+    case "ad":
+      return "ad";
+    case "business":
+      return "profile";
+    default:
+      return null;
+  }
+}
+export function inquiryKindLabel(kind: InquiryKind): string {
+  return { listing: "Listing", post: "Post", ad: "Ad", profile: "Your profile" }[kind];
+}
+
+/**
+ * Waiting for the business: the student wrote last. A chat appears in the inbox only once the student has written
+ * (migration 56), so there is always a student message somewhere in it.
+ */
+export function inquiryNeedsReply(lastSenderId: string | null | undefined, teamIds: ReadonlySet<string>): boolean {
+  return Boolean(lastSenderId) && !teamIds.has(lastSenderId as string);
+}
+
+/** A new message as an alert shows it: its words, or what it carries. */
+export function inquiryMessagePreview(m: { content?: string | null; image_url?: string | null; attachments?: unknown; shared_post?: unknown }): string {
+  const text = (m.content ?? "").replace(/\s+/g, " ").trim();
+  if (text) return text.length > 120 ? `${text.slice(0, 119)}…` : text;
+  if (Array.isArray(m.attachments) && m.attachments.length) return "Sent an attachment";
+  if (m.image_url) return "Sent a photo";
+  if (m.shared_post) return "Shared a post";
+  return "Sent a message";
+}
+
+/** The inbox's filters, in the order the inbox shows them. */
+export const INQUIRY_FILTERS = [
+  { value: "all", label: "All" },
+  { value: "unread", label: "Unread" },
+  { value: "needs_reply", label: "Needs reply" },
+  { value: "listing", label: "Listings" },
+  { value: "post", label: "Posts" },
+  { value: "ad", label: "Ads" },
+  { value: "profile", label: "Profile" },
+] as const;
+export type InquiryFilter = (typeof INQUIRY_FILTERS)[number]["value"];
+
+/** Whether an inquiry shows under a filter and a search (the student's name, the message, or what it is about). */
+export function inquiryMatches(
+  inquiry: { unreadCount: number; needsReply: boolean; kind: InquiryKind | null; text: string },
+  filter: InquiryFilter,
+  query = "",
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (q && !inquiry.text.toLowerCase().includes(q)) return false;
+  if (filter === "all") return true;
+  if (filter === "unread") return inquiry.unreadCount > 0;
+  if (filter === "needs_reply") return inquiry.needsReply;
+  return inquiry.kind === filter;
+}
+
+/** A message as Realtime delivers it to the inbox (the columns the list needs). */
+export type InboxMessageEvent = { conversation_id: string; sender_id: string | null; created_at: string; content?: string | null; image_url?: string | null; attachments?: unknown; shared_post?: unknown };
+
+/** One row of the inbox's list, as far as a message or a read receipt changes it. */
+export type InboxRow = {
+  conversation: Pick<ConversationSummary, "id" | "lastMessageAt" | "lastMessagePreview" | "unreadCount">;
+  needsReply: boolean;
+  lastBy: string | null;
+};
+
+const timeOf = (iso: string | null | undefined) => (iso ? new Date(iso).getTime() : 0);
+
+/**
+ * The inbox's list after a message, applied in the browser without asking the server: the chat moves to the top with
+ * the message as its preview; who wrote it decides "Needs reply" (a student) and "You:" or the teammate's first name;
+ * and the unread count grows for anyone else's message unless that chat is open on screen (opening it marks it read).
+ * `team` maps every member's id, the viewer's included, to their first name. Null when the chat is not in the list yet
+ * (a student's first message): then only the server knows what it is about. A message older than the chat's newest
+ * (one delivered late) changes nothing.
+ */
+export function inboxAfterMessage<T extends InboxRow>(rows: T[], message: InboxMessageEvent, me: { userId: string; team: ReadonlyMap<string, string>; openConversationId: string | null }): T[] | null {
+  const index = rows.findIndex((r) => r.conversation.id === message.conversation_id);
+  if (index < 0) return null;
+  const row = rows[index];
+  const c = row.conversation;
+  if (c.lastMessageAt && timeOf(message.created_at) < timeOf(c.lastMessageAt)) return rows;
+  const mine = message.sender_id === me.userId;
+  const teammate = Boolean(message.sender_id && me.team.has(message.sender_id));
+  const next: T = {
+    ...row,
+    conversation: {
+      ...c,
+      lastMessageAt: message.created_at,
+      lastMessagePreview: inquiryMessagePreview(message),
+      unreadCount: mine || message.conversation_id === me.openConversationId ? c.unreadCount : c.unreadCount + 1,
+    },
+    needsReply: !mine && !teammate && Boolean(message.sender_id),
+    lastBy: mine ? "You" : teammate ? (me.team.get(message.sender_id as string) ?? null) : null,
+  };
+  return [next, ...rows.slice(0, index), ...rows.slice(index + 1)];
+}
+
+/**
+ * The inbox's list after the viewer's own membership row changed (they read the chat, here or on another device): its
+ * unread count is 0 once they have read up to its newest message. Any other change to the row (delivery times) leaves
+ * the list as it is.
+ */
+export function inboxAfterRead<T extends InboxRow>(rows: T[], membership: { conversation_id: string; last_read_at: string | null }): T[] {
+  const index = rows.findIndex((r) => r.conversation.id === membership.conversation_id);
+  if (index < 0) return rows;
+  const row = rows[index];
+  if (row.conversation.unreadCount === 0 || timeOf(membership.last_read_at) < timeOf(row.conversation.lastMessageAt)) return rows;
+  const next: T = { ...row, conversation: { ...row.conversation, unreadCount: 0 } };
+  return [...rows.slice(0, index), next, ...rows.slice(index + 1)];
+}
+
+/**
+ * Whether the inbox's list, rendered by the server, already reflects the newest message the portal saw arrive while
+ * open (inbox-live.ts). False when it does not: the list is from before that message and should be read again. With
+ * no message seen there is nothing to check.
+ */
+export function inboxReflects(rows: readonly InboxRow[], last: { conversationId: string; createdAt: string } | null): boolean {
+  if (!last) return true;
+  const row = rows.find((r) => r.conversation.id === last.conversationId);
+  return Boolean(row) && timeOf(row?.conversation.lastMessageAt) >= timeOf(last.createdAt);
+}
+
+// --- Billing --------------------------------------------------------------------------------------------------------
+
+/** How a payment stands: running now, not started, over, or cancelled by the UniBuzz team. */
+export type PaymentStanding = "active" | "upcoming" | "ended" | "cancelled";
+export function paymentStanding(p: { status: string; starts_at: string; ends_at: string }, now: number = Date.now()): PaymentStanding {
+  if (p.status === "cancelled") return "cancelled";
+  if (new Date(p.ends_at).getTime() <= now) return "ended";
+  return new Date(p.starts_at).getTime() > now ? "upcoming" : "active";
+}
+
+export function paymentStandingLabel(s: PaymentStanding): string {
+  return { active: "Running", upcoming: "Scheduled", ended: "Ended", cancelled: "Cancelled" }[s];
+}
+
+/** Money by currency (a business may have paid in more than one), as "$120 + €40". */
+export type MoneyByCurrency = Record<string, number>;
+export function formatMoneyByCurrency(totals: MoneyByCurrency): string {
+  const parts = Object.entries(totals).filter(([, cents]) => cents > 0).map(([currency, cents]) => formatCents(cents, currency));
+  return parts.length ? parts.join(" + ") : formatCents(0);
+}
+
+/**
+ * What a business has paid, counting payments by when the UniBuzz team recorded them; cancelled ones count in none
+ * of the totals. `thisMonth` is the calendar month of `now` (UTC), `last30` the 30 days up to it.
+ */
+export function paymentTotals(payments: { status: string; amount_cents: number; currency: string; created_at: string; starts_at: string; ends_at: string }[], now: number = Date.now()): {
+  thisMonth: MoneyByCurrency;
+  last30: MoneyByCurrency;
+  allTime: MoneyByCurrency;
+  running: number;
+} {
+  const out = { thisMonth: {} as MoneyByCurrency, last30: {} as MoneyByCurrency, allTime: {} as MoneyByCurrency, running: 0 };
+  const d = new Date(now);
+  const monthStart = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+  const add = (into: MoneyByCurrency, currency: string, cents: number) => {
+    into[currency] = (into[currency] ?? 0) + cents;
+  };
+  for (const p of payments) {
+    if (p.status === "cancelled") continue;
+    const at = new Date(p.created_at).getTime();
+    add(out.allTime, p.currency, p.amount_cents);
+    if (at >= monthStart && at <= now) add(out.thisMonth, p.currency, p.amount_cents);
+    if (at > now - 30 * 864e5 && at <= now) add(out.last30, p.currency, p.amount_cents);
+    if (paymentStanding(p, now) === "active") out.running += 1;
+  }
+  return out;
+}
+
+/**
+ * A CSV of payments for a spreadsheet: one row each, the amount in the currency's units. A cell that a spreadsheet
+ * would run as a formula (starting with =, +, -, @ or a tab) is written as text, since ad and listing names are the
+ * business's own words.
+ */
+export function paymentsCsv(rows: { recorded_at: string; reference: string; paid_for: string; starts_at: string; ends_at: string; amount_cents: number; currency: string; status: string }[]): string {
+  const cell = (v: string) => {
+    const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+    return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  };
+  const day = (iso: string) => iso.slice(0, 10);
+  const lines = [["Recorded", "Reference", "Paid for", "From", "To", "Amount", "Currency", "Status"].join(",")];
+  for (const r of rows) {
+    lines.push([day(r.recorded_at), r.reference, r.paid_for, day(r.starts_at), day(r.ends_at), (r.amount_cents / 100).toFixed(2), r.currency, r.status].map((v) => cell(String(v))).join(","));
+  }
+  return lines.join("\r\n") + "\r\n";
+}
+
 // --- UniBuzz Business v2: ads ------------------------------------------------------------------------------------
 
 /** An ad's status as it stands now, whether or not the database's sweep has run since its dates came (ad_effective_status()). */

@@ -740,6 +740,8 @@ function Chat({
       sender_id: userId,
       content: body,
       image_url: null,
+      hidden_at: null,
+      hidden_reason: null,
       shared_post: null,
       attachments: [],
       reply_to: answering ? replySnapshotOf(answering) : null,
@@ -924,7 +926,8 @@ function Chat({
 
   // ---------------------------------------------------------------------------
   // Calls: the bar's Audio call and Video call, a call's row tapped (call back, or join), and the banner for a call
-  // going on in this chat that I am not in (kept up with the chat's calls over realtime).
+  // going on in this chat that I am not in (kept up with the chat's calls over realtime). While calls are paused
+  // (CALLS_PAUSED) none of them is offered: the bar shows Info alone and a call's row is history only.
   // ---------------------------------------------------------------------------
   const { place, join } = useCalls();
   const [liveCall, setLiveCall] = useState<CallRecord | null>(null);
@@ -950,7 +953,7 @@ function Chat({
   }, [conversation.id]);
   const inLiveCall = liveCall?.participants.some((p) => p.user_id === userId && p.state === "joined") ?? false;
   // A business answers in writing; its team is never rung. Nor is an anonymous poster, nor by one (a call names who joins).
-  const canCall = block === "none" && !business && !posterHidden;
+  const canCall = !CALLS_PAUSED && block === "none" && !business && !posterHidden;
   const startAudioCall = useCallback(() => {
     Keyboard.dismiss();
     void place(conversation.id, "audio");
@@ -1068,7 +1071,7 @@ function Chat({
           onOpenFile={openFile}
           onOpenSnap={openSnapViewer}
           onSnapActivity={openSnapActivity}
-          onCall={onCall}
+          onCall={CALLS_PAUSED ? undefined : onCall}
           onActions={onActions}
           onReply={startReply}
           onReveal={revealTime}

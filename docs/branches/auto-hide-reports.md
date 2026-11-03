@@ -1,6 +1,7 @@
 # auto-hide-reports
 
-- **Owner:** Yubraj. **As of 2026-10-28:** branched from `main` at `188c918`; `main` at `0d8e459`, then at `f77d796` (PR #52: Business v2 fixes to 55 and 56), merged in. Pushed; PR into `main`, not merged.
+- **Owner:** Yubraj. **As of 2026-11-03:** branched from `main` at `188c918` (2026-10-28); `main` merged in at
+  `f77d796` (PR #52) and at `753ab56` (PR #92, after the Business v2 release). Pushed; **PR #53 open**, not merged.
   Written by an AI session.
 - **Purpose:** content that 10 different legitimate people report is hidden at once on the website
   and the app, flagged for review in CampConnect Admin, its owner told and the action audited. Admins
@@ -8,47 +9,36 @@
 - **Owner's decisions (2026-10-28):**
   - 10 is a backstop on top of Trust & Safety's thresholds, which still hide Buzz at a weighted 3.
   - Covered: posts, reels, comments, apartments, roommate posts, Marketplace items, Buzz threads and
-    replies. Not covered: profiles and messages.
+    replies. Not covered: profiles, messages and stories.
   - After a restore only new reports count.
-  - Two branches: the database, website and app here; CampConnect Admin's review screens on `step-admin`.
 
 ## Done
 
-- Migration 57, `20261110000000_report_auto_hide.sql` (first written as `20261109000000_…`, renamed when `main` took that timestamp), with its rollback (README §"Buzz (anonymous)",
-  "Hidden at 10 reports"; docs/migrations.md).
-- PGlite suite `supabase/tests/report-auto-hide.test.mjs`, added to `db:test`. It runs:
-  - production's schema in full;
-  - production as it is today (the migrations not live yet left out);
-  - this repo's schema alone, where nothing changes.
-- `harness.mjs` gained `boot({ skip })`.
+- Migration 64, `20261116000000_report_auto_hide.sql`, with its rollback (README §"Hidden at 10 reports";
+  docs/migrations.md). It was 57 as `20261110000000_…` until `main` took that timestamp for the business hours
+  (PR #59); renamed 2026-11-03 to follow 63, the last migration live on production.
+- **2026-11-03, after merging `main`:** migration 62 (story actions, live since 2026-11-02) had replaced
+  `ts_snapshot()` and `ts_set_content_status()` with story-aware versions. This migration replaces both again, so its
+  versions, and the rollback's, now keep 62's story branches (a story's snapshot from `ts_story_snapshot()`; a removed
+  story deleted). Without that, applying 64 would have broken story reports.
+- The PGlite suite `supabase/tests/report-auto-hide.test.mjs`, in `db:test`, runs the migration on production's
+  schema in full, on production as it is today (nothing left out any more: every migration up to 63 is live), and on
+  this repo's schema alone. The rollout rehearsal (`production-rollout.test.mjs`) ends with 64.
 - The console's limitation note U1 is updated.
-- **Fixes from an independent review (2026-10-28, local commit, not pushed):**
-  - A review closes only the reports that count: never a self-harm report, nor a queue item on legal hold or about
-    someone's wellbeing; an escalated item only when an admin acts (`report_auto_hide_close`, new
-    `report_auto_hide_close_reports`).
-  - Restore and keep hidden follow the console's reviewer rule: not by someone who wrote or reported the content, and
-    not by a moderator on an escalated or legal-hold item (new `report_auto_hide_assert_reviewer`).
-  - The console's approve, restore and granted appeals un-hide public content only where reports hid it, never a hide
-    staff made by hand, and write CampConnect Admin's audit log (`ts_set_content_status`, new `report_hidden_reason`).
-  - Staff-approved content (`autoHideImmune`) is never auto-hidden; only a Buzz Trust & Safety hid is flagged as
-    its own; the auto-hide log takes the author from CampConnect Admin's snapshot, so it never names an anonymous
-    listing's poster; the reporter count runs only when it is needed.
-  - The rollback has no `begin`/`commit` of its own; the repo-schema check uses the real five-argument signature.
-  - Not done (the review's info notes): the schema guard still checks only `staff_audit_log`; the delete log still
-    names a Buzz author (CampConnect Admin's existing behaviour); an owner is not told when upheld content is later
-    restored.
+- The CampConnect Admin review screens (the Flagged page, the "Hidden automatically" panel, the overview count, the
+  nav entry, the audit labels) are on `main` already, from `admin-analytics-business`. They read
+  `admin_auto_hidden_list(status, limit, before, target_type, target_id)` and show "Database update needed" until
+  the migration is live. That notice is what the owner sees on the deployed admin app today.
+- Fixes from the independent review of 2026-10-28 (commit `7c45258`): a review closes only the reports that count;
+  restore and keep hidden follow the console's reviewer rule; the console's approve, restore and granted appeals
+  un-hide public content only where reports hid it; staff-approved content is never auto-hidden; the rollback has no
+  `begin`/`commit` of its own.
 
-## Tests (2026-10-28)
+## Tests
 
-- `npm run db:test`: 42 suites, 1623 checks, 0 failures, with the review's fixes (1607 before them, after merging `main` at `f77d796`; 1583 at `0d8e459`).
-  The production rollout rehearsal now applies, rolls back and re-applies 57 with the other pending migrations. That includes Trust & Safety, Buzz v2 and
-  CampConnect Admin + Buzz, unchanged.
-- `report-auto-hide`: 99 checks (83 before the review's fixes). Each fix has a check that fails on the earlier migration (run against it on 2026-10-28).
-- `npm run check`: 6/6 (again with the review's fixes). `test:shared` 184/184, `test:moderation` 429/429 (after merging `f77d796`).
-- 57 shares no function, policy, trigger or view with 49 to 56, so running after Business v2 changes none of it.
-- Not run: anything against a real Supabase project. step-admin's own admin suites do not run on
-  `main`'s schema: they predate Trust & Safety, whose report trigger refuses some of their fixtures.
-  That is part of the pending step-admin merge.
+See docs/testing.md for the latest run on this branch (2026-11-03, with `main` at `753ab56` merged in).
+
+- Not run: anything against a real Supabase project (no token in this session's environment).
 
 ## Read paths checked (2026-10-28, production's schema in PGlite)
 
@@ -56,20 +46,16 @@
   `roommate_posts` applies `content_visible()`; the owner-only anonymous-listing policies are correct.
 - `reels_feed` and Discover's reads (`security invoker`, joined to `feed_posts`) follow those policies.
 - No views. No `security definer` function a student can call returns these rows' content.
-- **One gap, not fixed here:** `ads_for_feed()` (migration 50, not live) shows a promoted apartment's
-  title and photos without checking `hidden_at`. Fix it in a migration after 50 is live. The owner is
-  Sunil's `business-v2` line.
+- **One gap, not fixed here:** `ads_for_feed()` (migration 50, live since 2026-11-03) shows a promoted
+  apartment's title and photos without checking `hidden_at`. Fix it in a later migration.
 
 ## Pending
 
-- [x] The CampConnect Admin review screens: `step-admin` commit `1a0968e`, local, not pushed.
-  - A Flagged page with tabs per review status and counts.
-  - A "Hidden automatically" panel with Keep hidden on the content page.
-  - The overview count, the nav entry, the `actioned` badge and the audit labels.
-  - It reads `admin_auto_hidden_list(status, limit, before, target_type, target_id)` and shows a setup notice
-    until this migration is live.
-  - Checked: tsc, eslint, next build and the signed-out e2e. Signed-in pages are untested (no staff
-    credentials on the owner's Mac).
-- [ ] Before production: read production's `admin_content_*` bodies, and run
-      `verify.mjs --live` (needs a token).
-- [ ] Owner's approval, then: apply 57 alone, merge this branch's PR, deploy the admin app.
+- [ ] Owner's approval, then apply 64 alone on production: `scripts/backup.mjs before-migration-64 --full`, a
+      read-only `verify.mjs --live` (production should match the repo exactly), the file as one transaction with
+      its `_migrations` row, `notify pgrst, 'reload schema'`; check `report_auto_hides`, the triggers and the
+      `admin_auto_*` functions after; record it in docs/migrations.md.
+- [ ] Merge PR #53 (every push to `main` deploys both apps). The Flagged notice disappears as soon as the
+      migration is live, since the screens are already deployed.
+- [ ] Afterwards: an owner is not told when upheld content is later restored; the schema guard still checks only
+      `staff_audit_log`; the delete log still names a Buzz author (CampConnect Admin's existing behaviour).

@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Animated, FlatList, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type GestureResponderEvent, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
 import { Image } from "expo-image";
 import { StatusBar } from "expo-status-bar";
-import { useVideoPlayer, VideoView } from "expo-video";
+import { useVideoPlayer, VideoView, type VideoThumbnail } from "expo-video";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { makeStyles, useColors } from "@/lib/theme-provider";
+import { BACKDROP_PIXELS, BlurredBackdrop } from "@/components/blurred-backdrop";
 import { Icon } from "@/components/icon";
 
 /** One photo or video in the viewer. `cacheKey` (the storage path) lets a fresh signed URL reuse the cached photo. */
@@ -14,13 +15,14 @@ const DOUBLE_TAP_MS = 280;
 const MAX_ZOOM = 4;
 /** How far a double tap zooms in. */
 const TAP_ZOOM = 2.5;
-const TOP_BAR = 52;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 /**
- * Full-screen dark viewer for a message's photos and videos: swipe between them, pinch or double tap to zoom a photo,
- * videos play with the system controls, and the close button (or Android's back) returns to the chat.
+ * Full-screen viewer for a message's photos and videos: swipe between them, pinch or double tap to zoom a photo, videos
+ * play with the system controls, and the close button (or Android's back) returns to the chat. Each photo or video sits
+ * whole from the screen's very top edge, the status bar and the close button over it, and a blurred copy of it fills
+ * the rest of the screen, never black.
  */
 export function MediaViewer({ visible, items, index, onClose }: { visible: boolean; items: MediaViewerItem[]; index: number; onClose: () => void }) {
   // Keep showing what was open while the modal fades out, even if the caller already cleared `items`. The viewer starts
@@ -75,8 +77,12 @@ function ViewerBody({ items, index, onClose }: { items: MediaViewerItem[]; index
         renderItem={({ item, index: i }) => (
           <View style={{ width, height }}>
             {item.kind === "video" ? (
-              <VideoPage uri={item.uri} active={i === current} width={width} height={height - insets.top - TOP_BAR - insets.bottom} top={insets.top + TOP_BAR} />
-            ) : Platform.OS === "ios" ? (
+              <VideoPage uri={item.uri} active={i === current} width={width} height={height} />
+            ) : (
+              // Outside the zooming view, so it stays put while the photo zooms.
+              <BlurredBackdrop source={{ uri: item.uri, cacheKey: item.cacheKey }} />
+            )}
+            {item.kind === "video" ? null : Platform.OS === "ios" ? (
               <NativeZoomPhoto item={item} width={width} height={height} onZoomChange={setZoomed} />
             ) : (
               <TouchZoomPhoto item={item} width={width} height={height} onZoomChange={setZoomed} />
@@ -101,7 +107,7 @@ function ViewerBody({ items, index, onClose }: { items: MediaViewerItem[]; index
   );
 }
 
-/** The photo itself, letterboxed, with a spinner until it has loaded. */
+/** The photo itself, whole, from the top of the screen (over its blurred copy), with a spinner until it has loaded. */
 function Photo({ item, width, height }: { item: MediaViewerItem; width: number; height: number }) {
   const colors = useColors();
   const [loading, setLoading] = useState(true);
@@ -111,6 +117,7 @@ function Photo({ item, width, height }: { item: MediaViewerItem; width: number; 
         source={{ uri: item.uri, cacheKey: item.cacheKey }}
         style={{ width, height }}
         contentFit="contain"
+        contentPosition="top"
         transition={150}
         onLoad={() => setLoading(false)}
         onError={() => setLoading(false)}
@@ -281,18 +288,46 @@ function TouchZoomPhoto({ item, width, height, onZoomChange }: { item: MediaView
   );
 }
 
-/** A video with the system controls; it plays while its page is the one showing. */
-function VideoPage({ uri, active, width, height, top }: { uri: string; active: boolean; width: number; height: number; top: number }) {
+/**
+ * A video with the system controls; it plays while its page is the one showing. It sits whole from the screen's top edge
+ * once its shape is known (the chat does not record it: it comes from the video's own track), in the middle until then,
+ * and a small blurred frame of it fills the rest of the screen.
+ */
+function VideoPage({ uri, active, width, height }: { uri: string; active: boolean; width: number; height: number }) {
   const player = useVideoPlayer({ uri }, (p) => {
     p.loop = false;
   });
+  const [aspect, setAspect] = useState<number | null>(null);
+  const [frame, setFrame] = useState<VideoThumbnail | null>(null);
   useEffect(() => {
     if (active) player.play();
     else player.pause();
   }, [active, player]);
+  useEffect(() => {
+    let alive = true;
+    const shape = (size: { width: number; height: number } | undefined) => {
+      if (alive && size && size.width > 0 && size.height > 0) setAspect(size.width / size.height);
+    };
+    shape(player.videoTrack?.size);
+    const track = player.addListener("videoTrackChange", ({ videoTrack }) => shape(videoTrack?.size));
+    // A frame a moment in (the very first is often black), made small for the blur behind the video.
+    const loaded = player.addListener("sourceLoad", ({ duration }) => {
+      player
+        .generateThumbnailsAsync([Math.min(1, (duration || 0) / 2)], { maxWidth: BACKDROP_PIXELS })
+        .then(([thumb]) => alive && thumb && setFrame(thumb))
+        .catch(() => {});
+    });
+    return () => {
+      alive = false;
+      track.remove();
+      loaded.remove();
+    };
+  }, [player]);
+  const box = aspect ? { left: (width - Math.min(width, height * aspect)) / 2, top: 0, width: Math.min(width, height * aspect), height: Math.min(width, height * aspect) / aspect } : { left: 0, top: 0, width, height };
   return (
-    <View style={{ width, height: height + top, paddingTop: top }}>
-      <VideoView player={player} style={{ width, height }} contentFit="contain" nativeControls fullscreenOptions={{ enable: false }} allowsPictureInPicture={false} />
+    <View style={{ width, height }}>
+      <BlurredBackdrop small={frame} />
+      <VideoView player={player} style={[{ position: "absolute" }, box]} contentFit="contain" nativeControls fullscreenOptions={{ enable: false }} allowsPictureInPicture={false} />
     </View>
   );
 }

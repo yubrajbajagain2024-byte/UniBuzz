@@ -235,6 +235,52 @@ export const FOR_YOU_PAGE = { posts: 6, reels: 2 } as const;
  * page keeps its own address (/apartments, /roommates, /marketplace), so listing links, filters and saved searches are
  * unchanged.
  */
+/**
+ * The kinds of event the Events tab sorts by (events.category, migration 61), in the order the category pills show
+ * them. The sync guesses one from a calendar's own words (categoryFromText); members pick one when they publish.
+ */
+export const EVENT_CATEGORIES = [
+  { value: "academic", label: "Academic" },
+  { value: "career", label: "Career" },
+  { value: "social", label: "Social" },
+  { value: "sports", label: "Sports" },
+  { value: "music", label: "Music" },
+  { value: "arts", label: "Arts" },
+  { value: "tech", label: "Tech" },
+  { value: "wellness", label: "Wellness" },
+  { value: "cultural", label: "Cultural" },
+  { value: "service", label: "Service" },
+  { value: "faith", label: "Faith" },
+  { value: "other", label: "Other" },
+] as const;
+export type EventCategory = (typeof EVENT_CATEGORIES)[number]["value"];
+export const EVENT_CATEGORY_VALUES = EVENT_CATEGORIES.map((c) => c.value) as [EventCategory, ...EventCategory[]];
+/** Who may publish events: a student club, a student organization, or a university department (organizations.kind). */
+export const ORGANIZATION_KINDS = [
+  { value: "club", label: "Student club" },
+  { value: "organization", label: "Student organization" },
+  { value: "department", label: "University department" },
+] as const;
+export type OrganizationKind = (typeof ORGANIZATION_KINDS)[number]["value"];
+export const ORGANIZATION_KIND_VALUES = ORGANIZATION_KINDS.map((k) => k.value) as [OrganizationKind, ...OrganizationKind[]];
+/** The Events tab's two pages: the ranked page, then everything in time order. */
+export const EVENT_SECTIONS = [
+  { value: "foryou", label: "For you" },
+  { value: "all", label: "All events" },
+] as const;
+export type EventSection = (typeof EVENT_SECTIONS)[number]["value"];
+export const EVENT_TITLE_MAX = 160;
+export const EVENT_DESCRIPTION_MAX = 5000;
+export const EVENT_LOCATION_MAX = 200;
+export const ORGANIZATION_NAME_MAX = 80;
+export const ORGANIZATION_DESCRIPTION_MAX = 1000;
+/** Events per page of the All list; For you ranks this many upcoming events at once. */
+export const EVENTS_PAGE_SIZE = 40;
+export const FOR_YOU_EVENTS_POOL = 200;
+/** How far ahead a feed sync takes events, and how far back it still updates them (an event that ran yesterday may be marked cancelled today). */
+export const EVENT_SYNC_DAYS_AHEAD = 120;
+export const EVENT_SYNC_DAYS_BACK = 1;
+
 export const HOUSING_SECTIONS = [
   { value: "apartments", label: "Housing" },
   { value: "roommates", label: "Roommate" },
@@ -396,3 +442,62 @@ export const BUSINESS_REPORT_REASONS = [
   { value: "spam", label: "Spam" },
   { value: "other", label: "Something else" },
 ] as const;
+/**
+ * Staff roles for CampConnect Admin (apps/admin: owner > admin > moderator). The database enforces them; these drive its
+ * UI. The website's staff console has its own two (trust-safety's StaffRole: moderator, admin; owners count as admins).
+ */
+export const STAFF_ROLES = [
+  { value: "owner", label: "Owner", description: "Everything, including adding and removing owners and admins." },
+  { value: "admin", label: "Admin", description: "Runs the admin section day to day and manages moderators." },
+  { value: "moderator", label: "Moderator", description: "Reviews reports and content. Cannot change the team." },
+] as const;
+export type AdminStaffRole = (typeof STAFF_ROLES)[number]["value"];
+export const STAFF_ROLE_VALUES = STAFF_ROLES.map((r) => r.value) as [AdminStaffRole, ...AdminStaffRole[]];
+export const STAFF_ROLE_RANK: Record<AdminStaffRole, number> = { owner: 3, admin: 2, moderator: 1 };
+
+/** The eight kinds of content staff can hide, restore and delete: the names reports.target_type uses ('profile' is handled by suspension instead). */
+export const MODERATION_TARGET_TYPES = [
+  { value: "apartment", label: "Apartment listing" },
+  { value: "item", label: "Marketplace item" },
+  { value: "roommate", label: "Roommate post" },
+  { value: "post", label: "Post or reel" },
+  { value: "comment", label: "Comment" },
+  { value: "message", label: "Message" },
+  { value: "buzz", label: "Buzz thread" },
+  { value: "buzz_comment", label: "Buzz reply" },
+] as const;
+export const MODERATION_TARGET_TYPE_VALUES = MODERATION_TARGET_TYPES.map((t) => t.value) as [(typeof MODERATION_TARGET_TYPES)[number]["value"], ...(typeof MODERATION_TARGET_TYPES)[number]["value"][]];
+
+/** What staff record when they close a report (reports.decision). "Dismissed" sets the report's status to dismissed; every other decision sets it to reviewed. */
+export const REPORT_DECISIONS = [
+  { value: "dismissed", label: "Dismissed" },
+  { value: "content_hidden", label: "Content hidden" },
+  { value: "content_deleted", label: "Content deleted" },
+  { value: "user_suspended", label: "User suspended" },
+  { value: "warning", label: "Warning given" },
+  { value: "no_action", label: "No action needed" },
+] as const;
+export const REPORT_DECISION_VALUES = REPORT_DECISIONS.map((d) => d.value) as [(typeof REPORT_DECISIONS)[number]["value"], ...(typeof REPORT_DECISIONS)[number]["value"][]];
+
+/** Different eligible people whose reports hide content automatically (report_auto_hide_threshold() in SQL). */
+export const AUTO_HIDE_THRESHOLD = 10;
+
+/** Where an automatically hidden item stands (report_auto_hides.status). */
+export const AUTO_HIDE_STATUSES = [
+  { value: "pending", label: "Waiting for review" },
+  { value: "upheld", label: "Kept hidden" },
+  { value: "restored", label: "Restored" },
+  { value: "deleted", label: "Deleted" },
+] as const;
+
+/** The media clean-up queue (media_jobs.kind): work on storage and Mux that SQL cannot do itself, performed by the app-side worker with the service role. */
+export const MEDIA_JOB_KINDS = [
+  { value: "quarantine", label: "Move a hidden photo out of the public bucket" },
+  { value: "release", label: "Move a restored photo back to the public bucket" },
+  { value: "delete_object", label: "Remove a deleted photo from storage" },
+  { value: "delete_prefix", label: "Remove everything a deleted account uploaded to one folder" },
+  { value: "mux_disable", label: "Turn off playback of a hidden video" },
+  { value: "mux_enable", label: "Turn playback of a restored video back on" },
+  { value: "mux_delete", label: "Delete a removed video from Mux" },
+] as const;
+export const MEDIA_JOB_KIND_VALUES = MEDIA_JOB_KINDS.map((k) => k.value) as [(typeof MEDIA_JOB_KINDS)[number]["value"], ...(typeof MEDIA_JOB_KINDS)[number]["value"][]];

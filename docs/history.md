@@ -42,6 +42,21 @@ open work is in [status.md](status.md).
   longer holds a Buzz for review); PR #42 adds the root `CLAUDE.md`; PRs #43 and #44 are opened
   from two merged branches and conflict with `main`; PR #45 restructures the AI documentation into
   one shared `CLAUDE.md` plus `docs/`; PRs #46 and #47 are opened from two more merged branches.
+- **2026-10-30:** migrations 58, 59 and 60 reach production on their own, ahead of the Business v2
+  release (19:30, 20:30 and 21:46 UTC); PRs #69 to #73 merge (Stories, their media, the upload
+  folders and the full backup, the business portal made instant).
+- **2026-10-31:** branch `events`: the app's bar becomes Home, Explore, Messages, Events, Profile,
+  and the Discover tab becomes the search screen behind a magnifier beside the bell; migration 61
+  (Events) is written and applied on staging, not on production. PR #74 merges it at 03:43 UTC
+  (deployed; 61 still not applied). Sunil and Ankur may merge their own pull requests from then on
+  ([decisions.md](decisions.md)).
+- **2026-11-01:** PRs #77 to #81 merge (the app's viewers, bottom bar, Home's top edge, Settings, Explore's and Events'
+  filters); migration 61 (Events) reaches production on its own, ahead of the Business v2 release (23:31 UTC).
+- **2026-11-03:** the Business v2 release reaches production (00:19 UTC): 44, 46, 49 to 57 and 63 in one `db:setup`
+  run, after a full verified backup; CampConnect Admin's Analytics and Business work from then on.
+- **2026-11-02:** migration 62 (story actions) reaches production on its own (04:32 UTC). PR #60 merges:
+  CampConnect Admin (`apps/admin`, from `step-admin`) is on `main` with its Analytics and Business sections
+  (migration 63, not on production) and the rest of `step-admin` outside its migration files.
 
 ## The AI documentation
 
@@ -60,6 +75,101 @@ open work is in [status.md](status.md).
   Production's website therefore runs Business v2 code against a database without them (see
   status.md). The follow-up work (migration 51, now 55; video routes; review fixes) stays on
   `business-v2` for a new PR.
+
+- 2026-10-28 19:03 UTC: PR #52 (`business-v2`'s third and fourth rounds: the fixes to 50, 55 and 56,
+  the staging rehearsal and backup tooling, the production checklist) merged into `main`. None of
+  49 to 56 is on production.
+
+- 2026-11-02 05:28 UTC: PR #86 (`story-viewer-redesign`) merged into `main` by the owner: the story viewer redesigned.
+  App only; the website's production deployment from it is Ready (its pages answer 200); testers get it with an EAS update.
+
+- 2026-11-02: PR #60 (`admin-analytics-business`) merged into `main` with the owner's approval ("merge it if everything
+  is good"): CampConnect Admin and its Analytics and Business sections, `step-admin`'s tooling, suites and README
+  section, the staging scripts' two-factor sign-in. Migration 63 is not on production; the `campconnect-admin` Vercel
+  project is still disconnected, so the merge deployed the website only (two messages changed there). The branch's
+  file stays until the launch plan in it is carried out.
+  The same day, with the owner's approval, the `campconnect-admin` Vercel project was disconnected from the repository: it
+  builds `apps/admin`, which only `step-admin` has, so every other push failed there (docs/decisions.md).
+
+- 2026-11-02: the `campconnect-admin` Vercel project reconnected to the repository (`vercel git connect`, with the
+  owner's "reconnect and merge everything"), now that `apps/admin` is on `main`; its first deployment from `main` comes with PR #91
+  (`admin-vercel-git`, the deploy rule and docs; a git-based ignore command was tried and dropped: `.vercelignore` strips `.git`).
+
+- 2026-11-02 04:32 UTC: migration 62 (story actions) applied to production on its own, with the owner's approval,
+  after staging (04:02 UTC, `staging/story-actions.mjs` 15/15) and a full backup checked against the live project
+  (`before-migration-62`); one transaction through the Management API, its `_migrations` row with it; every check
+  after passed ([migrations.md](migrations.md)). Story likes, replies and shares stop failing on production.
+
+- 2026-11-02 03:57 UTC: PR #84 (`ankur/dev`) merged into `main` by Ankur: the offline rehearsal for Discover (44, 46)
+  and Buzz (51 to 54) going live ahead of the release in two transactions, and PR #54's fix to 53 (a typed title stays).
+  None of the six is on production. Its rehearsal starts from a production with 62 since `story-actions-fix` merged
+  `main` in.
+
+- 2026-11-01 23:48 UTC: PR #82 (`migration-61-live`) merged into `main` by the owner: migration 61 recorded as live, and
+  the rollout rehearsals starting from a production that has it. Docs and tests only.
+
+- 2026-11-01 23:31 UTC: migration 61 (Events) applied to production on its own, with the owner's approval, after its
+  staging probe (13/13) and a full backup checked against the live project (`before-migration-61`); one transaction
+  through the Management API, its `_migrations` row with it; every check after passed ([migrations.md](migrations.md)).
+  From then on the app's Events writes (interests, saves, follows) work against production.
+
+- 2026-11-01 23:18 UTC: PR #81 (`discovery-redesign`) merged into `main` by the owner: Explore's and Events' search and
+  filters in three levels, Events' readable error before 61, a steady Profile grid. App only; the website redeployed
+  without a change of its own; testers get it with an EAS update (owner's approval).
+
+- 2026-11-01 20:18 UTC: PR #80 (`settings-redesign`, the owner's commit "Update UniBuzz features and UI") merged into
+  `main` by the owner: the app's Settings as a menu of sections, each its own screen. App only; the website redeployed
+  without a change of its own; testers get it with an EAS update (owner's approval).
+
+- 2026-11-01 19:52 – 19:53 UTC: PRs #77 (`viewer-full-bleed`), #78 (`nav-velocity-collapse`) and #79
+  (`home-full-bleed-top`) merged into `main` in that order by the owner: the app's viewers from the top edge over a
+  blurred copy, the bottom bar collapsing by the speed of a scroll, and Home's feeds under the status bar. App only; the
+  website redeployed without a change of its own; testers get them with an EAS update (owner's approval).
+
+- 2026-10-30 21:46 UTC: **migration 60 (every upload folder its owner's to list; a post's photos from and with the
+  post) applied to production on its own**, after 58 and 59, with the owner's approval: the first full backup
+  (`2026-10-30-before-migration-60`: rows, accounts with their password hashes, 101 files, restorable with
+  `scripts/restore.mjs`) and a read-only `verify.mjs --live` first. Signed out, listing any folder of the uploads bucket
+  now returns nothing; public addresses still serve. The restore tool was rehearsed on staging the same day (5/5).
+
+- 2026-10-30 21:03 UTC: PRs #70 (`stories-live`) and #71 (`stories-media`) merged into `main` by the owner; the
+  website redeployed without a change of its own.
+
+- 2026-10-30 20:50 UTC: `SUPABASE_SERVICE_ROLE_KEY` removed from Vercel's **Preview** environment (Production keeps
+  it): a preview build of any branch no longer holds the production service key. Previews cannot run the Buzz write
+  API or finish Mux uploads; nothing used them for that. The key itself was not rotated.
+
+- 2026-10-30 20:30 UTC: **migration 59 (a story's photo and video) applied to production on its own**, after 58 and
+  ahead of the Business v2 release, with the owner's approval: story photos in `uploads/stories/<author>/`, read through
+  the API by their owner alone; photos and videos accepted only from the author's own uploads; a story's photo deleted
+  with the story; the sweep at expiry, every ten minutes. JSON backup `2026-10-30-before-migration-59` and a read-only
+  `verify.mjs --live` first. The two stories shared before it keep their photos in `posts/` until they expire.
+
+- 2026-10-30 19:30 UTC: **migration 58 (Stories) applied to production on its own**, ahead of the Business v2
+  release (44, 46 and 49 to 57 stay pending): the file as one query through the Management API, then its
+  `_migrations` row, after the JSON backup `2026-10-30-before-migration-58` and a read-only `verify.mjs --live`
+  showing production in the rehearsed state. Rehearsed the same day offline (`stories-rollout.test.mjs`: 58 after
+  48, then the release after it, then 58's rollback alone) and on staging through the real API
+  (`staging/stories.mjs`, 12/12; 58 stays on staging). PR #69 (`stories`) had merged at 17:26 UTC with the app's
+  Stories and the migration; the app in Expo Go had shown "Not available yet" until the apply.
+
+- 2026-10-29 07:18 UTC: PR #59 (`business-hours`: the public profile's preview from the sidebar, the Website button,
+  opening hours; migration 57, not on production) merged into `main`; Vercel's production deployment finished at
+  07:19 UTC.
+
+- 2026-10-25: `4294c2f` gave the app's full-screen viewer the app's tab bar in place of its "Add comment…" bar; the
+  merge `8951d46` (main into `business-portal-prelaunch`) the same night kept the older viewer and undid it, without
+  anyone noticing until 2026-10-30, when `reel-viewer-actions` restored it (`floating-tab-bar.tsx` had kept its half).
+
+- 2026-10-29 06:14 UTC: PR #58 (`business-inbox-pending`: the Inbox below Overview for a business awaiting review
+  too; no migration) merged into `main`; Vercel's production deployment finished at 06:16 UTC.
+
+- 2026-10-29 04:06 UTC: PR #57 (`business-inbox`: the business Inbox below Overview, with alerts and inquiry context;
+  no migration) merged into `main`; Vercel's production deployment finished at 04:08 UTC. As merged, a business
+  awaiting review had no Inbox in its sidebar (`business-inbox-pending` changes that).
+
+- 2026-10-29 03:34 UTC: PR #56 (`business-sidebar`: the business portal's left sidebar, Billing and Settings pages;
+  no migration) merged into `main` and so deployed.
 
 - 2026-10-28, afternoon: read-only checks of production (owner's approval) found migration 47 applied
   on 2026-10-27 at 04:37 UTC although the docs listed it as pending, and no Supabase-managed backup

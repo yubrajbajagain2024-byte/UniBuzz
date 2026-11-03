@@ -62,42 +62,6 @@ export function LockedNotice({ message }: { message: string }) {
   );
 }
 
-/**
- * Settings → Privacy: one question with Everyone / Friends / Only me side by side, and a line under them saying what the
- * chosen one means.
- */
-export function VisibilityPicker({ section, value, onChange }: { section: ProfileSection; value: ProfileVisibility; onChange: (value: ProfileVisibility) => void }) {
-  const styles = useStyles();
-  const colors = useColors();
-  const question = visibilityQuestion(section);
-  const chosen = PROFILE_VISIBILITY_OPTIONS.find((o) => o.value === value);
-  return (
-    <View style={{ gap: 6 }}>
-      <Text style={styles.pickerLabel}>{question}</Text>
-      <View style={styles.segments} accessibilityRole="radiogroup" accessibilityLabel={question}>
-        {PROFILE_VISIBILITY_OPTIONS.map((o) => {
-          const selected = o.value === value;
-          return (
-            <Pressable
-              key={o.value}
-              onPress={() => onChange(o.value)}
-              accessibilityRole="radio"
-              accessibilityLabel={o.label}
-              accessibilityHint={question}
-              accessibilityState={{ checked: selected }}
-              style={[styles.segment, selected && styles.segmentOn]}
-            >
-              <Icon name={VISIBILITY_ICONS[o.value]} size={14} color={selected ? colors.brand : colors.muted} />
-              <Text style={[styles.segmentText, selected && { color: colors.brand }]}>{o.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      {chosen ? <Text style={styles.pickerHint}>{chosen.description}</Text> : null}
-    </View>
-  );
-}
-
 const useStyles = makeStyles((colors) => ({
   row: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.lg, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   note: { flex: 1, fontSize: 13, color: colors.muted },
@@ -106,10 +70,4 @@ const useStyles = makeStyles((colors) => ({
   locked: { alignItems: "center", gap: space.md, paddingHorizontal: space.xl, paddingVertical: 40 },
   lockCircle: { width: 56, height: 56, borderRadius: 28, borderWidth: 1.5, borderColor: colors.text, alignItems: "center", justifyContent: "center" },
   lockedText: { fontSize: 15, fontWeight: "600", color: colors.text, textAlign: "center" },
-  pickerLabel: { fontSize: 13, fontWeight: "600", color: colors.muted },
-  segments: { flexDirection: "row", gap: space.sm },
-  segment: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, height: 36, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
-  segmentOn: { backgroundColor: colors.brandSoft, borderColor: colors.brand },
-  segmentText: { fontSize: 13, fontWeight: "600", color: colors.muted },
-  pickerHint: { fontSize: 12, color: colors.muted },
 }));

@@ -193,6 +193,16 @@ body {
     --biz-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.04);
     --biz-shadow-lift: 0 2px 6px rgb(0 0 0 / 0.06), 0 18px 40px rgb(0 0 0 / 0.08);
     --biz-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", var(--font-inter), "Helvetica Neue", system-ui, sans-serif;
+    /* The sidebar: graphite in both themes, its own quiet inks, and one accent mark for the page you are on. */
+    --biz-sidebar-width: 15.5rem;
+    --biz-side: #111113;
+    --biz-side-raise: rgb(255 255 255 / 0.06);
+    --biz-side-hover: rgb(255 255 255 / 0.045);
+    --biz-side-line: rgb(255 255 255 / 0.08);
+    --biz-side-ink: #f5f5f7;
+    --biz-side-ink-2: #c7c7cc;
+    --biz-side-ink-3: #8e8e93;
+    --biz-side-mark: #5aa2ff;
     color-scheme: light;
     background-color: var(--biz-canvas);
     color: var(--biz-ink);
@@ -316,6 +326,45 @@ body {
   }
 }
 
+/*
+ * The portal's preview of the business's public profile (/preview): the student site's own look inside the portal, in
+ * either of its themes, so the preview is what students see. Tailwind's greys and the brand's light tints as the
+ * student site has them, white panels, the Aurora on the primary button, the student site's font and ink. After the
+ * dark-portal rules above, which these match in specificity and so override.
+ */
+[data-surface="business"] [data-student-preview] {
+  --color-gray-50: oklch(98.5% 0.002 247.839);
+  --color-gray-100: oklch(96.7% 0.003 264.542);
+  --color-gray-200: oklch(92.8% 0.006 264.531);
+  --color-gray-300: oklch(87.2% 0.01 258.338);
+  --color-gray-400: oklch(70.7% 0.022 261.325);
+  --color-gray-500: oklch(55.1% 0.027 264.364);
+  --color-gray-600: oklch(44.6% 0.03 256.802);
+  --color-gray-700: oklch(37.3% 0.034 259.733);
+  --color-gray-800: oklch(27.8% 0.033 256.848);
+  --color-gray-900: oklch(21% 0.034 264.665);
+  --color-gray-950: oklch(13% 0.028 261.692);
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  color-scheme: light;
+  background: var(--color-surface);
+  color: #1c1e21;
+  font-family: var(--font-sans);
+}
+[data-surface="business"] [data-student-preview] :is(.bg-white, .hover\:bg-white:hover) {
+  background-color: #ffffff;
+}
+[data-surface="business"] [data-student-preview] .text-brand-600 {
+  color: var(--color-brand-600);
+}
+[data-surface="business"] [data-student-preview] :is(.text-brand-700, .hover\:text-brand-700:hover) {
+  color: var(--color-brand-700);
+}
+[data-surface="business"] [data-student-preview] .bg-aurora {
+  background-image: linear-gradient(110deg, var(--color-aurora-cyan) 0%, var(--color-aurora-blue) 34%, var(--color-aurora-periwinkle) 68%, var(--color-aurora-violet) 100%);
+}
+
 /* bg-biz-surface, text-biz-ink-3, ring-biz-line …: they resolve only inside the portal. */
 @theme inline {
   --color-biz-canvas: var(--biz-canvas);
@@ -343,12 +392,64 @@ body {
   --color-biz-danger-soft: var(--biz-danger-soft);
   --shadow-biz: var(--biz-shadow);
   --shadow-biz-lift: var(--biz-shadow-lift);
+  --color-biz-side: var(--biz-side);
+  --color-biz-side-raise: var(--biz-side-raise);
+  --color-biz-side-hover: var(--biz-side-hover);
+  --color-biz-side-line: var(--biz-side-line);
+  --color-biz-side-ink: var(--biz-side-ink);
+  --color-biz-side-ink-2: var(--biz-side-ink-2);
+  --color-biz-side-ink-3: var(--biz-side-ink-3);
+  --color-biz-side-mark: var(--biz-side-mark);
 }
 
 /* Skeletons in the portal shimmer in its own greys, light or dark. */
 [data-surface="business"] .ab-skeleton {
   background: linear-gradient(90deg, var(--biz-surface-3) 25%, var(--biz-surface-2) 50%, var(--biz-surface-3) 75%);
   background-size: 200% 100%;
+}
+
+/*
+ * The window around a dark portal: what shows past the page's edge when it is pulled (overscroll) and the document's
+ * scrollbar follow the portal's theme instead of the student site's light grey, so nothing light flashes at the edges.
+ */
+html:has([data-surface="business"][data-theme="dark"]) {
+  color-scheme: dark;
+}
+body:has([data-surface="business"][data-theme="dark"]) {
+  background: #000000;
+}
+@media (prefers-color-scheme: dark) {
+  html:has([data-surface="business"]:not([data-theme="light"])) {
+    color-scheme: dark;
+  }
+  body:has([data-surface="business"]:not([data-theme="light"])) {
+    background: #000000;
+  }
+}
+
+/*
+ * How a portal page arrives. biz-page-in (the (portal) template): a short fade in place, no movement, once per page.
+ * biz-loading (the portal's loading states): invisible for the first 160 ms, then a fade; a page ready sooner, as a
+ * prefetched or a warm one is, never flashes a skeleton, and one that takes a moment shows it without a jump.
+ */
+@keyframes biz-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.biz-page-in {
+  animation: biz-fade-in 200ms ease-out both;
+}
+.biz-loading {
+  opacity: 0;
+  animation: biz-fade-in 220ms ease-out 160ms forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .biz-page-in {
+    animation: none;
+  }
+  .biz-loading {
+    animation-duration: 1ms;
+  }
 }
 
 /* Thin scrollbars for the chat panes */
@@ -439,8 +540,35 @@ body {
   animation: ab-menu-in 180ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
 }
 
+/* The business portal's sidebar slides in from the left edge on tablets and phones. */
+/*
+ * An unopened Snap's tiny preview drifts slowly under its frosted pane, as if something moved behind it (the app's
+ * DriftingPreview): a few pixels over and a touch larger, then back. Not with reduced motion.
+ */
+@keyframes ab-snap-drift {
+  from {
+    transform: translate(-6px, 4px);
+  }
+  to {
+    transform: translate(6px, -4px) scale(1.06);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ab-snap-drift {
+    animation: ab-snap-drift 7s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes ab-drawer-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.ab-drawer-in {
+  animation: ab-drawer-in 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .ab-skeleton, .ab-burst, .ab-pop, .ab-fade-in, .ab-sheet-in, .ab-scrim-in, .ab-menu-in { animation: none; }
+  .ab-skeleton, .ab-burst, .ab-pop, .ab-fade-in, .ab-sheet-in, .ab-scrim-in, .ab-menu-in, .ab-drawer-in { animation: none; }
   /* Without its animation the burst heart would sit over the video for good. */
   .ab-burst { display: none; }
 }

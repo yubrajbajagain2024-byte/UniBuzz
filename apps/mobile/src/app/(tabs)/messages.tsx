@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, BackHandler, FlatList, Keyboard, Platform, Pressable, RefreshControl, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollView, type TextInput, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { Animated, BackHandler, Keyboard, Platform, Pressable, RefreshControl, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useIsFocused, useRouter } from "expo-router";
 import { listConversations, listFriends, markConversationRead, markConversationsRead, MUTE_DURATIONS, muteLabel, type ConversationSummary, type MessageWithSender, type MuteDuration, type MuteScope, type ProfileSummary } from "@apartment-book/shared";
 import { useActionSheet, type SheetOption } from "@/components/action-sheet";
-import { INBOX_PAGES, InboxHeader, InboxSearchField } from "@/components/messages/inbox-header";
+import { INBOX_HEADER_HEIGHT, INBOX_PAGES, InboxHeader, InboxSearchField } from "@/components/messages/inbox-header";
 import { InboxMessageRow, InboxNote, InboxRow, InboxSectionHeader } from "@/components/messages/inbox-row";
 import { inInbox, matchConversations, useMessageSearch, useNow, useUsernames, type InboxFilter, type InboxPage } from "@/components/messages/inbox-utils";
 import { InboxOnlineFriends, useOpenFriendChat } from "@/components/messages/online-friends";
@@ -11,6 +12,7 @@ import { Button, EmptyState, ErrorBanner, Loading, useAppearingCells } from "@/c
 import { hapticTap, refreshWithHaptic } from "@/lib/haptics";
 import { useQuery } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
+import { AnimatedFlatList, listInset, useCollapsingHeader } from "@/lib/collapsing-header";
 import { supabase } from "@/lib/supabase";
 import { useTabBarInset } from "@/lib/tab-bar";
 import { radius, space } from "@/lib/theme";
@@ -37,12 +39,15 @@ const CHAT_MATCHES = 5;
 const ORDER = INBOX_PAGES.map((p) => p.value);
 /** A page change waits until the pager is this share of a page past the halfway point, so a finger resting on the line cannot flip it back and forth. */
 const MARGIN = 0.02;
-const NOT_SCROLLED: Record<InboxPage, boolean> = { chats: false, groups: false };
+/** Where each page's list starts, under the header (see listInset): the same for both, the header being one. */
+const INSET = listInset(INBOX_HEADER_HEIGHT);
+const AT_TOP: Record<InboxPage, number> = { chats: 0, groups: 0 };
 
 /**
- * The Messages tab (between Explore and Profile in the bottom bar): its own top bar (the new-message pencil, the big
- * "Messages" title, Chats | Groups), a search box and the All | Unread | Requests pills, then the two pages side by side
- * in a pager like Home's: your direct chats and your group chats, newest first, a swipe or a tap on a label moving
+ * The Messages tab (between Explore and Profile in the bottom bar): its own header (the new-message pencil, the big
+ * "Messages" title, Chats | Groups, a search box and the All | Unread | Requests pills), then the two pages side by side
+ * in a pager like Home's. The header scrolls away with the list on screen as if it were part of it, and comes back as
+ * the list returns to its top; only the bottom bar stays. The pages: your direct chats and your group chats, newest first, a swipe or a tap on a label moving
  * between them silently, as on Home. Requests, a pill on Chats, holds the direct chats people you do not
  * follow started with you, until you reply (see useMessageRequests); the Messages tab's unread count counts them too.
  * Above the chats, right under the pills, Messenger's row of your friends who are online now (a tap opens your chat with
@@ -75,16 +80,35 @@ export default function MessagesScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [allChatMatches, setAllChatMatches] = useState(false);
   const [pulling, setPulling] = useState(false);
-  const [scrolledPages, setScrolledPages] = useState(NOT_SCROLLED);
+  /** Whether Chats has scrolled down at all (the online row holds still meanwhile: InboxOnlineFriends). */
+  const [chatsScrolled, setChatsScrolled] = useState(false);
+  const insets = useSafeAreaInsets();
+  /** The pages' height, under the status bar: every list is at least this tall, so even a short one can scroll the header away. */
+  const [bodyHeight, setBodyHeight] = useState(0);
   const inputRef = useRef<TextInputInstance>(null);
   const now = useNow(focused);
+  const query = text.trim();
+  const searching = Boolean(userId) && query.length > 0;
+  const searchingRef = useRef(searching);
+  searchingRef.current = searching;
+
+  // ---- The header scrolls with the list on screen, as if part of it (lib/collapsing-header.ts, `withList`), and holds
+  // still during a search, its field in use. The bottom bar stays whole however the lists scroll: only it stays put (the
+  // owner's choice, 2026-11-02; lib/tab-bar-collapse.ts).
+  /** How far each page's list is from its top: from its own scrolling, and from alignPages. */
+  const fromTops = useRef({ ...AT_TOP });
+  const onFollowedScroll = useCallback((fromTop: number) => {
+    fromTops.current[pageRef.current] = fromTop;
+    if (pageRef.current === "chats") setChatsScrolled(fromTop > 0);
+  }, []);
+  const { translateY: headerShift, select: followPage, onScroll: onPageScroll, scrollValue } = useCollapsingHeader(ORDER.length, INBOX_HEADER_HEIGHT, 0, onFollowedScroll, { withList: true });
 
   // ---- The pager: Chats | Groups side by side, as on Home. The underline follows the finger on the native driver (scrollX);
   // the page is committed when the pager crosses the halfway point or when a label is tapped.
   const pager = useRef<ScrollViewInstance>(null);
   /** Each page's list, so tapping Messages again scrolls the page on screen back to the top, as on every iOS tab. */
   const listRefs = useRef<Partial<Record<InboxPage, { scrollToOffset: (p: { offset: number; animated?: boolean }) => void } | null>>>({});
-  useTabReselect(() => listRefs.current[page]?.scrollToOffset({ offset: 0, animated: true }));
+  useTabReselect(() => listRefs.current[page]?.scrollToOffset({ offset: INSET.topOffset, animated: true }));
   const scrollX = useRef(new Animated.Value(0)).current;
   /** The page under the finger, by the halfway rule. */
   const under = useRef(0);
@@ -93,11 +117,31 @@ export default function MessagesScreen() {
   /** False until the pager has been placed at the current width, so the first layout cannot change the page. */
   const ready = useRef(false);
   const initialOffset = useRef({ x: 0, y: 0 });
-  const show = useCallback((i: number) => {
-    const next = ORDER[i];
-    if (!next || next === pageRef.current) return;
-    pageRef.current = next;
-    setPage(next);
+  const show = useCallback(
+    (i: number) => {
+      const next = ORDER[i];
+      if (!next || next === pageRef.current) return;
+      pageRef.current = next;
+      setPage(next);
+      followPage(searchingRef.current ? -1 : i);
+    },
+    [followPage],
+  );
+  /**
+   * Before the other page comes into view (a swipe starts, a label is tapped), its list is moved to where the header is
+   * now, so the header never jumps as the pages change: as far down as this one while the header is still in view, and
+   * at least the header's height once it has gone (a list already further down keeps its place).
+   */
+  const alignPages = useCallback(() => {
+    if (searchingRef.current) return;
+    const gone = Math.min(fromTops.current[pageRef.current], INBOX_HEADER_HEIGHT);
+    for (const p of ORDER) {
+      if (p === pageRef.current) continue;
+      const y = fromTops.current[p];
+      if (gone >= INBOX_HEADER_HEIGHT ? y >= INBOX_HEADER_HEIGHT : Math.abs(y - gone) < 0.5) continue;
+      fromTops.current[p] = gone;
+      listRefs.current[p]?.scrollToOffset({ offset: INSET.topOffset + gone, animated: false });
+    }
   }, []);
   const place = useCallback(() => {
     if (width <= 0) return;
@@ -111,12 +155,13 @@ export default function MessagesScreen() {
     (next: InboxPage) => {
       const i = ORDER.indexOf(next);
       if (i < 0 || next === pageRef.current) return;
+      alignPages();
       target.current = i;
       under.current = i;
       show(i);
       pager.current?.scrollTo({ x: i * width, animated: true });
     },
-    [show, width],
+    [alignPages, show, width],
   );
   const onPagerScroll = useMemo(
     () =>
@@ -176,8 +221,6 @@ export default function MessagesScreen() {
   const conversations = data ?? NO_CHATS;
   const { requestIds } = useMessageRequests(conversations, userId);
   const requestCount = useMemo(() => conversations.filter((c) => requestIds.has(c.id)).length, [conversations, requestIds]);
-  const query = text.trim();
-  const searching = Boolean(userId) && query.length > 0;
   const messageSearch = useMessageSearch(text, Boolean(userId));
 
   // Handles are never shown here, only searched: a chat still turns up when its person is typed as @username.
@@ -246,14 +289,14 @@ export default function MessagesScreen() {
   );
   const lists = useMemo(() => ORDER.map(itemsFor), [itemsFor]);
 
-  // The hairline under the top bar shows once the page on screen has moved; a new list (search, another pill) starts at the top.
+  // A new list (a search, another pill) starts at its top, and the header with it; during a search the header holds still.
   const listKey = searching ? "search" : filter;
-  useEffect(() => setScrolledPages(NOT_SCROLLED), [listKey]);
-  const onListScroll = useCallback((p: InboxPage, e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const next = e.nativeEvent.contentOffset.y > 0;
-    setScrolledPages((prev) => (prev[p] === next ? prev : { ...prev, [p]: next }));
-  }, []);
-  const scrolled = scrolledPages[page];
+  useEffect(() => {
+    ORDER.forEach((_, i) => scrollValue(i).setValue(INSET.topOffset));
+    fromTops.current = { ...AT_TOP };
+    setChatsScrolled(false);
+    followPage(searching ? -1 : ORDER.indexOf(pageRef.current));
+  }, [listKey, searching, scrollValue, followPage]);
 
   const onPull = useCallback(async () => {
     setPulling(true);
@@ -337,8 +380,8 @@ export default function MessagesScreen() {
 
   if (!sessionLoading && !user) {
     return (
-      <View style={styles.screen}>
-        <InboxHeader signedIn={false} page="chats" onPage={selectPage} scrollX={scrollX} pageWidth={width} requestCount={0} filter="all" unreadChats={0} onFilter={setFilter} scrolled={false} onNewChat={newChat} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <InboxHeader signedIn={false} page="chats" onPage={selectPage} scrollX={scrollX} pageWidth={width} requestCount={0} filter="all" unreadChats={0} onFilter={setFilter} onNewChat={newChat} />
         <EmptyState icon="chatbubbles-outline" title="Log in to see your messages" action={<Button title="Log in" onPress={() => router.push("/(auth)/login")} />} />
       </View>
     );
@@ -397,62 +440,76 @@ export default function MessagesScreen() {
   const placeholder = page === "groups" ? "Search groups" : filter === "requests" ? "Search requests" : "Search chats";
 
   return (
-    <View style={styles.screen}>
-      <InboxHeader signedIn={Boolean(user)} page={page} onPage={selectPage} scrollX={scrollX} pageWidth={width} requestCount={requestCount} filter={filter} unreadChats={unreadChats} pageUnread={pageUnread} onFilter={setFilter} scrolled={scrolled} onNewChat={newChat}>
-        {user ? <InboxSearchField value={text} onChangeText={setText} placeholder={placeholder} inputRef={inputRef} onFocusChange={setSearchFocused} showCancel={searchFocused || text.length > 0} onCancel={cancelSearch} accessibilityLabel="Search chats and messages" /> : null}
-      </InboxHeader>
-      {!user ? (
-        <Loading />
-      ) : (
-        <Animated.ScrollView
-          ref={pager}
-          horizontal
-          pagingEnabled
-          bounces={false}
-          overScrollMode="never"
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentOffset={initialOffset.current}
-          scrollEventThrottle={16}
-          onContentSizeChange={place}
-          onScrollBeginDrag={() => {
-            target.current = null;
-          }}
-          onScroll={onPagerScroll}
-          onMomentumScrollEnd={onSettled}
-          style={{ flex: 1 }}
-        >
-          {ORDER.map((p, i) => (
-            <View key={p} style={{ width, flex: 1 }}>
-              <FlatList
-                ref={(el) => {
-                  listRefs.current[p] = el;
-                }}
-                key={`${p}:${listKey}`}
-                data={lists[i]}
-                keyExtractor={(item) => item.key}
-                CellRendererComponent={appearCells}
-                renderItem={renderItem}
-                onScroll={(e) => onListScroll(p, e)}
-                scrollEventThrottle={16}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
-                automaticallyAdjustKeyboardInsets
-                contentContainerStyle={[searching ? styles.searchContent : styles.listContent, { paddingBottom: (searching ? space.xl : 96) + tabBar }]}
-                refreshControl={searching ? undefined : <RefreshControl refreshing={pulling} onRefresh={refreshWithHaptic(onPull)} tintColor={colors.muted} colors={[colors.brand]} progressBackgroundColor={colors.elevated} />}
-                ListHeaderComponent={
-                  searching ? undefined : p === "chats" && filterOn(p) === "requests" ? (
-                    requestCount > 0 ? <InboxNote text="From people you don't follow. Reply to move a chat to All." /> : undefined
-                  ) : p === "chats" ? (
-                    <InboxOnlineFriends friends={friends ?? NO_FRIENDS} me={userId} scrolled={scrolledPages.chats} opening={openingFriend} onOpen={openFriend} />
-                  ) : undefined
-                }
-                ListEmptyComponent={empty(p)}
-              />
-            </View>
-          ))}
-        </Animated.ScrollView>
-      )}
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={styles.body} onLayout={(e) => setBodyHeight(Math.round(e.nativeEvent.layout.height))}>
+        {!user ? (
+          <Loading />
+        ) : (
+          <Animated.ScrollView
+            ref={pager}
+            horizontal
+            pagingEnabled
+            bounces={false}
+            overScrollMode="never"
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentOffset={initialOffset.current}
+            scrollEventThrottle={16}
+            onContentSizeChange={place}
+            onScrollBeginDrag={() => {
+              target.current = null;
+              alignPages();
+            }}
+            onScroll={onPagerScroll}
+            onMomentumScrollEnd={onSettled}
+            style={{ flex: 1 }}
+          >
+            {ORDER.map((p, i) => (
+              <View key={p} style={{ width, flex: 1 }}>
+                <AnimatedFlatList
+                  ref={(el) => {
+                    listRefs.current[p] = el;
+                  }}
+                  key={`${p}:${listKey}`}
+                  data={lists[i]}
+                  keyExtractor={(item) => item.key}
+                  CellRendererComponent={appearCells}
+                  renderItem={renderItem}
+                  {...INSET.list}
+                  onScroll={onPageScroll(i)}
+                  scrollEventThrottle={16}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
+                  automaticallyAdjustKeyboardInsets
+                  // At least the page's height under the header, so even a short list scrolls the header away; an empty
+                  // one keeps its message in the middle of what the header leaves in view.
+                  contentContainerStyle={
+                    searching
+                      ? [styles.searchContent, { paddingTop: INSET.paddingTop, paddingBottom: space.xl + tabBar }]
+                      : [styles.listContent, { paddingTop: INSET.paddingTop, paddingBottom: 96 + tabBar + (lists[i]!.length === 0 ? INBOX_HEADER_HEIGHT : 0), minHeight: bodyHeight + INSET.paddingTop }]
+                  }
+                  refreshControl={searching ? undefined : <RefreshControl refreshing={pulling} onRefresh={refreshWithHaptic(onPull)} progressViewOffset={INSET.progressViewOffset} tintColor={colors.muted} colors={[colors.brand]} progressBackgroundColor={colors.elevated} />}
+                  ListHeaderComponent={
+                    searching ? undefined : p === "chats" && filterOn(p) === "requests" ? (
+                      requestCount > 0 ? <InboxNote text="From people you don't follow. Reply to move a chat to All." /> : undefined
+                    ) : p === "chats" ? (
+                      <InboxOnlineFriends friends={friends ?? NO_FRIENDS} me={userId} scrolled={chatsScrolled} opening={openingFriend} onOpen={openFriend} />
+                    ) : undefined
+                  }
+                  ListEmptyComponent={empty(p)}
+                />
+              </View>
+            ))}
+          </Animated.ScrollView>
+        )}
+        {/* Over the lists, moving with the one on screen; a drag on its plain parts reaches the list below (InboxHeader),
+            except during a search, when results pass under it. */}
+        <Animated.View pointerEvents={searching ? "auto" : "box-none"} style={[styles.header, { transform: [{ translateY: headerShift }] }]}>
+          <InboxHeader signedIn={Boolean(user)} page={page} onPage={selectPage} scrollX={scrollX} pageWidth={width} requestCount={requestCount} filter={filter} unreadChats={unreadChats} pageUnread={pageUnread} onFilter={setFilter} onNewChat={newChat}>
+            {user ? <InboxSearchField value={text} onChangeText={setText} placeholder={placeholder} inputRef={inputRef} onFocusChange={setSearchFocused} showCancel={searchFocused || text.length > 0} onCancel={cancelSearch} accessibilityLabel="Search chats and messages" /> : null}
+          </InboxHeader>
+        </Animated.View>
+      </View>
       {user && showMarkAll ? (
         <View pointerEvents="box-none" style={[styles.markAllWrap, { bottom: tabBar + space.lg }]}>
           <Pressable onPress={markAllRead} accessibilityRole="button" accessibilityLabel="Mark all as read" style={({ pressed }) => [styles.markAll, pressed && { opacity: 0.75 }]}>
@@ -467,6 +524,9 @@ export default function MessagesScreen() {
 
 const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
+  // The pages and the header over them, below the status bar: the header and the lists pass out of sight at its edge.
+  body: { flex: 1, overflow: "hidden" },
+  header: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 2 },
   listContent: { flexGrow: 1, paddingBottom: 96 },
   searchContent: { paddingBottom: space.xl },
   searchEmpty: { paddingTop: space.xl },

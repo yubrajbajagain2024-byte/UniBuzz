@@ -12,6 +12,11 @@ export type CollapsingHeader = {
   translateY: Animated.AnimatedInterpolation<number>;
   /** The `onScroll` of list `page` (give it `scrollEventThrottle={16}` too). The same handler every time, so the list attaches it once. */
   onScroll: (page: number) => (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  /**
+   * List `page`'s scroll offset as `onScroll(page)` writes it, on the native side: for a page that slides a bar of its own
+   * below this one from the same scroll (Buzz's filters), and that sets it to where its list rests (its own inset).
+   */
+  scrollValue: (page: number) => Animated.Value;
   /** Which list the bar follows from now on; -1 for none (the bar then stays in place). */
   select: (page: number) => void;
   /** Bring the bar back wherever the lists are (the pager starts to move, say); it follows the chosen list again once that list scrolls down. */
@@ -33,8 +38,15 @@ export type CollapsingHeader = {
  *
  * The lists start `height` points down, under the bar (see listInset): on iOS that is a content inset, so a list at
  * rest reports -height and the inset is added back before the clamp.
+ *
+ * `onFollowedScroll`, when given, hears every scroll event of the list the bar follows, with how far that list is from
+ * its top (the inset taken off) and the event itself: Home, Explore, Events and Messages hand it to the bottom bar's
+ * collapse (lib/tab-bar-collapse.ts), which reads the event's timestamp for the scroll's speed.
+ *
+ * `withList` makes the bar part of the list instead (Messages): it moves exactly as the list does and comes back only as
+ * the list returns to its top, not the moment it scrolls up.
  */
-export function useCollapsingHeader(pages: number, height: number, initial = 0): CollapsingHeader {
+export function useCollapsingHeader(pages: number, height: number, initial = 0, onFollowedScroll?: (fromTop: number, e: NativeScrollEvent) => void, { withList = false }: { withList?: boolean } = {}): CollapsingHeader {
   const scrollYs = useRef<Animated.Value[]>([]);
   const selectors = useRef<Animated.Value[]>([]);
   if (scrollYs.current.length !== pages) {
@@ -57,6 +69,10 @@ export function useCollapsingHeader(pages: number, height: number, initial = 0):
   const hiddenJs = useRef<number[]>([]);
   const heightRef = useRef(height);
   heightRef.current = height;
+  const withListRef = useRef(withList);
+  withListRef.current = withList;
+  const followedScroll = useRef(onFollowedScroll);
+  followedScroll.current = onFollowedScroll;
 
   const translateY = useMemo(() => {
     const max = Math.max(1, height);
@@ -67,12 +83,14 @@ export function useCollapsingHeader(pages: number, height: number, initial = 0):
       // Never below the top: a bounce past it, or a pull to refresh, must not count as a scroll down on the way back,
       // which would leave the bar part way up with the list at rest. The clamp below then always reads 0 at the top.
       const fromTop = scrolled.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolateLeft: "clamp", extrapolateRight: "extend" });
-      return Animated.multiply(Animated.diffClamp(fromTop, 0, max), selectors.current[i]!);
+      // With the list: as far as the list has moved, up to the bar's height. Otherwise only the way down since the list last turned back.
+      const away = withList ? fromTop.interpolate({ inputRange: [0, max], outputRange: [0, max], extrapolate: "clamp" }) : Animated.diffClamp(fromTop, 0, max);
+      return Animated.multiply(away, selectors.current[i]!);
     });
     const hidden = shares.reduce((sum, share) => Animated.add(sum, share));
     // -(hidden × (1 − reveal)): the bar's own distance, or none at all while it is brought back.
     return Animated.multiply(hidden, Animated.subtract(revealValue, 1));
-  }, [height, revealValue]);
+  }, [height, revealValue, withList]);
 
   const select = useCallback((page: number) => {
     selected.current = page;
@@ -109,7 +127,8 @@ export function useCollapsingHeader(pages: number, height: number, initial = 0):
             const fromTop = Math.max(0, Platform.OS === "ios" ? y + heightRef.current : y);
             const was = fromTopJs.current[page] ?? 0;
             fromTopJs.current[page] = fromTop;
-            hiddenJs.current[page] = Math.min(Math.max((hiddenJs.current[page] ?? 0) + fromTop - was, 0), Math.max(1, heightRef.current));
+            hiddenJs.current[page] = withListRef.current ? Math.min(fromTop, Math.max(1, heightRef.current)) : Math.min(Math.max((hiddenJs.current[page] ?? 0) + fromTop - was, 0), Math.max(1, heightRef.current));
+            if (page === selected.current) followedScroll.current?.(fromTop, e.nativeEvent);
             if (!revealed.current || page !== selected.current) return;
             // The page on screen scrolls down after a reveal: the bar is handed back to it.
             const delta = y - before;
@@ -125,8 +144,9 @@ export function useCollapsingHeader(pages: number, height: number, initial = 0):
   );
 
   const hidden = useCallback(() => (revealed.current || selected.current < 0 ? 0 : (hiddenJs.current[selected.current] ?? 0)), []);
+  const scrollValue = useCallback((page: number) => scrollYs.current[page]!, []);
 
-  return useMemo(() => ({ translateY, onScroll, select, reveal, hidden }), [translateY, onScroll, select, reveal, hidden]);
+  return useMemo(() => ({ translateY, onScroll, scrollValue, select, reveal, hidden }), [translateY, onScroll, scrollValue, select, reveal, hidden]);
 }
 
 /** FlatList with native-driven scroll events (Animated.event with useNativeDriver), keeping its item type. */

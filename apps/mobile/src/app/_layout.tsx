@@ -44,6 +44,10 @@ function ThemedStack() {
   const contentUnderHeader = Platform.OS === "android" && isDark ? { ...content, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : content;
   // Buzz's screens draw their own Phosphor header; behind them (a push, a swipe back) the screen is Phosphor too, in both themes.
   const buzzContent = { backgroundColor: phosphor.canvas };
+  // Settings' screens sit on iOS's grouped background (see components/settings/settings-ui.tsx), their header on the same
+  // colour with no line under it, so header and page read as one surface.
+  const grouped = isDark ? colors.bg : colors.panel;
+  const settings = { headerStyle: { backgroundColor: grouped }, headerShadowVisible: false, contentStyle: { backgroundColor: grouped } };
   return (
     <>
       <StatusBar style={isDark ? "light" : "dark"} />
@@ -51,6 +55,9 @@ function ThemedStack() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: content }} />
         <Stack.Screen name="(auth)/login" options={{ title: "Log in", presentation: "modal" }} />
         <Stack.Screen name="(auth)/signup" options={{ title: "Create account", presentation: "modal" }} />
+        {/* Pushed from the login modal, so it slides in inside it; and where a recovery link that opens the app lands. */}
+        <Stack.Screen name="(auth)/forgot-password" options={{ title: "Reset password" }} />
+        <Stack.Screen name="reset-password" options={{ title: "New password" }} />
         <Stack.Screen name="apartments/[id]" options={{ title: "Apartment" }} />
         <Stack.Screen name="roommates/[id]" options={{ title: "Roommate post" }} />
         <Stack.Screen name="marketplace/[id]" options={{ title: "Item" }} />
@@ -64,6 +71,8 @@ function ThemedStack() {
             To (snap/index); a Snap in a chat opens once, full screen (snap/[id]). Both fade in and out on their own. */}
         <Stack.Screen name="snap/index" options={{ headerShown: false, presentation: "transparentModal", animation: "none", gestureEnabled: false, contentStyle: { backgroundColor: "transparent" } }} />
         <Stack.Screen name="snap/[id]" options={{ headerShown: false, presentation: "transparentModal", animation: "none", gestureEnabled: false, contentStyle: { backgroundColor: "transparent" } }} />
+        {/* Stories, the same way: over Home, fading in and out on their own, closed by a pull down (app/stories/[id]). */}
+        <Stack.Screen name="stories/[id]" options={{ headerShown: false, presentation: "transparentModal", animation: "none", gestureEnabled: false, contentStyle: { backgroundColor: "transparent" } }} />
         <Stack.Screen name="buzz/[id]" options={{ headerShown: false, contentStyle: buzzContent }} />
         <Stack.Screen name="buzz/search" options={{ headerShown: false, contentStyle: buzzContent }} />
         <Stack.Screen name="buzz/mine" options={{ headerShown: false, contentStyle: buzzContent }} />
@@ -75,13 +84,35 @@ function ThemedStack() {
         <Stack.Screen name="messages/info/[id]" options={{ title: "Chat info" }} />
         <Stack.Screen name="messages/search/[id]" options={{ title: "Search" }} />
         <Stack.Screen name="find-people" options={{ title: "Search" }} />
+        {/* The search screen (people, topics, posts, what is popular) draws its own bar; opened from the magnifier beside the bell. */}
+        <Stack.Screen name="search" options={{ headerShown: false }} />
+        <Stack.Screen name="events/[id]" options={{ title: "Event" }} />
+        <Stack.Screen name="events/saved" options={{ title: "Saved events" }} />
+        <Stack.Screen name="events/interests" options={{ title: "Interests", presentation: "modal" }} />
+        <Stack.Screen name="events/new" options={{ title: "New event" }} />
+        <Stack.Screen name="events/edit/[id]" options={{ title: "Edit event" }} />
+        <Stack.Screen name="organizations/[id]" options={{ title: "Organization" }} />
+        <Stack.Screen name="organizations/new" options={{ title: "New organization" }} />
+        <Stack.Screen name="organizations/edit/[id]" options={{ title: "Edit organization" }} />
+        <Stack.Screen name="organizations/members/[id]" options={{ title: "Members" }} />
         <Stack.Screen name="topics/[tag]" options={{ title: "Topic" }} />
         <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
         {/* A profile draws its own floating bar (Back over the cover, the menu or More), so the cover can run under the status bar. */}
         <Stack.Screen name="profile/[id]" options={{ headerShown: false, contentStyle: content }} />
         <Stack.Screen name="follows/[id]" options={{ title: "Followers" }} />
         <Stack.Screen name="saved" options={{ title: "Saved" }} />
-        <Stack.Screen name="settings" options={{ title: "Settings" }} />
+        <Stack.Screen name="settings" options={{ title: "Settings", ...settings }} />
+        <Stack.Screen name="settings/account" options={{ title: "Account & Profile", ...settings }} />
+        <Stack.Screen name="settings/edit-profile" options={{ title: "Edit profile", ...settings }} />
+        <Stack.Screen name="settings/study" options={{ title: "Major & class year", ...settings }} />
+        <Stack.Screen name="settings/university" options={{ title: "University", ...settings }} />
+        <Stack.Screen name="settings/account-management" options={{ title: "Account Management", ...settings }} />
+        <Stack.Screen name="settings/privacy" options={{ title: "Privacy", ...settings }} />
+        <Stack.Screen name="settings/notifications" options={{ title: "Notifications", ...settings }} />
+        <Stack.Screen name="settings/safety" options={{ title: "Safety & Security", ...settings }} />
+        <Stack.Screen name="settings/blocked" options={{ title: "Blocked accounts", ...settings }} />
+        <Stack.Screen name="settings/appearance" options={{ title: "Appearance", ...settings }} />
+        <Stack.Screen name="settings/about" options={{ title: "About & Support", ...settings }} />
         <Stack.Screen name="settings/account-status" options={{ title: "Account status" }} />
         <Stack.Screen name="settings/buzz-anonymity" options={{ title: "How Buzz anonymity works" }} />
         <Stack.Screen name="create/apartment" options={{ title: "List an apartment" }} />

@@ -1,8 +1,11 @@
+import type { Story } from "./stories";
 import type { FeedMedia, FeedPostWithAuthor, Reel, SavedTargetType, SharedPost, SharedPostKind } from "./types/models";
 
 const KINDS: SharedPostKind[] = ["post", "reel", "listing"];
-const TARGETS = ["post", "apartment", "roommate", "item"] as const;
-const BASES: Record<SharedPost["target_type"], string> = { post: "/posts", apartment: "/apartments", roommate: "/roommates", item: "/marketplace" };
+const TARGETS = ["post", "apartment", "roommate", "item", "story"] as const;
+// A story has no page on the website: its path is what the database's card check expects, and the app opens it in the
+// story viewer (see isStoryCard).
+const BASES: Record<SharedPost["target_type"], string> = { post: "/posts", apartment: "/apartments", roommate: "/roommates", item: "/marketplace", story: "/stories" };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // A regex rather than `new URL`: React Native's URL does not implement `protocol`.
 const HTTPS = /^https:\/\/[^\s/?#]+[^\s]*$/i;
@@ -52,8 +55,9 @@ export function sharedPostOf(value: unknown): SharedPost | null {
   if (!target_type || !target_id || !(TARGETS as readonly string[]).includes(target_type) || !UUID.test(target_id)) return null;
   const type = target_type as SharedPost["target_type"];
   const stated = str(v.kind);
-  // A listing is always a listing; a post is a post or a reel.
-  const kind: SharedPostKind = type !== "post" ? "listing" : stated === "reel" ? "reel" : stated && (KINDS as string[]).includes(stated) && stated !== "listing" ? (stated as SharedPostKind) : "post";
+  // A story is shared or answered; a listing is always a listing; a post is a post or a reel.
+  const kind: SharedPostKind =
+    type === "story" ? (stated === "story_reply" ? "story_reply" : "story") : type !== "post" ? "listing" : stated === "reel" ? "reel" : stated && (KINDS as string[]).includes(stated) && stated !== "listing" ? (stated as SharedPostKind) : "post";
   const author = v.author && typeof v.author === "object" ? (v.author as Record<string, unknown>) : null;
   return {
     target_type: type,
@@ -119,12 +123,93 @@ export function sharedPostFromListing(input: { targetType: SavedTargetType; targ
   };
 }
 
-/** The inbox line for a share without words; the same text the database writes into last_message_preview. */
-export function sharedPostPreview(shared: Pick<SharedPost, "kind">): string {
-  return shared.kind === "reel" ? "Sent a reel" : shared.kind === "listing" ? "Sent a listing" : "Sent a post";
+/**
+ * Someone's story as a card in a chat (migration 62): shared with friends (`reply` false) or answering the story in the
+ * author's chat. The database rewrites the picture and the author from the story itself and refuses it for anyone who
+ * may not see the story; what is sent here is only what the chat shows while the message is on its way.
+ */
+export function sharedPostFromStory(story: Pick<Story, "id" | "author" | "photo" | "video">, reply = false): SharedPost {
+  return {
+    target_type: "story",
+    target_id: story.id,
+    kind: reply ? "story_reply" : "story",
+    path: sharedPostPath({ target_type: "story", target_id: story.id }),
+    title: null,
+    caption: null,
+    image_url: story.photo?.url ?? story.video?.poster_url ?? null,
+    author: { id: story.author.id, name: story.author.full_name, avatar_url: story.author.avatar_url },
+  };
 }
 
-/** The card's footer: what tapping it opens. */
+/** A story card: it opens the story viewer while the story lasts, and points nowhere on the website. */
+export function isStoryCard(shared: Pick<SharedPost, "target_type">): boolean {
+  return shared.target_type === "story";
+}
+
+const PREVIEWS: Record<SharedPostKind, string> = { post: "Sent a post", reel: "Sent a reel", listing: "Sent a listing", story: "Sent a story", story_reply: "Replied to a story" };
+const LABELS: Record<SharedPostKind, string> = { post: "View post", reel: "View reel", listing: "View listing", story: "View story", story_reply: "Replied to a story" };
+
+/** The inbox line for a share without words; the same text the database writes into last_message_preview. */
+export function sharedPostPreview(shared: Pick<SharedPost, "kind">): string {
+  return PREVIEWS[shared.kind] ?? PREVIEWS.post;
+}
+
+/** The card's footer: what tapping it opens (a story reply says what it is: the story was the author's own). */
 export function sharedPostLabel(shared: Pick<SharedPost, "kind">): string {
-  return shared.kind === "reel" ? "View reel" : shared.kind === "listing" ? "View listing" : "View post";
+  return LABELS[shared.kind] ?? LABELS.post;
+}
+
+/** What a story's like, reply or share reads while the database lacks migration 62 (story_likes, the story card). */
+export const STORY_ACTIONS_NOT_READY = "Likes, replies and sharing for stories need the latest server update. Try again once it's out.";
+
+/** The word for what a card carries, as the database's own refusals use it ("can't see this story"). */
+export function sharedPostNoun(shared: Pick<SharedPost, "target_type" | "kind">): string {
+  if (shared.target_type === "story") return "story";
+  return shared.kind === "reel" ? "reel" : shared.kind === "listing" ? "listing" : "post";
+}
+
+/**
+ * Why a card did not reach one chat, read from the database's answer rather than guessed:
+ *   * "audience": someone in that chat may not see it (guard_message_story_card, migration 62; migrations 45 and 47 for
+ *     posts and listings). The people who may not see it are never named by the database, so the chat is.
+ *   * "gone": the story expired, was deleted, or its author and the sender are blocked either way.
+ *   * "not_ready": a story card on a database without migration 62 (its card check, or no story_likes).
+ *   * "other": anything else (no network, a rate limit), with the error's own words.
+ */
+export type ShareFailureKind = "audience" | "gone" | "not_ready" | "other";
+export type ShareFailure = { kind: ShareFailureKind; message: string };
+
+const MISSING_TABLE = new Set(["42P01", "PGRST205"]);
+const errorCode = (e: unknown): string => String((e as { code?: unknown } | null)?.code ?? "");
+const errorWords = (e: unknown): string => (e instanceof Error ? e.message : typeof e === "string" ? e : String((e as { message?: unknown } | null)?.message ?? ""));
+
+export function shareFailureOf(error: unknown, shared: Pick<SharedPost, "target_type">): ShareFailure {
+  const message = errorWords(error).trim();
+  if (/can['’]t see this/i.test(message)) return { kind: "audience", message };
+  if (/no longer available/i.test(message)) return { kind: "gone", message };
+  if (shared.target_type === "story" && (MISSING_TABLE.has(errorCode(error)) || (errorCode(error) === "23514" && message.includes("messages_shared_post_check")))) {
+    return { kind: "not_ready", message: STORY_ACTIONS_NOT_READY };
+  }
+  return { kind: "other", message: message || "Check your connection and try again." };
+}
+
+/** A chat a card was sent to: a friend (a direct chat) or a group, by the name the sheet showed. */
+export type ShareTarget = { name: string; group: boolean };
+
+/**
+ * The words under "Could not send to …": one line per reason, naming who or which group, so a refusal for privacy is
+ * never mistaken for a network failure (or the other way round). `noun` is sharedPostNoun's word.
+ */
+export function shareFailureSummary(failures: readonly (ShareTarget & ShareFailure)[], noun: string): string {
+  const lines: string[] = [];
+  const list = (names: string[]) => (names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
+  const people = failures.filter((f) => f.kind === "audience" && !f.group).map((f) => f.name);
+  const groups = failures.filter((f) => f.kind === "audience" && f.group).map((f) => f.name);
+  if (people.length) lines.push(`${list(people)} can't see this ${noun}.`);
+  if (groups.length) lines.push(`Some people in ${list(groups)} can't see this ${noun}.`);
+  if (failures.some((f) => f.kind === "gone")) lines.push(`This ${noun} is no longer available.`);
+  if (failures.some((f) => f.kind === "not_ready")) lines.push(STORY_ACTIONS_NOT_READY);
+  const other = failures.filter((f) => f.kind === "other");
+  if (other.length) lines.push(`${list(other.map((f) => f.name))}: ${other[0].message}`);
+  return lines.join("\n");
 }

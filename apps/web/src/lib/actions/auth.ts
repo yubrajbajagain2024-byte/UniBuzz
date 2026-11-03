@@ -1,8 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createSignUpSchema, flattenZodError, getAllowedEmailDomains, signInSchema, type FieldErrors } from "@apartment-book/shared";
+import { authErrorMessage, createSignUpSchema, flattenZodError, getAllowedEmailDomains, newPasswordSchema, PASSWORD_CHANGED, requestPasswordReset, RESET_REQUESTED, resetPasswordUrl, resetRequestSchema, setNewPassword, signInSchema, type FieldErrors } from "@apartment-book/shared";
 import { getSiteUrl } from "@/lib/env";
+import { createRecoveryClient } from "@/lib/supabase/recovery";
 import { createClient } from "@/lib/supabase/server";
 import { errorMessage, formToObject, safeNextPath } from "@/lib/utils";
 
@@ -19,12 +20,15 @@ function stringValues(formData: FormData, keys: string[]): Record<string, string
   return values;
 }
 
-/** "Database error saving new user" is what Supabase returns when the email domain trigger rejects a sign-up. */
+/**
+ * Supabase Auth's answers in the person's words: "Database error saving new user" is what it returns when the email
+ * domain trigger rejects a sign-up; the rest (a wrong password, an unconfirmed email, a rate limit) is authErrorMessage's.
+ */
 export async function friendlyAuthError(message: string): Promise<string> {
   if (/database error saving new user/i.test(message)) {
     return "Only verified university email addresses can join. Please use your @txstate.edu email.";
   }
-  return message;
+  return authErrorMessage(message);
 }
 
 export async function signUpAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
@@ -72,13 +76,41 @@ export async function signInAction(_prev: AuthState, formData: FormData): Promis
     email: parsed.data.email,
     password: parsed.data.password,
   });
-  if (error) {
-    const friendly =
-      error.message === "Invalid login credentials" ? "Incorrect email or password." : error.message;
-    return { error: friendly, values };
-  }
+  if (error) return { error: authErrorMessage(error.message), values };
 
   redirect(safeNextPath(String(formData.get("next") ?? "")));
+}
+
+/**
+ * "Forgot password?": asks Supabase for a recovery email whose link lands on /reset-password (the implicit flow, so the
+ * link opens in any browser: lib/supabase/recovery.ts). The reply never says whether an account exists.
+ */
+export async function requestPasswordResetAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const values = stringValues(formData, ["email"]);
+  const parsed = resetRequestSchema.safeParse(formToObject(formData));
+  if (!parsed.success) {
+    return { error: "Please fix the highlighted fields.", fieldErrors: flattenZodError(parsed.error).fieldErrors, values };
+  }
+  try {
+    await requestPasswordReset(createRecoveryClient(), parsed.data.email, resetPasswordUrl(getSiteUrl()));
+  } catch (error) {
+    return { error: errorMessage(error), values };
+  }
+  return { success: RESET_REQUESTED };
+}
+
+/** "Choose a new password", in the session a recovery link entered (or the signed-in person's own). */
+export async function updatePasswordAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const parsed = newPasswordSchema.safeParse(formToObject(formData));
+  if (!parsed.success) {
+    return { error: "Please fix the highlighted fields.", fieldErrors: flattenZodError(parsed.error).fieldErrors };
+  }
+  try {
+    await setNewPassword(await createClient(), parsed.data.password);
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
+  return { success: PASSWORD_CHANGED };
 }
 
 export async function signInWithGoogleAction(formData: FormData): Promise<void> {

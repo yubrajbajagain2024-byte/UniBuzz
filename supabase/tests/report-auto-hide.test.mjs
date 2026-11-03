@@ -1,4 +1,4 @@
-// The report auto-hide backstop (20261110000000_report_auto_hide.sql) on production's schema: content 10 different
+// The report auto-hide backstop (20261116000000_report_auto_hide.sql) on production's schema: content 10 different
 // legitimate people report is hidden for everyone but its owner, flagged for CampConnect Admin, its owner told and the
 // hide audited (never naming a Buzz author or an anonymous poster); duplicates and people who do not count are left
 // out, and the author cannot cancel reports by blocking; Buzz stays anonymous, Trust & Safety's own hide at 3 still
@@ -6,26 +6,21 @@
 // to hide it again; keep hidden, delete and the website console's approve settle the flag; a review never closes a
 // self-harm report, a wellbeing item or a legal hold, nobody reviews what they wrote or reported, and moderators leave
 // escalated items to admins; the console never un-hides a hide staff made by hand; the new table and helpers are
-// closed, and the rollback keeps to its caller's transaction. Then the same core on production as it is today (the
-// migrations not live yet left out, since this one may be applied alone), and on this repo's schema alone, where it
-// changes nothing.
+// closed, and the rollback keeps to its caller's transaction; stories (migration 62) stay reported, snapshotted and
+// removed as before. Then the same core on production as it is today (the migrations not live yet left out, since
+// this one may be applied alone), and on this repo's schema alone, where it changes nothing.
 // Usage: node supabase/tests/report-auto-hide.test.mjs
 import { boot, read, expectOk, expectError, done } from "./harness.mjs";
 import { BUZZ_GUIDELINES_VERSION } from "../../packages/shared/src/buzz/constants.ts";
 
-const MIGRATION = "migrations/20261110000000_report_auto_hide.sql";
-const ROLLBACK = "rollbacks/20261110000000_report_auto_hide.down.sql";
+const MIGRATION = "migrations/20261116000000_report_auto_hide.sql";
+const ROLLBACK = "rollbacks/20261116000000_report_auto_hide.down.sql";
 const MFA = { aal: "aal2" };
 const THRESHOLD = 10;
 const check = (cond, message) => { if (!cond) throw new Error(message); };
-// Production's migrations as of 2026-10-28: these are in this repo but not live yet (docs/migrations.md; 47, the
-// anonymous listings, has been live since 2026-10-27).
-const NOT_LIVE = [
-  "20261103000300_discover.sql", "20261104000100_discover_audience.sql",
-  "20261107000000_business_teams.sql", "20261107000100_business_ads.sql", "20261108000000_buzz_reply_tree.sql",
-  "20261108000100_buzz_top_reply.sql", "20261108000200_buzz_prompt_threads.sql", "20261108000300_buzz_categories.sql",
-  "20261109000000_media_server_fields.sql", "20261109000100_business_hardening.sql",
-];
+// Production's migrations as of 2026-11-03: every migration in this repo up to 63 is live (docs/migrations.md), so
+// nothing is left out; the list stays for the next one that goes ahead of a release.
+const NOT_LIVE = [];
 
 /** One database and the helpers every section uses. */
 async function setup(bootOpts) {
@@ -541,6 +536,22 @@ await expectOk("the rollback removes the backstop and its helpers; the migration
       check(await T.sees(viewer, kind, id), "re-hidden by the same reports");
     });
   }
+  // Migration 62's story branches survive: this migration replaces ts_snapshot() and ts_set_content_status() again.
+  await expectOk("today's production: a story is still snapshotted, never flagged at 10 reports, and removed by staff", async () => {
+    // The photo must be the author's own upload (migration 59).
+    const name = `stories/${author}/1730000000001-abc.jpg`;
+    await T.db.query("insert into storage.objects (bucket_id, name, owner, owner_id) values ('uploads', $1, $2::uuid, $3)", [name, author, author]);
+    const story = await T.as(author, () => T.val(T.db.query("insert into public.stories (author_id, kind, image_url, image_meta, audience) values ($1, 'photo', $2, '{\"width\":1080,\"height\":1920,\"blur\":null}', 'global') returning id", [author, `https://proj.supabase.co/storage/v1/object/public/uploads/${name}`])));
+    const s = await T.val(T.db.query("select public.ts_snapshot('story', $1)", [story]));
+    check(s?.entityType === "story" && s?.status === "active", JSON.stringify(s));
+    const rs = await T.people(THRESHOLD, "Today story Reporter");
+    for (const r of rs) await T.as(r, () => T.db.query("insert into public.reports (reporter_id, target_type, target_id, reason) values ($1, 'story', $2, 'harassment')", [r, story]));
+    check((await T.flags("story", story)).length === 0, "a story was flagged");
+    check(Number(await T.val(T.db.query("select count(*) from public.stories where id = $1", [story]))) === 1, "the story is gone");
+    await T.db.query("select public.ts_set_content_status('story', $1, 'removed')", [story]);
+    check(Number(await T.val(T.db.query("select count(*) from public.stories where id = $1", [story]))) === 0, "the story stayed");
+    check((await T.val(T.db.query("select public.ts_snapshot('story', $1) is null", [story]))) === true, "the snapshot stayed");
+  });
 }
 
 // =====================================================================================================================

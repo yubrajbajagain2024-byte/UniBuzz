@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { signInAction, signInWithGoogleAction, signUpAction } from "@/lib/actions/auth";
+import { requestPasswordResetAction, signInAction, signInWithGoogleAction, signUpAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,11 @@ export function LoginForm({ next, initialError, domains = [] }: { next: string; 
         <Field label="Password" htmlFor="password" error={state?.fieldErrors?.password}>
           <Input id="password" name="password" type="password" autoComplete="current-password" required />
         </Field>
+        <p className="-mt-2 text-right text-sm">
+          <Link href="/forgot-password" className="text-gray-600 hover:underline">
+            Forgot password?
+          </Link>
+        </p>
         <Button type="submit" size="lg" loading={pending}>
           Log in
         </Button>
@@ -114,6 +119,41 @@ export function SignupForm({ next, domains = [] }: { next: string; domains?: str
           Log in
         </Link>
       </p>
+    </div>
+  );
+}
+
+/** "Forgot password?": the email to send a recovery link to; afterwards, what to expect. Never says whether an account exists. */
+export function ForgotPasswordForm({ domains = [] }: { domains?: string[] }) {
+  const [state, action, pending] = useActionState(requestPasswordResetAction, null);
+  const back = (
+    <p className="text-center text-sm text-gray-600">
+      <Link href="/login" className="font-semibold text-brand-600 hover:underline">
+        Back to log in
+      </Link>
+    </p>
+  );
+  if (state?.success) {
+    return (
+      <div className="flex flex-col gap-4">
+        <FormMessage success={state.success} />
+        <p className="text-sm text-gray-600">The link is good for an hour and opens a page where you choose a new password. Nothing after a few minutes? Check the address and send it again.</p>
+        {back}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      <form action={action} className="flex flex-col gap-4">
+        <FormMessage error={state?.error} />
+        <Field label="Email" htmlFor="email" error={state?.fieldErrors?.email} hint={domainHint(domains)}>
+          <Input id="email" name="email" type="email" autoComplete="email" required defaultValue={state?.values?.email} placeholder={domains[0] ? `you@${domains[0]}` : "you@university.edu"} autoFocus />
+        </Field>
+        <Button type="submit" size="lg" loading={pending}>
+          Send reset link
+        </Button>
+      </form>
+      {back}
     </div>
   );
 }

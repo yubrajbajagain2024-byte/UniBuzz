@@ -20,8 +20,12 @@ import {
   POST_AUDIENCE_VALUES,
   POST_KIND_VALUES,
   POST_TITLE_MAX,
+  REPORT_DECISION_VALUES,
   SLEEP_SCHEDULES,
+  STAFF_ROLE_VALUES,
 } from "../constants";
+import { PASSWORD_MAX, PASSWORD_MIN } from "../auth";
+import { CLOSE_CLOCK, HOURS_TIMEZONE_VALUES, isHoursDate, MAX_HOURS_RANGES, MAX_SPECIAL_HOURS, OPEN_CLOCK } from "../business-hours";
 import {
   formBoolean,
   imageMeta,
@@ -35,6 +39,7 @@ import {
 } from "./common";
 
 export * from "./common";
+export * from "./events";
 
 // ---------------------------------------------------------------------------
 // Auth
@@ -51,16 +56,30 @@ export function createSignUpSchema(allowedDomains: string[]) {
       : `Use your university email address (${domains.map((d) => `@${d}`).join(", ")})`;
   return z.object({
     fullName: z.string().trim().min(2, "Enter your name").max(80),
+    // Tidied before it is checked: a space after the address (iOS adds one when it completes an email) is not a mistake.
     email: z
-      .email({ error: "Enter a valid email address" })
+      .string()
       .trim()
       .toLowerCase()
+      .pipe(z.email({ error: "Enter a valid email address" }))
       .refine((email) => domains.length === 0 || domains.includes(email.split("@")[1] ?? ""), { error: hint }),
     password: z.string().min(8, "Password must be at least 8 characters").max(72),
   });
 }
 export const signUpSchema = createSignUpSchema([]);
 export type SignUpInput = z.infer<typeof signUpSchema>;
+
+/** "Forgot password?": an email, tidied as the sign-in form tidies it. */
+export const resetRequestSchema = z.object({ email: z.string().trim().toLowerCase().pipe(z.email({ error: "Enter a valid email address" })) });
+
+/** "Choose a new password": the sign-up rule (8 to 72 characters), typed twice the same. */
+export const newPasswordSchema = z
+  .object({
+    password: z.string().min(PASSWORD_MIN, `Use at least ${PASSWORD_MIN} characters`).max(PASSWORD_MAX, `Use at most ${PASSWORD_MAX} characters`),
+    confirm: z.string(),
+  })
+  .refine((v) => v.password === v.confirm, { error: "The passwords don't match", path: ["confirm"] });
+export type NewPasswordInput = z.infer<typeof newPasswordSchema>;
 
 /** Optional map pin: both coordinates or neither. */
 const coordinateFields = {
@@ -72,7 +91,7 @@ const bothOrNeither = (v: { latitude?: number; longitude?: number }) =>
 const coordinateError = { error: "Pin the location on the map or clear the pin", path: ["latitude"] };
 
 export const signInSchema = z.object({
-  email: z.email({ error: "Enter a valid email address" }).trim().toLowerCase(),
+  email: z.string().trim().toLowerCase().pipe(z.email({ error: "Enter a valid email address" })),
   password: z.string().min(1, "Enter your password"),
 });
 export type SignInInput = z.infer<typeof signInSchema>;
@@ -311,6 +330,54 @@ const uuidList = z.preprocess(
   z.array(z.uuid()).max(50),
 );
 
+const hoursRange = z
+  .strictObject({
+    open: z.string().regex(OPEN_CLOCK, "Use a time like 09:00"),
+    close: z.string().regex(CLOSE_CLOCK, "Use a time like 17:00"),
+  })
+  .refine((r) => r.open !== r.close, "Opening and closing can't be the same time");
+const hoursRanges = z.array(hoursRange).max(MAX_HOURS_RANGES, `Up to ${MAX_HOURS_RANGES} sets of hours a day`);
+
+/**
+ * A business's opening hours (businesses.hours, migration 57): a time zone from the list, each weekday's ranges (none
+ * is closed) and special hours by date, each date once, closed or with its own hours. The database checks the same.
+ */
+export const businessHoursSchema = z.strictObject({
+  timezone: z.enum(HOURS_TIMEZONE_VALUES, { error: "Choose a time zone" }),
+  week: z.strictObject({ mon: hoursRanges, tue: hoursRanges, wed: hoursRanges, thu: hoursRanges, fri: hoursRanges, sat: hoursRanges, sun: hoursRanges }),
+  special: z
+    .array(
+      z
+        .strictObject({
+          date: z.string().refine(isHoursDate, "Choose a date"),
+          label: z
+            .string()
+            .trim()
+            .max(40, "Keep the name to 40 characters")
+            .nullish()
+            .transform((v) => v || null),
+          closed: z.boolean(),
+          hours: hoursRanges,
+        })
+        .refine((d) => (d.closed ? d.hours.length === 0 : d.hours.length > 0), "Add the hours, or mark the day closed"),
+    )
+    .max(MAX_SPECIAL_HOURS, `Up to ${MAX_SPECIAL_HOURS} special dates`)
+    .refine((list) => new Set(list.map((d) => d.date)).size === list.length, "Each date can have one set of special hours"),
+});
+export type BusinessHoursInput = z.infer<typeof businessHoursSchema>;
+
+/** The form sends the hours as JSON: "" or nothing leaves them as they are, "null" takes them off the profile. */
+const hoursField = z.preprocess((v) => {
+  if (v === undefined || v === "") return undefined;
+  if (v === "null") return null;
+  if (typeof v !== "string") return v;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return v;
+  }
+}, businessHoursSchema.nullable().optional());
+
 /** The business profile the owner edits. */
 export const businessProfileSchema = z.object({
   name: z.string().trim().min(2, "Enter the business's name").max(120),
@@ -323,6 +390,8 @@ export const businessProfileSchema = z.object({
   city: optionalText(120),
   logoUrl: optionalUrl,
   universityIds: uuidList,
+  /** Undefined leaves the hours as they are (and a database without migration 57 has none to change). */
+  hours: hoursField,
 });
 export type BusinessProfileInput = z.infer<typeof businessProfileSchema>;
 
@@ -449,3 +518,30 @@ export const businessReportSchema = z.object({
   reason: z.enum(REPORT_REASON_VALUES, { error: "Choose a reason" }),
   details: optionalText(1000),
 });
+// Admin section: staff and two-factor authentication
+// ---------------------------------------------------------------------------
+export const staffAddSchema = z.object({ email: z.email({ error: "Enter a valid email address" }).trim().toLowerCase().max(320), role: z.enum(STAFF_ROLE_VALUES, { error: "Choose a role" }) });
+export type StaffAddInput = z.infer<typeof staffAddSchema>;
+/** 6 digits; spaces the user typed are ignored. */
+export const totpCodeSchema = z.object({ code: z.preprocess((v) => (typeof v === "string" ? v.replace(/\s+/g, "") : v), z.string().regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app")) });
+export type TotpCodeInput = z.infer<typeof totpCodeSchema>;
+
+// ---------------------------------------------------------------------------
+// Admin section: moderation
+// ---------------------------------------------------------------------------
+const emptyStringToUndefined = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
+/** The reason the person sees, 3 to 500 characters: the same rule the database applies. */
+const moderationReason = z.string().trim().min(3, "Give a reason of at least 3 characters").max(500, "Keep the reason under 500 characters");
+/** Suspend an account. expiresAt is an ISO date-time (a datetime-local input's value is accepted too); leave it empty for "until lifted". */
+export const suspendUserSchema = z.object({
+  reason: moderationReason,
+  expiresAt: z.preprocess(emptyStringToUndefined, z.iso.datetime({ offset: true, local: true, error: "Enter a valid end date and time" }).optional()),
+  note: optionalText(2000),
+});
+export type SuspendUserInput = z.infer<typeof suspendUserSchema>;
+export const hideContentSchema = z.object({ reason: moderationReason });
+export type HideContentInput = z.infer<typeof hideContentSchema>;
+export const deleteContentSchema = z.object({ reason: moderationReason });
+export type DeleteContentInput = z.infer<typeof deleteContentSchema>;
+export const resolveReportSchema = z.object({ decision: z.enum(REPORT_DECISION_VALUES, { error: "Choose a decision" }), notes: optionalText(2000) });
+export type ResolveReportInput = z.infer<typeof resolveReportSchema>;
