@@ -6,7 +6,9 @@ import { boot, read, expectOk, expectError, done } from "./harness.mjs";
 import { callOf, callPreview, callRowText, missedCallBody } from "../../packages/shared/src/calls.ts";
 
 const MIGRATION = "migrations/20261028000000_calls.sql";
-const { db, mk, as } = await boot();
+// The calls themselves, as they work when calls are switched on: without migration 64's pause, which refuses every new
+// call (supabase/tests/calls-paused.test.mjs tests that).
+const { db, mk, as } = await boot({ skip: ["20261116000000_calls_paused.sql"] });
 await expectOk("the migration re-runs cleanly", () => db.exec(read(MIGRATION)));
 
 const one = async (p) => (await p).rows[0];
