@@ -150,6 +150,22 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   owner's approval, after a full verified backup and a zero-difference schema diff; the diff is zero again after it and
   rows, accounts and files are as in the backup ([migrations.md](migrations.md)). Still to do: the app's EAS update for
   the features that need these migrations (owner's approval).
+- **Ads reach students** (branch `ads-delivery`, 2026-11-03, not merged yet; no migration). Ads approved in UniBuzz
+  Business did not show in the student feeds. Not the connection: the portal is part of the website, and the website's
+  and the app's settings name the same Supabase project (`apps/web/.env.local`, `apps/mobile/.env`; Vercel's own
+  variables not read), which has had the ads schema since the release above (read-only check as `anon`, 2026-11-03). Not
+  the approval or the serving: an ad built, submitted and approved through the apps' own code is returned by
+  `ads_for_feed()` on production's migrations (`supabase/tests/ad-delivery.test.mjs`). The cause was where the feeds put
+  ads: the first one waited for the 9th organic row, but the first page of For You and of Reels has 8 rows (Housing 12),
+  so those feeds never asked for an ad on their first page, and a campus with fewer than 9 posts never showed one; and
+  the app's Reels had no ads at all. Now the first ad follows the 3rd row, then one per 9 at most; a feed that has ended
+  with 1 or 2 rows ends with its ad ([decisions.md](decisions.md)); the app's Reels shows Sponsored reels. The website's
+  part goes live with the merge; the app's needs a new native build before any EAS update (see the EAS row under
+  "Blockers and known risks"). The live website and portal (their public JavaScript), EAS's production, preview and
+  development variables and the local settings all name the same live project, with the same anon key (2026-11-03).
+  Draft PR from `ads-delivery`. **Not yet run on staging, in a browser or on an iPhone**: the owner runs
+  `supabase/tests/staging/ad-delivery.mjs --keep`, `apps/web/e2e/sponsored-ads.mjs` and the app in Expo Go
+  ([testing.md](testing.md)).
 - **UniBuzz Business v2 is on `main` without its migrations.** PR #49 was merged on 2026-10-28 at
   04:07 UTC (and #51 at 07:06 UTC), so production's website runs Business v2 code while neither
   migration 49 nor 50 is applied (production's `_migrations`, read-only, 2026-10-28). Until they are, the code
@@ -324,6 +340,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | Supabase CDN may serve a just-deleted Snap to the same viewer for ~1 minute | README §"Snaps" |
 | Supabase free projects pause after a week idle (Pro, USD 25/mo, before real users); built-in auth email is rate-limited (custom SMTP needed) | README §"Production checklist" |
 | Vercel Hobby optimizes 5,000 source images a month | README §"Photos" |
+| An EAS update from `main` would reach a build that cannot run it (read-only check, 2026-11-03): the app's runtime policy is `sdkVersion`, so every SDK 58 build takes any SDK 58 update, and the only one, the Android preview build of 2026-10-26 07:12 UTC (`2e0e4458`), predates `expo-camera`, `expo-media-library`, `expo-video-thumbnails` and `react-native-view-shot` (added 20:28 UTC that day, used by the create flow). No update has been published since. A new native build has to come first; a `fingerprint` runtime policy would stop this from recurring. No EAS build exists for an iPhone (the iOS build is an SDK 57 simulator build); iPhones run the app in Expo Go | "Ads reach students" above |
 | The README still says the Vercel project is not connected to Git, and that 41 and 42 are not live; both are out of date | this file, [migrations.md](migrations.md) |
 
 ## Future plans

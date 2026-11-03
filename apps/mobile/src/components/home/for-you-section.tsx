@@ -22,7 +22,7 @@ import { useCreateMenu } from "./create-menu";
 import { InstaPost } from "./insta-post";
 import { StoriesTray } from "./stories-tray";
 import { SponsoredCard } from "@/components/ads/sponsored-card";
-import { isAdRow, useAdImpressions, useFeedAds, type AdRow } from "@/lib/use-feed-ads";
+import { feedAdSpacing, isAdRow, useAdImpressions, useFeedAds, type AdRow } from "@/lib/use-feed-ads";
 import { markReelsStale } from "./reels-section";
 import { useTabReselect } from "@/lib/tab-reselect";
 import { refreshWithHaptic } from "@/lib/haptics";
@@ -185,9 +185,10 @@ export function ForYouSection({ active, topInset, onScroll }: { active: boolean;
   // One video plays at a time, the first row on screen (at least 60% of it) that has one: sound is one switch for every
   // video, so two playing at once would both be heard.
   const [playingId, setPlayingId] = useState<string | null>(null);
-  // Sponsored posts between the posts (at most one per ADS_EVERY), counted as seen when the list says so.
-  const ads = useFeedAds("for_you", items.length, Boolean(userId));
-  const rows = useMemo<(ForYouItem | AdRow)[]>(() => interleaveAds(items, ads, ADS_EVERY).map((r) => (r.kind === "ad" ? { id: `ad-${r.ad.id}`, ad: r.ad } : r.item)), [items, ads]);
+  // Sponsored posts between the posts (the first after ADS_FIRST_AFTER, then at most one per ADS_EVERY), counted as seen
+  // when the list says so.
+  const ads = useFeedAds("for_you", items.length, Boolean(userId), !loading && !hasMore);
+  const rows = useMemo<(ForYouItem | AdRow)[]>(() => interleaveAds(items, ads, ADS_EVERY, feedAdSpacing(!loading && !hasMore)).map((r) => (r.kind === "ad" ? { id: `ad-${r.ad.id}`, ad: r.ad } : r.item)), [items, ads, loading, hasMore]);
   const countAds = useAdImpressions("for_you");
   const countAdsRef = useRef(countAds);
   const onViewable = useRef(({ viewableItems }: { viewableItems: ListViewToken[] }) => {

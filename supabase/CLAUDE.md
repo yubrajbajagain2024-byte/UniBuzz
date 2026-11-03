@@ -59,6 +59,9 @@ Supabase's `auth` and `storage` schemas.
   app's own code (it applies 62 on staging when missing); `auth-recovery.mjs`, sign-up, confirmation,
   login and password recovery through Supabase Auth and the apps' own code (links made with the
   admin API; staging's built-in mailer allows two emails an hour); and
+  `ad-delivery.mjs`, an ad from a business's sign-up to students' first pages through the apps' own code, with
+  `--keep` to leave the campaigns live three hours for the website (`apps/web/e2e/sponsored-ads.mjs`) and a phone, then
+  `verify` and `cleanup`; and
   `release-rehearsal.mjs`, which rehearses a release step by step (see its header) and expects every
   migration that went live ahead of the release (58 to 61) to be applied on staging first.
   Staging's `media_jobs` grows on its own: leave it out of row-count comparisons.

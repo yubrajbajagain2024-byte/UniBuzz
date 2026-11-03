@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { RefreshControl, Text, View, type FlatList, type NativeScrollEvent, type NativeSyntheticEvent, type ListViewToken } from "react-native";
 import { ADS_EVERY, interleaveAds, KM_PER_MILE, listApartments, videosFor, type ApartmentWithOwner } from "@apartment-book/shared";
 import { SponsoredCard } from "@/components/ads/sponsored-card";
-import { isAdRow, useAdImpressions, useFeedAds, type AdRow } from "@/lib/use-feed-ads";
+import { feedAdSpacing, isAdRow, useAdImpressions, useFeedAds, type AdRow } from "@/lib/use-feed-ads";
 import type { RoomFilterChoice } from "@apartment-book/shared";
 import { HousingCard } from "@/components/housing/housing-card";
 import { FEED_HEADER_PADDING } from "@/components/post-card";
@@ -41,9 +41,11 @@ export function ApartmentsSection({ topInset, onScroll, q, campus, filters, filt
   const inset = useMemo(() => listInset(topInset), [topInset]);
   // Tapping Explore again while Housing is on screen: back to the top.
   const listRef = useRef<FlatList<ApartmentWithOwner | AdRow>>(null);
-  // Housing ads (only housing ads run here) between the listings, at most one per ADS_EVERY.
-  const ads = useFeedAds("housing", feed.items.length, Boolean(user));
-  const rows = useMemo<(ApartmentWithOwner | AdRow)[]>(() => interleaveAds(feed.items, ads, ADS_EVERY).map((r) => (r.kind === "ad" ? { id: `ad-${r.ad.id}`, ad: r.ad } : r.item)), [feed.items, ads]);
+  // Housing ads (only housing ads run here) between the listings: the first after ADS_FIRST_AFTER, then at most one per
+  // ADS_EVERY.
+  const ended = !feed.loading && !feed.hasMore;
+  const ads = useFeedAds("housing", feed.items.length, Boolean(user), ended);
+  const rows = useMemo<(ApartmentWithOwner | AdRow)[]>(() => interleaveAds(feed.items, ads, ADS_EVERY, feedAdSpacing(ended)).map((r) => (r.kind === "ad" ? { id: `ad-${r.ad.id}`, ad: r.ad } : r.item)), [feed.items, ads, ended]);
   const countAds = useAdImpressions("housing");
   const countAdsRef = useRef(countAds);
   // Rows fade in once as they first arrive (not when scrolled back into view).

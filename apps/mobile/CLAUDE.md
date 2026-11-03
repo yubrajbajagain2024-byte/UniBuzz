@@ -36,6 +36,9 @@ npx eas-cli@latest update --channel preview --environment preview   # publish JS
   docs/branches/business-portal-prelaunch.md).
 - `eas update` publishes JavaScript only. A change to native configuration (`app.json` plugins,
   permissions, SDK) needs a new native build; `npx eas-cli@latest build:list` shows which exist.
+  The runtime version is the native fingerprint, so an update reaches only builds with the same
+  native code: before publishing, `npx eas-cli@latest fingerprint:compare --build-id <id>` against
+  the testers' build should say the fingerprints match.
 - Publishing an update reaches real testers, so it is a production write.
 
 ## Configuration

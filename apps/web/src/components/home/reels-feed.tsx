@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Clapperboard, Plus, X } from "lucide-react";
-import { ADS_EVERY, adSlotCount, getApartmentsByIds, homeSectionHref, interleaveAds, listFeedAds, listReels, reelPath, REELS_PAGE_SIZE, type BusinessSummary, type FeedAd, type Reel } from "@apartment-book/shared";
+import { ADS_EVERY, ADS_FIRST_AFTER, adSlotCount, getApartmentsByIds, homeSectionHref, interleaveAds, listFeedAds, listReels, reelPath, REELS_PAGE_SIZE, type BusinessSummary, type FeedAd, type Reel } from "@apartment-book/shared";
 import { createClient } from "@/lib/supabase/client";
 import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -47,7 +47,8 @@ export function ReelsFeed({ initial, universityId, hasHomeUniversity, signedIn, 
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const busy = useRef(false);
-  // Sponsored reels (vertical video ads): at most one after every ADS_EVERY reels, for the student's campus.
+  // Sponsored reels (vertical video ads): the first after ADS_FIRST_AFTER reels (or at the end of a shorter feed), then
+  // at most one after every ADS_EVERY, for the student's campus.
   const [ads, setAds] = useState<FeedAd[]>([]);
   const adsDone = useRef(false);
   const adsBusy = useRef(false);
@@ -80,7 +81,7 @@ export function ReelsFeed({ initial, universityId, hasHomeUniversity, signedIn, 
 
   useEffect(() => {
     if (!signedIn || adsDone.current || adsBusy.current) return;
-    const need = adSlotCount(items.length, ADS_EVERY) - ads.length;
+    const need = adSlotCount(items.length, ADS_EVERY, { first: ADS_FIRST_AFTER, ended: done }) - ads.length;
     if (need <= 0) return;
     adsBusy.current = true;
     listFeedAds(createClient(), "reels", need, ads.length)
@@ -91,7 +92,7 @@ export function ReelsFeed({ initial, universityId, hasHomeUniversity, signedIn, 
       .finally(() => {
         adsBusy.current = false;
       });
-  }, [items.length, ads.length, signedIn]);
+  }, [items.length, ads.length, signedIn, done]);
 
   useEffect(() => {
     const ids = items.filter((r) => r.sourceType === "apartment" && !asked.current.has(r.sourceId)).map((r) => r.sourceId);
@@ -105,7 +106,7 @@ export function ReelsFeed({ initial, universityId, hasHomeUniversity, signedIn, 
       .catch(() => {});
   }, [items]);
 
-  const rows = interleaveAds(items.map((reel) => ({ id: reel.sourceId, reel })), ads, ADS_EVERY);
+  const rows = interleaveAds(items.map((reel) => ({ id: reel.sourceId, reel })), ads, ADS_EVERY, { first: ADS_FIRST_AFTER, ended: done });
 
   // Measure where the feed starts so it ends exactly at the bottom of the screen.
   useEffect(() => {
