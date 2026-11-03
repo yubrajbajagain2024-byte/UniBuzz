@@ -52,6 +52,8 @@ open work is in [status.md](status.md).
   ([decisions.md](decisions.md)).
 - **2026-11-01:** PRs #77 to #81 merge (the app's viewers, bottom bar, Home's top edge, Settings, Explore's and Events'
   filters); migration 61 (Events) reaches production on its own, ahead of the Business v2 release (23:31 UTC).
+- **2026-11-03:** the Business v2 release reaches production (00:19 UTC): 44, 46, 49 to 57 and 63 in one `db:setup`
+  run, after a full verified backup; CampConnect Admin's Analytics and Business work from then on.
 - **2026-11-02:** migration 62 (story actions) reaches production on its own (04:32 UTC). PR #60 merges:
   CampConnect Admin (`apps/admin`, from `step-admin`) is on `main` with its Analytics and Business sections
   (migration 63, not on production) and the rest of `step-admin` outside its migration files.

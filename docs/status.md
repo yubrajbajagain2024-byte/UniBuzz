@@ -146,15 +146,10 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   and shares work against production from then on (checked as students in a rolled-back transaction). **Not checked
   in the app on an iPhone** (the Mac's iOS Simulator stopped drawing within a minute of each boot). Still to do: the
   pull request; an EAS update for the app's part (share reasons, group chats, the heart), not approved yet.
-- **Apply the pending migrations.** One run of `db:setup` from `main` in database-URL mode
-  ([supabase/CLAUDE.md](../supabase/CLAUDE.md)), after a backup, applies them in file order: 44 and
-  46 together, 49 and 50 (Business v2), 51 to 54 (Buzz), 55 and 56 (Business v2, PR #51), once
-  `business-v2`'s ad trigger fix is merged (the order of release below). Confirm with `verify.mjs --live`, then
-  publish the app update. Their code is already on `main`, which deploys production, so this is
-  overdue. Needs the owner and a credential. Ankur's 44, 46 and 51 to 54 (Discover and Buzz) can go
-  ahead of that run on their own, in two transactions, rehearsed offline on 2026-11-01
-  ([migrations.md](migrations.md), "44, 46 and 51 to 54 ahead of the release"); they wait on the
-  staging rehearsal and Sunil's approval.
+- **The Business v2 release is live (2026-11-03 00:19 UTC).** 44, 46, 49 to 57 and 63 applied in one `db:setup` run with the
+  owner's approval, after a full verified backup and a zero-difference schema diff; the diff is zero again after it and
+  rows, accounts and files are as in the backup ([migrations.md](migrations.md)). Still to do: the app's EAS update for
+  the features that need these migrations (owner's approval).
 - **UniBuzz Business v2 is on `main` without its migrations.** PR #49 was merged on 2026-10-28 at
   04:07 UTC (and #51 at 07:06 UTC), so production's website runs Business v2 code while neither
   migration 49 nor 50 is applied (production's `_migrations`, read-only, 2026-10-28). Until they are, the code
@@ -178,6 +173,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   - analytics from real events;
   - an Apple-style portal with light and dark modes.
 
+  **Released 2026-11-03 00:19 UTC** (steps 2 and 3 below done; step 4, the app update, still waits on the owner).
   Order of release (the full list, rollbacks included, is "Production deployment checklist" in
   [branches/business-v2.md](branches/business-v2.md); rehearsed on staging on 2026-10-28). PR #51,
   the website part with 55 and 56, is live since 2026-10-28 07:06 UTC.
@@ -282,10 +278,10 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   a rate card, students' reports and the business audit log. The PR also brings the admin app itself to `main` from
   `step-admin`, with its scripts, suites and README section (its migration files stay where they are:
   [branches/step-admin.md](branches/step-admin.md)); on the website only two sign-in and account-deletion messages
-  change. **Migration 63** (`20261115000000_console_business.sql`), **not on production**: until it is, both sections say
-  they need it. Rehearsed on staging 2026-10-30/31 with the Business v2 release, through the API and in the admin app
-  signed in as staff with a second factor. Still to do, each with the owner's approval: the release (63 goes with it),
-  `grant_role` for business admins, the `campconnect-admin` Vercel project (reconnected to the repository on 2026-11-02) deployed from `main`, which its first merge touching `apps/admin` does. See
+  change. **Migration 63** (`20261115000000_console_business.sql`), **live since 2026-11-03 00:19 UTC** with the release: both
+  sections work for the owner (staff owner, admin role, authenticator). Rehearsed on staging 2026-10-30/31 with the Business v2 release, through the API and in the admin app
+  signed in as staff with a second factor. The `campconnect-admin` Vercel project is reconnected to the repository and deployed from `main` (PR #91,
+  2026-11-02); no `grant_role` was needed (the only staff account already has the admin role). See
   [branches/admin-analytics-business.md](branches/admin-analytics-business.md).
 - **Buzz on the website.** The app has the threaded replies, top replies and prompt threads; the
   website still shows two levels of replies, no top reply, and prompt threads as ordinary buzzes

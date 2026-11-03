@@ -148,7 +148,7 @@ The website project and the mobile app are not touched by any of this.
 | `step-admin` reconciled with `main` outside its migrations | ready (commit `f532cf8`); the owner's questions 1 to 3 and 5 remain |
 | `main` merged in (PRs #61 to #89; the migration renamed to 63, after `story_actions`) | ready |
 | PR #60 merged (2026-11-02 23:24 UTC, the owner's approval) | done; the website deployed by the merge (Vercel: success, pages 200) |
-| Production backup (`scripts/backup.mjs before-migration-63 --full`), the dry run, the migrations, `grant_role` | **each needs the owner's approval**; steps 1 to 4 above (a fresh `SUPABASE_ACCESS_TOKEN` in a git-ignored file first) |
+| Production backup (`before-migration-63`, 200 files matching their SHA-256), the dry run, the migrations | done 2026-11-03 00:19 UTC with the owner's approval (docs/migrations.md); `grant_role` not needed: the only staff account already has the admin role |
 | The Vercel reconnection of `campconnect-admin` | done 2026-11-02 (`vercel git connect`); its first deploy from `main` comes with PR #91 (`admin-vercel-git`), or `npm run deploy:admin` |
 | The unpushed migration on the owner's Mac (`admin-check-1028`, now `20261115000100`): apply alone, then push | **needs the owner** |
 | `step-admin`'s merge-plan questions 1 to 3 (where 14 to 18 live, `_migrations` rows, migration 18) | resolved 2026-11-02 (docs/decisions.md): they stay in `supabase/applied-outside-repo/`, 18 now copied there with its suite; no production write needed. Sunil's confirmation asked for (note below) |
