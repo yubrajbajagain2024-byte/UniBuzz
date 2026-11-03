@@ -36,7 +36,7 @@
 
 ## Tests
 
-2026-11-03, with `main` at `753ab56` merged in (docs/testing.md): `npm run db:test` 59 suites, 1720 checks,
+2026-11-03, with `main` at `753ab56` merged in (docs/testing.md): `npm run db:test` 58 suites, 1720 checks,
 0 failures (`report-auto-hide` 100, with the new story check); `npm run check` 9/9; `test:shared` 295/295.
 
 - Not run: anything against a real Supabase project (no token in this session's environment).
