@@ -202,6 +202,14 @@ open work is in [status.md](status.md).
   alone, with the owner's approval, after a full backup (`before-migration-64`) and a zero-difference
   schema diff; every object checked after and the schema matching the repo exactly (migrations.md).
   CampConnect Admin's Flagged page works from then on.
+- 2026-11-03: PR #95 (`admin-sections`) merged into `main`: CampConnect Admin's sidebar becomes nine
+  sections (Dashboard, Users, Moderation, Content, Business & Ads, Analytics, Operations, Support,
+  Administration), each section's pages as tabs; new pages Appeals, Events, System health, Email,
+  Support requests, Issues and Settings; Alerts and Pending decisions on the dashboard; Verification
+  on Users (docs/technical-reference.md, "CampConnect Admin: sections"). Migration 65
+  (`20261117000000_console_health.sql`) applied to production at 05:02 UTC the same day, alone, with
+  the owner's approval, after a full backup (`before-migration-65`) and a zero-difference schema diff;
+  checked after, the schema matching the repo exactly (migrations.md).
 
 ## Retired branches
 
@@ -210,3 +218,5 @@ its file in `branches/`.
 
 - `auto-hide-reports` (Yubraj, 2026-10-28 to 2026-11-03): the report auto-hide backstop, migration 64
   and its PGlite suite, the console's limitation note U1. PR #53. Deleted after the merge.
+- `admin-sections` (Yubraj, 2026-11-03): the admin app's nine sections and their pages, migration 65 and its
+  suite. PR #95. Deleted after the merge.
