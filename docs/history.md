@@ -196,8 +196,12 @@ open work is in [status.md](status.md).
   CampConnect Admin's Flagged page, its owner told, the hide audited) merged into `main` with its
   migration renamed from `20261110000000_…` (57, a timestamp `main` had taken for the business hours)
   to `20261116000000_report_auto_hide.sql` (64), after a merge of `main` that kept migration 62's
-  story branches in the two Trust & Safety functions it replaces. **64 is not on production**: the
-  admin app's Flagged page says "Database update needed" until it is applied (status.md).
+  story branches in the two Trust & Safety functions it replaces. Applied to production the same day
+  (below).
+- 2026-11-03 04:14 UTC: migration 64 (`20261116000000_report_auto_hide.sql`) applied to production
+  alone, with the owner's approval, after a full backup (`before-migration-64`) and a zero-difference
+  schema diff; every object checked after and the schema matching the repo exactly (migrations.md).
+  CampConnect Admin's Flagged page works from then on.
 
 ## Retired branches
 
