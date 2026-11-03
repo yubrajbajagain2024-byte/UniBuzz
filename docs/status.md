@@ -104,7 +104,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   probe exercised). **Ankur's "Invalid login
   credentials"** on production was not looked up (that reads a student's account): with Google sign-in off there, it
   is a wrong password or no account for that email; Forgot password now covers the first, Create an account the second.
-- **Calls hidden for the launch** (`pause-calls`, 2026-11-02, PR #90 open, `main` merged in): calls were already paused behind
+- **Calls hidden for the launch** (`pause-calls`, merged as PR #90, 2026-11-02 23:59 UTC; migration 64 after it): calls were already paused behind
   `CALLS_PAUSED`, but every chat's bar still showed Audio call and Video call, which only brought up a "Coming Soon"
   pill. The owner postponed calls for the launch to hold down operating costs (docs/decisions.md), so now nothing of
   them shows in the app: Info stands alone in a direct or group chat's bar, no ring is listened for (no incoming-call
@@ -117,7 +117,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   ring from Ann while Sim's chat was open showed no incoming screen, and a call link landed on Messages. Testers get it
   with the next EAS update. The app alone left a gap: a signed-in request made outside the app could still start a
   call (it then showed in the chat as a live "Ringing" row and rang the other phone through a push). **Migration 64**
-  (`20261116000000_calls_paused.sql`, written the same day, on `pause-calls`, PR #90) closes it: the database refuses every
+  (`20261116000000_calls_paused.sql`, written the same day, pushed to `pause-calls` after PR #90 was merged; PR to
+  open) closes it: the database refuses every
   new call, whoever asks, and ends any call still open when it runs, keeping every past call; `start_call()` and its
   grants stay as they are. Rehearsed offline (`calls-paused.test.mjs`; the other rollout suites leave it out of production's state until it is
   live) and on staging (12/12), where it stays applied;
@@ -289,7 +290,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   change. **Migration 63** (`20261115000000_console_business.sql`), **not on production**: until it is, both sections say
   they need it. Rehearsed on staging 2026-10-30/31 with the Business v2 release, through the API and in the admin app
   signed in as staff with a second factor. Still to do, each with the owner's approval: the release (63 goes with it),
-  `grant_role` for business admins, the `campconnect-admin` Vercel project reconnected and deployed from `main`. See
+  `grant_role` for business admins, the `campconnect-admin` Vercel project (reconnected to the repository on 2026-11-02) deployed from `main`, which its first merge touching `apps/admin` does. See
   [branches/admin-analytics-business.md](branches/admin-analytics-business.md).
 - **Buzz on the website.** The app has the threaded replies, top replies and prompt threads; the
   website still shows two levels of replies, no top reply, and prompt threads as ordinary buzzes
