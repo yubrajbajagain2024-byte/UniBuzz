@@ -12,7 +12,10 @@ import { chromium } from "playwright";
 const BASE = process.env.BASE || "http://localhost:3061";
 const PRODUCTION = "dskbzoqreandwwpxiplh";
 const state = JSON.parse(fs.readFileSync(new URL("../../../supabase/tests/staging/.ad-delivery.json", import.meta.url), "utf8"));
-const student = state.accounts.student;
+// STUDENT=web signs in as a student made with `ad-delivery.mjs student web`, whose impressions and clicks `verify`
+// shows; the run's own student has already counted its one per hour.
+const student = state.accounts[process.env.STUDENT || "student"];
+if (!student) throw new Error(`No "${process.env.STUDENT}" in the kept run: make it with ad-delivery.mjs student ${process.env.STUDENT}`);
 const [cafe, rent] = state.businesses;
 const SCREENS = [
   { name: "desktop", viewport: { width: 1280, height: 900 } },

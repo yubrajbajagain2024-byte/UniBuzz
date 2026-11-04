@@ -15,6 +15,8 @@
 //   … ad-delivery.mjs env       the lines that start the website and the app against staging (the anon key is public).
 //   … ad-delivery.mjs verify    as the businesses, each kept ad's impressions, reach and clicks (what the devices did).
 //   … ad-delivery.mjs pause for_you   (or reels, housing) the business pauses that kept ad; `resume for_you` brings it back.
+//   … ad-delivery.mjs student phone   a fresh student of the campus for one device, so its impressions and clicks show
+//       in `verify` (they count once per student, ad and hour); the clean-up deletes it with the rest.
 //   … ad-delivery.mjs cleanup   deletes everything the kept run made.
 import fs from "node:fs";
 import zlib from "node:zlib";
@@ -83,7 +85,12 @@ async function session(u) {
 /** Everything a run made, for the clean-up: accounts (their rows cascade), uploads, media rows, payments. */
 async function cleanup(state) {
   const ids = state.made.map(lit).join(",") || "null";
-  await sql(`delete from storage.objects where bucket_id = 'uploads' and name like 'posts/%/ad-delivery-${state.run}-%'`).catch((e) => console.log(`  ! uploads: ${e.message}`));
+  // Through the Storage API: Supabase refuses deleting storage.objects rows in SQL (storage.protect_delete()).
+  const files = (await sql(`select name from storage.objects where bucket_id = 'uploads' and name like 'posts/%/ad-delivery-${state.run}-%'`).catch(() => [])).map((r) => r.name);
+  if (files.length) {
+    const { error } = await admin.storage.from("uploads").remove(files);
+    if (error) console.log(`  ! uploads: ${error.message}`);
+  }
   // Payments stay on record when a business goes (migration 56); this run's are test rows, so they go too.
   await sql(`delete from public.listing_promotions where payment_reference like ${lit(`STAGING-${state.run}-%`)}`).catch((e) => console.log(`  ! payments: ${e.message}`));
   await sql(`delete from public.media where owner_id in (${ids})`).catch((e) => console.log(`  ! media: ${e.message}`));
@@ -102,9 +109,29 @@ if (command === "env") {
   console.log(`EXPO_PUBLIC_SUPABASE_URL=${URL_} EXPO_PUBLIC_SUPABASE_ANON_KEY=${ANON} npx expo start --go --tunnel --clear`);
   process.exit(0);
 }
-if (["verify", "cleanup", "pause", "resume"].includes(command)) {
+if (["verify", "cleanup", "pause", "resume", "student"].includes(command)) {
   if (!fs.existsSync(STATE)) throw new Error("No kept run: start one with --keep");
   const state = JSON.parse(fs.readFileSync(STATE, "utf8"));
+  if (command === "student") {
+    // A student of the kept run's campus for one device. An impression and a click count once per student, ad and
+    // hour, so a device signed in as the run's own student adds nothing to `verify` within the hour of the run.
+    const label = process.argv[3] ?? "device";
+    if (!/^[a-z]{2,12}$/.test(label)) throw new Error("A label of 2 to 12 lowercase letters, e.g. web or phone");
+    if (state.accounts[label]) throw new Error(`"${label}" already exists in the kept run`);
+    const email = `${label}.ads.${state.run}@txstate.edu`;
+    const password = `Pw-${state.run}-${Math.random().toString(36).slice(2, 10)}!`;
+    const fullName = `${label[0].toUpperCase()}${label.slice(1)} Student`;
+    const { data: link, error } = await admin.auth.admin.generateLink({ type: "signup", email, password, options: { data: { full_name: fullName } } });
+    if (error) throw new Error(error.message);
+    // Kept before it is confirmed, so the clean-up deletes it whatever happens next.
+    state.made.push(link.user.id);
+    state.accounts[label] = { id: link.user.id, email, password };
+    fs.writeFileSync(STATE, JSON.stringify(state, null, 2), { mode: 0o600 });
+    const { error: e2 } = await createClient(URL_, ANON, opts).auth.verifyOtp({ type: "signup", token_hash: link.properties.hashed_token });
+    if (e2) throw new Error(e2.message);
+    console.log(`  ${label}: ${email} (${fullName}; password in supabase/tests/staging/.ad-delivery.json)`);
+    process.exit(0);
+  }
   if (command === "cleanup") {
     await cleanup(state);
     fs.rmSync(STATE);
@@ -290,9 +317,13 @@ try {
     const page = await listApartments(ben, { universityId: state.txstate, page: 1 });
     const spacing = { first: ADS_FIRST_AFTER, ended: page.totalPages <= 1 };
     const ads = await q.listFeedAds(ben, "housing", adSlotCount(page.data.length, ADS_EVERY, spacing), 0);
-    const placed = interleaveAds(page.data, ads, ADS_EVERY, spacing).filter((r) => r.kind === "ad");
-    console.log(`    ${page.data.length} listings on the first page; ads placed: ${placed.length}`);
+    const rows = interleaveAds(page.data, ads, ADS_EVERY, spacing);
+    const placed = rows.filter((r) => r.kind === "ad");
+    const promoted = placed.map((r) => r.ad.promoted?.id).filter(Boolean);
+    const onPage = page.data.some((l) => promoted.includes(l.id));
+    console.log(`    ${page.data.length} listings on the first page; ads placed: ${placed.length}${onPage ? " (its listing was on the page: shown once, as the ad)" : ""}`);
     expect(placed.length >= 1, `no ad on a first page of ${page.data.length} listings`);
+    expect(!rows.some((r) => r.kind === "item" && promoted.includes(r.item.id)), "the promoted listing showed twice");
   });
   await check("targeting: a student on another campus, a business session and a signed-out visitor get none of them", async () => {
     expect(other, "staging has one campus only: nothing to compare with");
