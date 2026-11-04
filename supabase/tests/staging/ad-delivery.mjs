@@ -14,6 +14,7 @@
 //       website and the app on a phone; supabase/tests/staging/.ad-delivery.json (git-ignored) keeps the accounts.
 //   … ad-delivery.mjs env       the lines that start the website and the app against staging (the anon key is public).
 //   … ad-delivery.mjs verify    as the businesses, each kept ad's impressions, reach and clicks (what the devices did).
+//   … ad-delivery.mjs pause for_you   (or reels, housing) the business pauses that kept ad; `resume for_you` brings it back.
 //   … ad-delivery.mjs cleanup   deletes everything the kept run made.
 import fs from "node:fs";
 import zlib from "node:zlib";
@@ -95,16 +96,30 @@ async function cleanup(state) {
 if (command === "env") {
   console.log(`# The website against staging (from the repo root; the variables win over apps/web/.env.local):`);
   console.log(`NEXT_PUBLIC_SUPABASE_URL=${URL_} NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON} NEXT_PUBLIC_SITE_URL=http://localhost:3061 npm run dev -w web -- -p 3061`);
+  // --clear: Metro caches the bundle with the variables written into it, so without it a bundle built for production
+  // can be served again.
   console.log(`# The app in Expo Go on a phone (from apps/mobile; the variables win over apps/mobile/.env):`);
-  console.log(`EXPO_PUBLIC_SUPABASE_URL=${URL_} EXPO_PUBLIC_SUPABASE_ANON_KEY=${ANON} npx expo start --go --tunnel`);
+  console.log(`EXPO_PUBLIC_SUPABASE_URL=${URL_} EXPO_PUBLIC_SUPABASE_ANON_KEY=${ANON} npx expo start --go --tunnel --clear`);
   process.exit(0);
 }
-if (command === "verify" || command === "cleanup") {
+if (["verify", "cleanup", "pause", "resume"].includes(command)) {
   if (!fs.existsSync(STATE)) throw new Error("No kept run: start one with --keep");
   const state = JSON.parse(fs.readFileSync(STATE, "utf8"));
   if (command === "cleanup") {
     await cleanup(state);
     fs.rmSync(STATE);
+    process.exit(0);
+  }
+  if (command === "pause" || command === "resume") {
+    // The phone's pause check: the business pauses one kept ad, as in its Ads Manager, and the student's next refresh
+    // no longer gets it; resume brings it back.
+    const placement = process.argv[3] ?? "for_you";
+    const b = state.businesses.find((x) => x.ads.some((a) => a.placement === placement));
+    if (!b) throw new Error(`No kept ad in "${placement}" (for_you, reels or housing)`);
+    const ad = b.ads.find((a) => a.placement === placement);
+    const owner = await session(b.owner);
+    const row = command === "pause" ? await q.pauseAd(owner, ad.id) : await q.resumeAd(owner, ad.id);
+    console.log(`  ${placement} "${ad.name}" (${b.name}): ${row.status}`);
     process.exit(0);
   }
   for (const b of state.businesses) {
