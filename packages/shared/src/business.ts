@@ -486,18 +486,21 @@ export type FeedRow<T> = { kind: "item"; item: T; index: number } | { kind: "ad"
 
 /**
  * A feed's rows with its ads between them, at the positions adSlotsAfter() gives, while there are ads. The ads keep
- * their order (the database's rotation); an ad whose promoted listing or post is already in the feed, or which already
- * ran, is skipped for the next one, so a student never meets the same thing twice in a row.
+ * their order (the database's rotation) and each runs once. A student never meets the same thing twice: when an ad
+ * promotes a listing or post that is also in the feed, the ad keeps its slot and the organic copy is left out
+ * (docs/decisions.md). Skipping the ad instead left its slot empty, since a feed asks for only as many ads as it has
+ * slots, so on a campus with a page or less of listings a Housing ad never showed.
  */
 export function interleaveAds<T extends { id: string }>(items: T[], ads: FeedAd[], every: number, spacing: AdSpacing = {}): FeedRow<T>[] {
+  const slots = items.map((_, index) => isAdSlot(index, items.length, every, spacing));
+  const placed = ads.filter((a, i) => ads.findIndex((b) => b.id === a.id) === i).slice(0, slots.filter(Boolean).length);
+  const shownByAd = new Set(placed.flatMap((a) => (a.promoted ? [a.promoted.id] : [])));
   const rows: FeedRow<T>[] = [];
-  const present = new Set(items.map((i) => i.id));
-  const queue = ads.filter((a, i) => ads.findIndex((b) => b.id === a.id) === i && !(a.promoted && present.has(a.promoted.id)));
   let slot = 0;
   items.forEach((item, index) => {
-    rows.push({ kind: "item", item, index });
-    if (slot < queue.length && isAdSlot(index, items.length, every, spacing)) {
-      rows.push({ kind: "ad", ad: queue[slot], slot });
+    if (!shownByAd.has(item.id)) rows.push({ kind: "item", item, index });
+    if (slots[index] && slot < placed.length) {
+      rows.push({ kind: "ad", ad: placed[slot], slot });
       slot += 1;
     }
   });

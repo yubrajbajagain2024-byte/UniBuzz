@@ -204,6 +204,17 @@ await expectOk("a campus with only two posts still shows the ad, at the end of t
   check(JSON.stringify(rows) === JSON.stringify(["p1", "p2", `ad:${forYouAd.id}`]), JSON.stringify(rows));
 });
 
+await expectOk("a Housing feed of five listings, the promoted one among them: the ad runs and the listing shows once, as the ad", async () => {
+  // What staging found on 2026-11-04: skipping the ad for its listing left the only slot empty.
+  const [ad] = await q.listFeedAds(ben, "housing", 1, 0);
+  check(ad?.promoted?.type === "apartment", "the Housing ad came without its listing");
+  const items = [{ id: "l1" }, { id: ad.promoted.id }, { id: "l3" }, { id: "l4" }, { id: "l5" }];
+  const spacing = { first: ADS_FIRST_AFTER, ended: true };
+  const ads = await q.listFeedAds(ben, "housing", adSlotCount(items.length, ADS_EVERY, spacing), 0);
+  const rows = interleaveAds(items, ads, ADS_EVERY, spacing).map((r) => (r.kind === "ad" ? `ad:${r.ad.id}` : r.item.id));
+  check(JSON.stringify(rows) === JSON.stringify(["l1", "l3", `ad:${housingAd.id}`, "l4", "l5"]), JSON.stringify(rows));
+});
+
 await expectOk("campus targeting: a student on another campus gets none; the business's own session gets none", async () => {
   check((await served(uma, "for_you")).length === 0, "another campus saw it");
   check((await served(client(cafeOwner), "for_you")).length === 0, "a business session got ads");

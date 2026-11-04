@@ -120,11 +120,22 @@ test("interleaveAds with the apps' spacing: the first ad after row 3, then 9 apa
   }
 });
 
-test("interleaveAds: an ad promoting a listing already in the feed gives its slot to the next ad; no ads, no slots", () => {
+test("interleaveAds: an ad promoting a listing already in the feed runs, and the listing's own row leaves the feed", () => {
+  const ids = (rows) => rows.map((r) => (r.kind === "ad" ? `ad:${r.ad.id}` : r.item.id));
   const rows = biz.interleaveAds(posts(18), [ad("a1", { type: "apartment", id: "p3" }), ad("a2")], 9);
-  assert.deepEqual(rows.filter((r) => r.kind === "ad").map((r) => r.ad.id), ["a2"]);
+  assert.deepEqual(rows.filter((r) => r.kind === "ad").map((r) => r.ad.id), ["a1", "a2"]);
+  assert.ok(!ids(rows).includes("p3"), "the promoted listing shows once, as the ad");
+  assert.equal(rows.filter((r) => r.kind === "item").length, 17);
+  // The case staging found: a campus whose whole Housing feed is 5 listings, the promoted one among them.
+  const small = biz.interleaveAds(posts(5), [ad("h1", { type: "apartment", id: "p0" })], 9, { first: 3, ended: true });
+  assert.deepEqual(ids(small), ["p1", "p2", "ad:h1", "p3", "p4"]);
+  // At the slot itself, the ad stands where the listing was.
+  assert.deepEqual(ids(biz.interleaveAds(posts(5), [ad("h1", { type: "apartment", id: "p2" })], 9, { first: 3, ended: true })), ["p0", "p1", "ad:h1", "p3", "p4"]);
+  // A promoted listing further down, or an ad not placed, takes nothing out.
+  assert.deepEqual(ids(biz.interleaveAds(posts(5), [ad("h1"), ad("h2", { type: "apartment", id: "p4" })], 9, { first: 3, ended: true })), ["p0", "p1", "p2", "ad:h1", "p3", "p4"]);
   assert.equal(biz.interleaveAds(posts(18), [], 9).length, 18);
   assert.equal(biz.interleaveAds(posts(5), [ad("a1")], 9).filter((r) => r.kind === "ad").length, 0);
+  assert.equal(biz.interleaveAds(posts(2), [ad("a1", { type: "apartment", id: "p0" })], 9, { first: 3 }).length, 2, "no slot yet: nothing taken out");
 });
 
 test("adDestination: links, listings, posts, a chat the student starts, or the profile", () => {

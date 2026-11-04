@@ -406,7 +406,7 @@ Built on the v1 rules above, which all still hold (`business-portal.test.mjs` ru
   It tells the team each time. What students see never waits for it: the serving checks the dates itself.
 - **What students see.** `ads_for_feed(placement, limit, offset)` returns running, paid ads of approved businesses for the caller's campus, in a daily rotation that is the same for everyone there.
   - **Signed-in students only.** No budget, no targeting.
-  - The website and the app place the **first after the 3rd** post, reel or listing, then **at most one after every 9** (`interleaveAds`, `adSlotCount`, `ADS_FIRST_AFTER`, `ADS_EVERY`), so every feed's first page has one; a feed that has ended with fewer than 3 rows ends with its ad.
+  - The website and the app place the **first after the 3rd** post, reel or listing, then **at most one after every 9** (`interleaveAds`, `adSlotCount`, `ADS_FIRST_AFTER`, `ADS_EVERY`), so every feed's first page has one; a feed that has ended with fewer than 3 rows ends with its ad. When an ad promotes a listing or post that is also in the feed, the ad keeps its slot and the organic copy is left out, so nothing shows twice.
   - Each ad looks like the post or listing next to it, with **Sponsored** under the business's name: a post in For You, a full-screen page in Reels (the app's `SponsoredReel` since 2026-11-03), a listing in Housing.
   - The "…" menu **hides** the ad, **reports** it (`business_reports`: 20 a day per student, read by the UniBuzz team only, never by the business), **blocks the business** (`business_blocks`: its ads and posts disappear and it cannot be messaged) or explains why the ad is there.
   - Students can save an ad, and message the business from it; the business can still only reply.

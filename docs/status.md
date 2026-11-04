@@ -159,13 +159,17 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   ads: the first one waited for the 9th organic row, but the first page of For You and of Reels has 8 rows (Housing 12),
   so those feeds never asked for an ad on their first page, and a campus with fewer than 9 posts never showed one; and
   the app's Reels had no ads at all. Now the first ad follows the 3rd row, then one per 9 at most; a feed that has ended
-  with 1 or 2 rows ends with its ad ([decisions.md](decisions.md)); the app's Reels shows Sponsored reels. The website's
+  with 1 or 2 rows ends with its ad ([decisions.md](decisions.md)); the app's Reels shows Sponsored reels. Staging found
+  one more (2026-11-04): an ad whose promoted listing was already on the page was skipped, leaving the only slot empty,
+  so on a campus with a page or less of listings a Housing ad never showed; now the ad runs and the listing's organic
+  row leaves the feed (the owner's choice, decisions.md). The website's
   part goes live with the merge; the app's needs a new native build before any EAS update (see the EAS row under
   "Blockers and known risks"). The live website and portal (their public JavaScript), EAS's production, preview and
   development variables and the local settings all name the same live project, with the same anon key (2026-11-03).
-  Draft PR from `ads-delivery`. **Not yet run on staging, in a browser or on an iPhone**: the owner runs
-  `supabase/tests/staging/ad-delivery.mjs --keep`, `apps/web/e2e/sponsored-ads.mjs` and the app in Expo Go
-  ([testing.md](testing.md)).
+  Draft PR from `ads-delivery`. On staging, 2026-11-04 (staging first brought to production's schema, history.md): the
+  API run 13/13 and the browser 6/6, both as the run's student and as a fresh one whose impressions and clicks reached
+  the businesses; the iPhone in Expo Go is in [testing.md](testing.md). Merging (the website's part goes live) and any
+  EAS update each wait on the owner's approval.
 - **UniBuzz Business v2 is on `main` without its migrations.** PR #49 was merged on 2026-10-28 at
   04:07 UTC (and #51 at 07:06 UTC), so production's website runs Business v2 code while neither
   migration 49 nor 50 is applied (production's `_migrations`, read-only, 2026-10-28). Until they are, the code

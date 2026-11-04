@@ -210,6 +210,12 @@ open work is in [status.md](status.md).
   (`20261117000000_console_health.sql`) applied to production at 05:02 UTC the same day, alone, with
   the owner's approval, after a full backup (`before-migration-65`) and a zero-difference schema diff;
   checked after, the schema matching the repo exactly (migrations.md).
+- 2026-11-04 08:30–08:31 UTC: staging (`campconnect-staging`) brought to production's schema, with
+  the owner's approval, for the `ads-delivery` staging run. Since the release rehearsal's rollback it
+  lacked 15 migrations production has: staff invitations by email (applied outside the repo), 44, 46,
+  49 to 57, 63, 64 and 65. First one dry run of all 15 in a transaction rolled back, then each in its
+  own transaction with its `_migrations` row; no existing table's rows changed. Staging also keeps
+  `20261116000000_calls_paused.sql` from `pause-calls`, which production does not have.
 
 ## Retired branches
 
