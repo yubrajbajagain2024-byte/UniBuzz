@@ -172,10 +172,13 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   pull-to-refresh, took the card away at once; a resume and a refresh brought it back; one impression throughout. Results
   in [testing.md](testing.md). The app's part reaches testers only
   with an EAS update, the owner's approval; it changes no native code.
-- **Production's one live campaign is not visible yet** (read-only check, 2026-11-05): it is a Housing ad, and
-  `ads_for_feed()` serves it to students of its campus (checked as one, in a transaction rolled back), but production
-  has no listings at all, so no Housing feed has a row for it to follow (an empty feed shows no ad, decisions.md). It
-  shows by itself once a listing exists on its campus.
+- **Test ads on production** (read-only check, 2026-11-05 23:00 CST). The only business, The Summit Apartments, has
+  four Housing ads whose words are tests, two of them pasted development notes: "Best Apartment", **active** ("We offer
+  worst apartment", a $100 payment); "addition", **scheduled from 2026-11-05 09:00 CST** (a $50 payment); and two
+  drafts. `ads_for_feed()` serves them to its campus, but production has no listings, so no Housing feed shows them
+  yet; the first listing would. Removing them (pause or reject, void the payments, delete the drafts) waits on the
+  owner's decision. The business uses a real apartment complex's name and website: whether it is the owner's test
+  account or the complex's is for the owner to confirm.
 - **Ads reach students** (branch `ads-delivery`, merged by the owner as PRs #97, #98 and #99, 2026-11-03 21:25 UTC to
   2026-11-04 09:14 UTC; no migration; the website's part is live on production). Ads approved in UniBuzz
   Business did not show in the student feeds. Not the connection: the portal is part of the website, and the website's
@@ -321,14 +324,16 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 - **Buzz on the website.** The app has the threaded replies, top replies and prompt threads; the
   website still shows two levels of replies, no top reply, and prompt threads as ordinary buzzes
   (categories it has). See [branches/ankur/dev.md](branches/ankur/dev.md).
-- **Admin authority fix live** (migration 67, branch `fix/security-2026-10-27`, 2026-11-05). Until then the business
-  portal's staff tools (business review, payments, and since Business v2 ad review) trusted the admin role on its own,
-  with a password alone. Now an admin is a staff owner or admin, not suspended, past a second factor; the portal
-  sends a staff admin to `/business/two-factor` first. The website went live first (22:05 CST, from the branch), then
-  67 alone (04:15 UTC), each with the owner's approval, after a full backup (docs/migrations.md). Still to do: the
-  owner's check in a browser (passed, 2026-11-05), then the branch's PR (its merge, the owner's approval): the docs
-  merge of 22:14 CST redeployed `main`'s website over the branch's, so until the PR is merged the portal lacks its
-  two-factor routing (the database still enforces the rule).
+- **Admin authority fix live** (migration 67, `fix/security-2026-10-27`, merged as PR #106 on 2026-11-05 22:31 CST,
+  branch deleted). Until then the business portal's staff tools (business review, payments, and since Business v2 ad
+  review) trusted the admin role on its own, with a password alone. Now an admin is a staff owner or admin, not
+  suspended, past a second factor, and the portal sends a staff admin to `/business/two-factor` first. Rollout, each
+  step with the owner's approval: a full backup, the website from the branch (22:05 CST), 67 alone (04:15 UTC), then
+  PR #106, whose deployments (website and CampConnect Admin) are Ready and serve production. Read-only checks after
+  the merge: the build lists `/business/two-factor`; a staff admin with a password only is told to pass the second
+  factor, past it allowed, a student and a visitor refused, on business review, ad review, payments and reports;
+  production's schema the same as `main` (608 functions). Open: the owner's real sign-in through the two-factor page
+  since the merge, and the rollout plan's two product questions (docs/admin-authority-rollout.md).
 - **Decide and merge `step-admin`.** `admin-analytics-business` (draft PR #60) brings its app, scripts, suites,
   README section and website hunks to `main`'s tree (as of 2026-10-31); what still waits is its migration files'
   placement, production's `_migrations` rows, migration 18 and the `hidden_at` message types: the owner's questions
@@ -353,7 +358,6 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | Item | Where it is written up |
 | --- | --- |
 | `db:setup` token mode resets the production auth Site URL to localhost by default | [supabase/CLAUDE.md](../supabase/CLAUDE.md) |
-| Until `fix/security-2026-10-27`'s PR is merged, production's website is `main`'s (the docs merge of 2026-11-05 22:14 CST redeployed it over the branch's deployment): migration 67 still decides in the database, but the portal sends a staff admin without a second factor to errors instead of its two-factor page; merge that PR before anything else | "Admin authority fix live" above |
 | Supabase CLI history empty on production; `supabase db push` would re-run everything | `supabase/applied-outside-repo/README.md` |
 | Calls are paused and hidden for the launch (operating costs, 2026-11-02); switching them on also needs an Apple Developer Program membership (USD 99/yr), and the native ring (CallKit/PushKit, Android full-screen intent) is not built. Since migration 66 went live (2026-11-05) the database refuses new calls too; switching calls on takes its rollback as well as a build with `EXPO_PUBLIC_CALLS_ENABLED=1` | README §"Calls"; "Calls hidden for the launch" above |
 | `is_suspended(uuid)` callable while signed out (low severity) | applied-outside-repo README §"Security review" |
@@ -364,6 +368,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | Vercel Hobby optimizes 5,000 source images a month | README §"Photos" |
 | Testers' app: EAS updates reach only builds with the same native fingerprint (since `828b9d3`); today that is Android build `0493abcf` alone (update of 2026-11-05 03:13 UTC), whose install link stops working on 2026-11-17 (installed apps keep working); the old Android build gets no more updates; there is no iPhone build (an Apple Developer Program membership, USD 99/yr, then an iOS build) and no store build (the last Play Store build is on SDK 57) | "Ads refresh with the feed" above |
 | Production has no listings and no For You or Reels campaigns (read-only, 2026-11-05): Housing is empty everywhere and no student sees an ad until listings and campaigns exist | "Production's one live campaign is not visible yet" above |
+| Test records on production (read-only, 2026-11-05): four test Housing ads with two test payments (one ad scheduled from 2026-11-05 09:00 CST), and three accounts from the calls end-to-end test of 2026-10-24 whose passwords sit in a local, world-readable `apps/mobile/e2e/.call-partners.json` | "Test ads on production" above |
+| The staging access token (a Supabase personal access token, in `~/.config/unibuzz/staging.env`) reaches every project in the account, production included: revoke it in the dashboard and delete the file once testing is done | docs/environment.md |
 
 ## Future plans
 

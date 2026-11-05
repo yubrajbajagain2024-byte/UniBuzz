@@ -237,7 +237,10 @@ open work is in [status.md](status.md).
   its migration renumbered 67, rehearsed on staging with its rollback; with the owner's approval, step by step:
   a full backup, the website deployed from the branch (22:05 CST), then 67 alone on production (04:15 UTC,
   22:15 CST). The docs PR #105, merged at 22:14 CST, had redeployed `main`'s website over the branch's 17 seconds
-  before; the portal's two-factor routing returns with this branch's merge.
+  before; the portal's two-factor routing returned with this branch's merge.
+- 2026-11-05 22:31 CST: PR #106 (`fix/security-2026-10-27`) merged into `main` by the owner; the website and
+  CampConnect Admin redeployed (both Ready, 22:33 and 22:35 CST); read-only checks after it: the two-factor route in
+  the build, migration 67's rule for each kind of account, the schema the same as `main`.
 - 2026-11-05 01:50 UTC: PR #102 (`pause-calls`: migration 66 and its tests, `main` merged in) merged into
   `main` by the owner; 66 was already live.
 - 2026-11-05 02:42 UTC: PR #103 (`ads-refresh`: a pull-to-refresh asks for the feed's ads again in the app's
@@ -253,6 +256,22 @@ open work is in [status.md](status.md).
 When a branch is merged and deleted, add a line here (name, what it delivered, its PRs) and delete
 its file in `branches/`.
 
+- `fix/security-2026-10-27` (Sunil, 2026-10-27 to 2026-11-05): the business portal's admin authority, migration 67
+  (first written as 48), the portal's two-factor page, `admin-authority.test.mjs`, the staging rehearsal
+  `staging/admin-authority.mjs` and the browser check `business-admin-two-factor.mjs`; kept local until production was
+  patched, then rolled out step by step (above). PR #106. Deleted after the merge, with its notes file.
+- `pause-calls` (Sunil, 2026-11-02 to 2026-11-05): calls hidden in the app (PR #90) and migration 66, refusing new calls
+  in the database (first 64). PRs #90 and #102. Deleted after the merge.
+- `ads-delivery` (Sunil, 2026-11-03 to 2026-11-04): ads reaching students (the first ad after the 3rd row, Sponsored
+  reels in the app, a promoted listing's ad keeping its slot), the runtime fingerprint, `ad-delivery.test.mjs` and the
+  staging and browser ad checks. PRs #97, #98 and #99. Deleted after the merge.
+- `ads-delivery-followup` (Sunil, 2026-11-04): `console-business.test.mjs`'s revenue check made daylight-saving proof,
+  the docs after `ads-delivery`'s merge. PR #100. Deleted after the merge.
+- `ads-refresh` (Sunil, 2026-11-04): a pull-to-refresh asking for the feed's ads again in the app's Orbit, Reels and
+  Housing, `sponsored-ads-refresh.mjs`. PR #103; on testers' Android build with the EAS update of 2026-11-05 03:13 UTC.
+  Deleted after the merge.
+- `docs/ads-refresh-live` (Sunil, 2026-11-04): the docs after `ads-refresh` and `pause-calls`, Android build `0493abcf`
+  and its EAS update. PRs #104 and #105. Deleted after the merge.
 - `auto-hide-reports` (Yubraj, 2026-10-28 to 2026-11-03): the report auto-hide backstop, migration 64
   and its PGlite suite, the console's limitation note U1. PR #53. Deleted after the merge.
 - `admin-sections` (Yubraj, 2026-11-03): the admin app's nine sections and their pages, migration 65 and its
