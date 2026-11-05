@@ -216,6 +216,11 @@ open work is in [status.md](status.md).
   49 to 57, 63, 64 and 65. First one dry run of all 15 in a transaction rolled back, then each in its
   own transaction with its `_migrations` row; no existing table's rows changed. Staging also keeps
   `20261116000000_calls_paused.sql` from `pause-calls`, which production does not have.
+- 2026-11-03 21:25 UTC to 2026-11-04 09:14 UTC: `ads-delivery` merged into `main` by the owner in three
+  PRs: #97 (every feed's first ad after the 3rd row, Sponsored reels in the app, the runtime version
+  from the native fingerprint), #98 (the staging run's pause and resume), #99 (an ad keeping its slot
+  when its listing is on the page; the staging and browser results). Each redeployed the website and
+  CampConnect Admin; no migration; no EAS update.
 
 ## Retired branches
 

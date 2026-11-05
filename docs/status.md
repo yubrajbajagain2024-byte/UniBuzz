@@ -150,7 +150,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   owner's approval, after a full verified backup and a zero-difference schema diff; the diff is zero again after it and
   rows, accounts and files are as in the backup ([migrations.md](migrations.md)). Still to do: the app's EAS update for
   the features that need these migrations (owner's approval).
-- **Ads reach students** (branch `ads-delivery`, 2026-11-03, not merged yet; no migration). Ads approved in UniBuzz
+- **Ads reach students** (branch `ads-delivery`, merged by the owner as PRs #97, #98 and #99, 2026-11-03 21:25 UTC to
+  2026-11-04 09:14 UTC; no migration; the website's part is live on production). Ads approved in UniBuzz
   Business did not show in the student feeds. Not the connection: the portal is part of the website, and the website's
   and the app's settings name the same Supabase project (`apps/web/.env.local`, `apps/mobile/.env`; Vercel's own
   variables not read), which has had the ads schema since the release above (read-only check as `anon`, 2026-11-03). Not
@@ -162,14 +163,13 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   with 1 or 2 rows ends with its ad ([decisions.md](decisions.md)); the app's Reels shows Sponsored reels. Staging found
   one more (2026-11-04): an ad whose promoted listing was already on the page was skipped, leaving the only slot empty,
   so on a campus with a page or less of listings a Housing ad never showed; now the ad runs and the listing's organic
-  row leaves the feed (the owner's choice, decisions.md). The website's
-  part goes live with the merge; the app's needs a new native build before any EAS update (see the EAS row under
-  "Blockers and known risks"). The live website and portal (their public JavaScript), EAS's production, preview and
+  row leaves the feed (the owner's choice, decisions.md). The app's part reaches testers only with an EAS update, the
+  owner's approval, and only builds with the same native fingerprint take it (see the EAS row under "Blockers and known
+  risks"). The live website and portal (their public JavaScript), EAS's production, preview and
   development variables and the local settings all name the same live project, with the same anon key (2026-11-03).
-  Draft PR from `ads-delivery`. On staging, 2026-11-04 (staging first brought to production's schema, history.md): the
-  API run 13/13 and the browser 6/6, both as the run's student and as a fresh one whose impressions and clicks reached
-  the businesses; the iPhone in Expo Go is in [testing.md](testing.md). Merging (the website's part goes live) and any
-  EAS update each wait on the owner's approval.
+  On staging, 2026-11-04 (staging first brought to production's schema, history.md): the API run 13/13 (three runs)
+  and the browser 6/6, both as the run's student and as a fresh one whose impressions and clicks reached the
+  businesses; the iPhone in Expo Go is in [testing.md](testing.md). Any EAS update waits on the owner's approval.
 - **UniBuzz Business v2 is on `main` without its migrations.** PR #49 was merged on 2026-10-28 at
   04:07 UTC (and #51 at 07:06 UTC), so production's website runs Business v2 code while neither
   migration 49 nor 50 is applied (production's `_migrations`, read-only, 2026-10-28). Until they are, the code
@@ -344,7 +344,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | Supabase CDN may serve a just-deleted Snap to the same viewer for ~1 minute | README §"Snaps" |
 | Supabase free projects pause after a week idle (Pro, USD 25/mo, before real users); built-in auth email is rate-limited (custom SMTP needed) | README §"Production checklist" |
 | Vercel Hobby optimizes 5,000 source images a month | README §"Photos" |
-| An EAS update from `main` would reach a build that cannot run it (read-only check, 2026-11-03): the app's runtime policy is `sdkVersion`, so every SDK 58 build takes any SDK 58 update, and the only one, the Android preview build of 2026-10-26 07:12 UTC (`2e0e4458`), predates `expo-camera`, `expo-media-library`, `expo-video-thumbnails` and `react-native-view-shot` (added 20:28 UTC that day, used by the create flow). No update has been published since. **Addressed on `ads-delivery` (not merged):** the runtime version is now the native fingerprint (`828b9d3`), so an update reaches only builds with the same native code, and the old build gets none; a new Android preview build on it, `0493abcf` (EAS, 2026-11-03, commit `828b9d3`, runtime `048bb02e…`, artifact until 2026-11-17), matches the code's fingerprint by `eas fingerprint:compare`. It carries the branch's unmerged code: not for testers before the PR is approved; no update published. No EAS build exists for an iPhone (the iOS build is an SDK 57 simulator build); iPhones run the app in Expo Go | "Ads reach students" above |
+| An EAS update from `main` would reach a build that cannot run it (read-only check, 2026-11-03): the app's runtime policy is `sdkVersion`, so every SDK 58 build takes any SDK 58 update, and the only one, the Android preview build of 2026-10-26 07:12 UTC (`2e0e4458`), predates `expo-camera`, `expo-media-library`, `expo-video-thumbnails` and `react-native-view-shot` (added 20:28 UTC that day, used by the create flow). No update has been published since. **Addressed by `ads-delivery` (merged, PR #97):** the runtime version is now the native fingerprint (`828b9d3`), so an update reaches only builds with the same native code, and the old build gets none; a new Android preview build on it, `0493abcf` (EAS, 2026-11-03, commit `828b9d3`, runtime `048bb02e…`, artifact until 2026-11-17), matches the code's fingerprint by `eas fingerprint:compare`. Its code is `ads-delivery`'s as of `828b9d3`, merged since; sharing it with testers and any update wait on the owner's approval; no update published (as of 2026-11-04). No EAS build exists for an iPhone (the iOS build is an SDK 57 simulator build); iPhones run the app in Expo Go | "Ads reach students" above |
 | The README still says the Vercel project is not connected to Git, and that 41 and 42 are not live; both are out of date | this file, [migrations.md](migrations.md) |
 
 ## Future plans
