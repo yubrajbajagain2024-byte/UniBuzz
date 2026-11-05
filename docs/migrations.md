@@ -94,7 +94,7 @@ their own, and a picked category is simply not kept, so the `ankur/dev` PR can m
 rollback restores the functions it replaced verbatim; 53's keeps the prompt threads as ordinary
 buzzes and 54's keeps the categories (nothing reads them).
 
-**44, 46 and 51 to 54 ahead of the release:** they need only what production has, and none of them
+**44, 46 and 51 to 54 ahead of the release (overtaken: they went live with it):** they need only what production has, and none of them
 creates or replaces a function, view, table or trigger that 49, 50, 55 to 57 or 58 to 62 does, so
 they may go live on their own, as 58 to 62 did (supabase/CLAUDE.md), in two transactions: Discover
 (44, its `_migrations` row, 46, its row; never 44 alone, because 44 ends by ranking posts of every
@@ -102,9 +102,9 @@ audience and 46 re-ranks Global posts only before the transaction ends), then Bu
 with its row). Rehearsed offline by `tests/discover-buzz-rollout.test.mjs` (2026-11-01): production's
 state, the two transactions, a failure part-way that applies nothing, Discover and Buzz through the
 API roles, the rest of the release after them (62 is live since 2026-11-02, so the rehearsal starts with it),
-the documented undo, and both again. Still to
-do: the staging rehearsal, a full backup and Sunil's approval; afterwards, take the six out of the
-release lists.
+the documented undo, and both again. They did not
+go ahead in the end: they went live with the release itself on 2026-11-03 (row 44), so the two
+transactions never ran; the rehearsal stays in `npm run db:test` as a record.
 
 **Report auto-hide (64), live since 2026-11-03 04:14 UTC:** needed only what production already had (41, 62 and CampConnect
 Admin's schema), so it went live alone: one transaction with its `public._migrations` row (supabase/CLAUDE.md), then `notify pgrst`, after a
