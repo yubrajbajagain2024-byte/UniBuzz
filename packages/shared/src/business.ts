@@ -515,6 +515,58 @@ export function adSlotCount(count: number, every: number, spacing: AdSpacing = {
   return 1 + Math.floor((count - first) / every);
 }
 
+/**
+ * The ads a feed holds and the round they belong to. A round starts each time the feed loads its first page again
+ * (opening it, a pull-to-refresh, a new filter or campus), and its ads are asked for again from the first: an ad paused,
+ * ended, hidden or no longer paid for leaves, one approved, resumed or started since comes in (ads_for_feed() decides by
+ * the clock and the ad's state on every call). Within a round, more are asked for only as the feed grows.
+ */
+export type FeedAdsState = { round: number; ads: FeedAd[]; done: boolean };
+export type FeedAdsRequest = { round: number; offset: number; limit: number };
+export const emptyFeedAds = (): FeedAdsState => ({ round: 0, ads: [], done: false });
+
+/**
+ * What a feed asks ads_for_feed() for next, or null when it has what it needs. In a new round, every slot from the first
+ * ad (the round before keeps its ads on screen until the new ones arrive, so no gap opens in the list); in the same round,
+ * only the slots still empty, unless the database already had no more.
+ */
+export function nextAdsRequest(state: FeedAdsState, round: number, slots: number): FeedAdsRequest | null {
+  if (round !== state.round) return { round, offset: 0, limit: Math.max(0, slots) };
+  if (state.done || state.ads.length >= slots) return null;
+  return { round, offset: state.ads.length, limit: slots - state.ads.length };
+}
+
+/**
+ * The state once a request's ads arrive: a new round's replace the old (the same objects are kept when nothing changed,
+ * so the list does not re-render while it scrolls), a later page of the round is added after them with each ad once, and
+ * an answer for a round already over is dropped.
+ */
+export function receiveAds(state: FeedAdsState, request: FeedAdsRequest, ads: FeedAd[]): FeedAdsState {
+  if (request.round < state.round) return state;
+  const done = ads.length < request.limit;
+  if (request.round !== state.round) {
+    const fresh = ads.filter((a, i) => ads.findIndex((b) => b.id === a.id) === i);
+    const same = fresh.length === state.ads.length && fresh.every((a, i) => JSON.stringify(a) === JSON.stringify(state.ads[i]));
+    return { round: request.round, ads: same ? state.ads : fresh, done };
+  }
+  const more = ads.filter((a, i) => ads.findIndex((b) => b.id === a.id) === i && !state.ads.some((b) => b.id === a.id));
+  return { round: state.round, ads: more.length ? [...state.ads, ...more] : state.ads, done };
+}
+
+/**
+ * The ads on screen not counted yet in this view, remembered in `seen`. The set outlives refreshes, so pulling to
+ * refresh never sends an impression twice from one screen (the database also keeps one per student, ad and hour).
+ */
+export function adsToCount(seen: Set<string>, onScreen: string[]): string[] {
+  const out: string[] = [];
+  for (const id of onScreen) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
 export type AdDestination =
   | { kind: "url"; url: string }
   | { kind: "listing"; id: string }
