@@ -1,7 +1,7 @@
 # Branches
 
-Every branch at a glance, **as of 2026-10-27**. GitHub: `yubrajbajagain2024-byte/UniBuzz`
-(public); default branch `main`; work lands through pull requests (PRs #1 – #42 so far). One file
+Every branch at a glance, **as of 2026-10-31**. GitHub: `yubrajbajagain2024-byte/UniBuzz`
+(public); default branch `main`; work lands through pull requests (PRs #1 – #47 so far). One file
 per branch holds the details, tips and counts included: `<branch name>.md`, with a slash in the
 name as a folder. The rules for these files are in the root CLAUDE.md ("Documentation: keep it
 current", rules 2 and 3).
@@ -9,23 +9,61 @@ current", rules 2 and 3).
 | Branch | Owner | What it is | State | Details |
 | --- | --- | --- | --- | --- |
 | `main` | everyone, via PRs | integration branch; **every push deploys production** | — | [../status.md](../status.md) |
-| `ankur/dev` | Ankur | Ankur's feature line | merged (PRs #35, #38, #41) | [ankur/dev.md](ankur/dev.md) |
+| `ankur/dev` | Ankur | Ankur's feature line | merged (PRs #35, #38, #41, and #50 on 2026-10-28: Buzz threaded replies, top reply, prompt threads, categories, migrations 51 to 54, not on production); and PR #84 (2026-11-02 03:57 UTC): the offline rehearsal for 44, 46 and 51 to 54 going live ahead of the release, and PR #54's fix to 53 (none of them on production yet) | [ankur/dev.md](ankur/dev.md) |
 | `ankur/owner-moderation` | Ankur | Buzz v2 and Trust & Safety | merged (PR #37) | [ankur/owner-moderation.md](ankur/owner-moderation.md) |
-| `step-admin` | Yubraj | **CampConnect Admin**, the separate staff app, and migrations 14–18 | **not merged**; merge plan in its `docs/step-admin-merge-plan.md` | [step-admin.md](step-admin.md) |
+| `step-admin` | Yubraj | **CampConnect Admin**, the separate staff app, and migrations 14–18 | **not merged**; merge plan in its `docs/step-admin-merge-plan.md`. Its Vercel project `campconnect-admin` is not connected to the repo since 2026-11-02 (docs/decisions.md): deploy it from this branch with the CLI | [step-admin.md](step-admin.md) |
 | `step-1-brand-shell` | Yubraj | first brand-and-shell pass (2026-09-07) | **1 commit never merged**; superseded | [step-1-brand-shell.md](step-1-brand-shell.md) |
-| `step-home-feed` | Sunil | the main feature line, 2026-10-09 to 10-25 | merged (PRs #1 – #32); since then 1 old `CLAUDE.md` commit | [step-home-feed.md](step-home-feed.md) |
-| `business-portal-prelaunch` | Sunil | the business portal | merged (PR #33, `fee2e8f`); since then the stray `app.json` commit and 1 old `CLAUDE.md` commit | [business-portal-prelaunch.md](business-portal-prelaunch.md) |
+| `step-home-feed` | Sunil | the main feature line, 2026-10-09 to 10-25 | merged (PRs #1 – #32); since then 1 old `CLAUDE.md` commit; **PR #46** carries only that copy | [step-home-feed.md](step-home-feed.md) |
+| `business-portal-prelaunch` | Sunil | the business portal | merged (PR #33, `fee2e8f`); since then the stray `app.json` commit and 1 old `CLAUDE.md` commit; **PR #47** carries only those two | [business-portal-prelaunch.md](business-portal-prelaunch.md) |
 | `create-flow-redesign` | Sunil | camera-first create flow, post details | merged (via PR #40); since then 2 old `CLAUDE.md` commits; **PR #44 open** | [create-flow-redesign.md](create-flow-redesign.md) |
 | `listing-flow-redesign` | Sunil | anonymous listings, Roommate and Marketplace create flow | merged (PR #40); since then 2 old `CLAUDE.md` commits; **PR #43 open** | [listing-flow-redesign.md](listing-flow-redesign.md) |
 | `docs/claude-md` | Sunil | the first root `CLAUDE.md` | merged (PR #42); nothing left on it | [../history.md](../history.md) |
-| `docs/claude-structure` | Sunil | one shared `CLAUDE.md` plus `docs/` | its PR into `main` | [../history.md](../history.md) |
+| `docs/claude-structure` | Sunil | one shared `CLAUDE.md` plus `docs/` | merged (PR #45); nothing left on it | [../history.md](../history.md) |
 | (one local branch) | Sunil | the pending security fix ([../status.md](../status.md), "Security fix pending") | local only, **not pushed** while production is unpatched | on the branch itself |
+| `business-v2` | Sunil | UniBuzz Business v2: roles, posts, Ads Manager, Sponsored ads, business profiles, analytics (migrations 49, 50, 55, 56) | merged (PR #49, 2026-10-28 04:07 UTC; PR #51, 07:06 UTC: 55, 56, review fixes) before its migrations were applied; PR #52, 19:03 UTC: the fixes to 50, 55 and 56 from the staging rehearsal and a second independent review | [business-v2.md](business-v2.md) |
+| `business-sidebar` | Sunil | The business portal's sidebar: Overview, Advertisements, Inbox, Products & Services, Analytics, Billing, Settings (no migration) | merged (PR #56, 2026-10-29 03:34 UTC); nothing left on it | [business-sidebar.md](business-sidebar.md) |
+| `business-inbox` | Sunil | The business Inbox, directly below Overview: Instagram-style list, filters, alerts, inquiry context (no migration) | merged (PR #57, 2026-10-29 04:06 UTC; its later commit is on `business-inbox-pending`) | [business-inbox.md](business-inbox.md) |
+| `business-inbox-pending` | Sunil | The Inbox for a business awaiting review: below Overview, saying it opens on approval (no migration) | merged (PR #58, 2026-10-29 06:14 UTC) | [business-inbox-pending.md](business-inbox-pending.md) |
+| `business-hours` | Sunil | The public profile's preview from the sidebar, a Website button, and opening hours with "open now" (migration 57) | merged (PR #59, 2026-10-29 07:18 UTC); 57 not on production | [business-hours.md](business-hours.md) |
+| `reel-viewer-actions` | Sunil | The app's full-screen viewer: no comment bar, the tab bar kept in view, the rail nearer the right edge (no migration) | merged (PR #61) | this table and docs/status.md (one PR) |
+| `viewer-close-transition` | Sunil | The app's viewer closes into the post it was opened from from any page, fading from a later reel (no migration) | merged (PR #62) | this table and docs/status.md (one PR) |
+| `viewer-polish` | Sunil | The app's viewer: the zoom at Instagram's measured speed, no blur under the words (no migration) | merged (PR #63) | this table and docs/status.md (one PR) |
+| `buzz-media-viewer` | Sunil | Buzz's photos and video in the app's full-screen viewer, as an anonymous page (no migration) | merged (PR #64) | this table and docs/status.md (one PR) |
+| `buzz-viewer-feed` | Sunil | The Buzz viewer goes on up and down through the Buzz list's buzzes with media (no migration) | merged (PR #65) | this table and docs/status.md (one PR) |
+| `buzz-thread-redesign` | Sunil | The Buzz thread laid out like Reddit's: actions at the right, subtle lines that fold their branch, a button to the next conversation (no migration) | merged (PR #66) | this table and docs/status.md (one PR) |
+| `snap-preview-frost` | Sunil | Snap previews in chats: a lighter frost, a slow drift while unopened (no migration) | merged (PR #67) | this table and docs/status.md (one PR) |
+| `camera-post-reel` | Sunil | One camera for POST and REEL, BUZZ \| POST \| REEL \| SNAP, no reload on switching (no migration) | merged (PR #68) | this table and docs/status.md (one PR) |
+| `stories` | Sunil | Stories: the tray under Home's tabs, the viewer, "Your story" on the publish screen; migration 58 | merged (PR #69, 2026-10-30 17:26 UTC); 58 on production since 2026-10-30 19:30 UTC | this table and docs/status.md (one PR) |
+| `stories-live` | Sunil | Migration 58 to production on its own, ahead of the release: its offline rehearsal, its staging probe, 58 out of the release lists; the viewer waits for the picture, expired stories leave an open tray, pull to refresh reloads it; the Business v2 review of 2026-10-30; CLAUDE.md (no new migration) | merged (PR #70, 2026-10-30 21:02 UTC) | — |
+| `stories-media` | Sunil | A story's photo in its own folder, checked and deleted with the story; video stories from the author's own uploads (migration 59, live 2026-10-30 20:30 UTC); the app moves the photo there | merged (PR #71, 2026-10-30 21:03 UTC) | — |
+| `post-media-privacy` | Sunil | Every upload folder listed by its owner alone; a post's photos from, and with, the post (migration 60); the full backup and restore tools (`scripts/backup.mjs --full`, `scripts/restore.mjs`, their staging rehearsal, the daily launchd backup) | merged (PR #72, 2026-10-30) | docs/history.md |
+| `business-performance` | Sunil | The business portal made instant: local token verification, parallel and deduplicated reads, prefetch on intent, delayed skeletons, filters without a request, one live channel, a self-updating Inbox list (no migration) | merged (PR #73, 2026-10-30); browser timings await a staging run | [business-performance.md](business-performance.md) |
+| `events` | Sunil | Home, Explore, Messages, Events, Profile; the Events tab, event pages, organizations that students create and staff verify, the university's ICS and RSS feeds synced by the website, the console's Events section (migration 61: on staging since 2026-10-31, on production since 2026-11-01 23:31 UTC) | merged (PR #74, 2026-10-31 03:43 UTC); 61 not on production | [events.md](events.md) |
+| `admin-analytics-business` | Yubraj | CampConnect Admin's Analytics and Business sections (growth, active and engaged students, ad delivery, revenue; advertisers, campaigns, payments, pricing, reports; migration 63), and the admin app itself brought from `step-admin` | merged (PR #60, 2026-11-02; `main` merged in up to PR #89; rehearsed on staging 2026-10-30); 63 not on production | [admin-analytics-business.md](admin-analytics-business.md) |
 | `claude/claude-md-documentation-0b8750` | — | leftover worktree branch of a 2026-10-26 AI session | no commits of its own; left untouched until the owner says otherwise | — |
+| `viewer-full-bleed` | Sunil | Every full-screen photo and video viewer in the app: the picture from the screen's top edge under the status bar, a blurred copy of it around it (no migration) | merged (PR #77, 2026-11-01) | this table and docs/status.md (one PR) |
+| `nav-velocity-collapse` | Sunil | The app's bottom bar collapses by the speed of a scroll, on every tab (no migration) | merged (PR #78, 2026-11-01) | this table and docs/status.md (one PR) |
+| `home-full-bleed-top` | Sunil | Home's feeds scroll on under the status bar to the top edge, a faint tint behind the clock (no migration) | merged (PR #79, 2026-11-01) | this table and docs/status.md (one PR) |
+| `settings-redesign` | Sunil | The app's Settings as a menu of sections, each its own screen, a searchable university picker, Delete account in Account Management (no migration) | merged (PR #80, 2026-11-01) | this table and docs/status.md (one PR) |
+| `discovery-redesign` | Sunil | Explore's and Events' search and filters in three levels, the advanced choices in the sheets, For you's interests asked once, Events' plain error before migration 61, a steady Profile grid (no migration) | merged (PR #81, 2026-11-01 23:18 UTC) | this table and docs/status.md (one PR) |
+| `migration-61-live` | Sunil | Migration 61 recorded as live on production (2026-11-01 23:31 UTC) and taken out of the rollout rehearsals' "ahead" lists (no migration of its own) | merged (PR #82, 2026-11-01 23:48 UTC) | this table and docs/migrations.md (one PR) |
+| `ankur-autonomy` | Sunil | Ankur's sessions work end to end without asking (code, tests, pushes, his own merges, development and staging deploys); production writes wait on Sunil's approval, each on its own (no migration) | merged (PR #83) | `CLAUDE.md` (Workflow) and docs/decisions.md |
+| `story-actions-fix` | Sunil | Story likes, replies and shares: the real reason for a refused share, group chats in the app's share sheet, the heart's last tap winning, readable errors before migration 62; 62's offline suite and a staging probe; 62 applied on staging, then on production on 2026-11-02 04:32 UTC | merged (PR #85) | docs/status.md and docs/migrations.md (one PR) |
+| `story-viewer-redesign` | Sunil | The story viewer redesigned: a rounded card with the actions below it, a clearer reply pill, 46-point heart and plane, Activity, Send and Delete on your own story, controls fading while a story is held (no migration) | merged (PR #86, 2026-11-02 05:28 UTC) | docs/status.md, "The story viewer, redesigned" |
+| `vercel-admin-disconnect` | Sunil | Docs only: the `campconnect-admin` Vercel project disconnected from the repository (it builds `apps/admin`, on `step-admin` alone), PR #86 recorded as merged | merged (PR #87) | docs/decisions.md |
+| `password-recovery` | Sunil | Forgot password on the website and in the app, the reset page a recovery link lands on, Change password in Settings, plain words for Supabase's sign-in answers, emails trimmed before checking (no migration) | merged (PR #88) | docs/status.md, "Password recovery, and sign-in's words" |
+| `profile-navigation` | Sunil | A pushed profile closes with a swipe right from anywhere on its first tab; your own photo or name opens the Profile tab; the Profile tab keeps the whole bottom bar; Listings squares show only their kind's icon; New Message's search field spaced and aligned; Messages' header scrolls away with the list, the bottom bar kept whole (no migration) | merged (PR #89, 2026-11-02 09:13 UTC) | docs/status.md, "Profile navigation" and "Messages' header scrolls with the list" |
+| `pause-calls` | Sunil | Calls hidden for the launch (operating costs): no call buttons in any chat's bar, no ring or incoming-call screen, no Join banner, a call link opens Messages, no Calls channel on Android, past calls kept as history rows; the code and the call records kept, the rule in `CLAUDE.md`; migration 66 (first written as 64), the database refusing new calls | merged (PR #90, 2026-11-02 23:59 UTC); migration 66 on the branch (renamed from 64 on 2026-11-04, when `main`'s report auto-hide had gone live as 64; `main` merged in), merged with it as PR #102 (2026-11-05 01:50 UTC); on staging, and on production since 2026-11-05 01:44 UTC (the owner's approval) | docs/status.md, "Calls hidden for the launch"; docs/decisions.md |
+| `ads-delivery` | Sunil | Approved ads reach students: every feed's first ad after the 3rd row (it waited for the 9th, past each first page), a short feed ending with its ad, Sponsored reels in the app's Reels, an ad keeping its slot when its listing is on the page, the runtime fingerprint, and `ad-delivery.test.mjs`, the business-to-student road through the apps' own code (no migration) | merged (PRs #97, #98, #99, 2026-11-03 21:25 to 2026-11-04 09:14 UTC) | [../status.md](../status.md) ("Ads reach students") |
+| `ads-delivery-followup` | Sunil | After `ads-delivery`'s merge: `console-business.test.mjs`'s revenue check made daylight-saving proof (it failed on 2026-11-04, three days after a 25-hour day), the docs brought up to the merge, the iPhone check's results (no migration) | merged (PR #100, 2026-11-05 01:12 UTC) | [../status.md](../status.md) ("Ads reach students"); [../testing.md](../testing.md) |
+| `ads-refresh` | Sunil | A pull-to-refresh asks for the feed's ads again in the app's Orbit, Reels and Housing (a paused, ended or hidden campaign leaves, a resumed or newly approved one comes in, an impression counted once per screen), the website checked (a reload already asks again), the tests (no migration) | merged (PR #103, 2026-11-05 02:42 UTC); the website and CampConnect Admin redeployed; the app's part reaches testers only with an EAS update (the owner's approval) | [../status.md](../status.md) ("Ads refresh with the feed"); [../testing.md](../testing.md) |
+| `fix/security-2026-10-27` | Sunil | A security fix for a live part of the database (details once it is live), migration 67 and the website | local, not pushed; `main` merged in, rehearsed on staging (2026-11-05) | [fix/security-2026-10-27.md](fix/security-2026-10-27.md) |
 
 **Safe to delete once their owner agrees**, because `main` has all their work (what is left on them
 is an old `CLAUDE.md` copy or, on `business-portal-prelaunch`, the stray `app.json`):
-`docs/claude-md`, `listing-flow-redesign` and `create-flow-redesign` (close PRs #43 and #44
-first), `step-home-feed`, `business-portal-prelaunch` (Sunil's); `ankur/owner-moderation` (Ankur's).
+`docs/claude-md`, `docs/claude-structure`, `listing-flow-redesign`, `create-flow-redesign`,
+`step-home-feed`, `business-portal-prelaunch` (Sunil's; close PRs #43, #44, #46 and #47 first);
+`ankur/owner-moderation` (Ankur's).
 
 ## Old per-branch CLAUDE.md copies
 
@@ -33,8 +71,10 @@ On 2026-10-27 each branch got its own `CLAUDE.md` with a branch-specific §9. Th
 the same day (docs/decisions.md, last row); every §9 now lives in the files here.
 
 - Copies pushed to GitHub: `listing-flow-redesign`, `create-flow-redesign`, `step-home-feed`,
-  `business-portal-prelaunch`. PRs #43 and #44 would bring two of them into `main`: close them
-  instead of merging.
+  `business-portal-prelaunch`. PRs #43, #44, #46 and #47 would bring all four into `main` (and #47
+  the stray `app.json`): close them instead of merging. Checked 2026-10-27 for #46 and #47: each
+  commit on those branches that `main` lacks only adds an old copy or the stub, and every note in
+  the copies is in these docs.
 - Copies committed only on the owner's Mac, never pushed: `ankur/dev`, `ankur/owner-moderation`,
   `step-admin`, `step-1-brand-shell` (one local commit each; reset to `origin/<branch>` to drop it).
 - If you continue a branch that has a copy, merge `main` into it and resolve `CLAUDE.md` by taking

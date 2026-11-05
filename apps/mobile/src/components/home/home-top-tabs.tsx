@@ -10,11 +10,10 @@ import { SlidingTabs } from "@/components/sliding-tabs";
 import { hapticTap } from "@/lib/haptics";
 import { SCOPE_TOGGLE_SHOWN, useHomeScope } from "@/lib/home-scope";
 import { useSession } from "@/lib/session";
-import { auroraGradient, radius } from "@/lib/theme";
+import { auroraGradient, radius, statusShade } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
-import { useCreateMenu } from "./create-menu";
 import { ProfileMenuSheet } from "./profile-menu";
-import { BuzzBarLayer, BuzzLabelMask, BuzzMeGlyph, BuzzStatusStripLayer, useBuzzBar } from "./buzz-top-bar";
+import { BuzzBarLayer, BuzzLabelMask, BuzzMeGlyph, BuzzStatusShade, useBuzzBar } from "./buzz-top-bar";
 import { phosphor } from "@/lib/palette";
 import { Icon } from "@/components/icon";
 import { GlassBackdrop } from "@/components/glass";
@@ -40,10 +39,11 @@ const RING_SIZE = PHOTO + 2 * (PHOTO_GAP + RING);
 /** The square your photo (or, over Reels, the "+") sits in at the left, as the bell does at the right. */
 const SIDE = 44;
 /**
- * The slot on each side of the wordmark, one SIDE square each: the Notifications bell centred on the right (search is the
- * Discover tab), your photo on the left. The same width both sides keeps the wordmark centred on the screen.
+ * The slot on each side of the wordmark: the magnifier and the Notifications bell on the right (two actions, a 4pt gap,
+ * and the bell's inset from the edge), your photo at the left of the left one. The same width both sides keeps the
+ * wordmark centred on the screen.
  */
-const SIDE_SLOT = SIDE;
+const SIDE_SLOT = 2 * HEADER_ACTION_SIZE + 4 + (SIDE - HEADER_ACTION_SIZE) / 2;
 const LABEL_SIZE = 16;
 /** The toggle: each segment this wide, the sliding thumb inset by the pill's padding. */
 const SEGMENT = 108;
@@ -106,8 +106,8 @@ export function campusSegments(profile: { university_id: string | null; universi
 /**
  * Floating top bar of Home, X style, in three rows. Row 1: your photo in a gradient ring on the left, which opens your
  * menu (ProfileMenuSheet: your profile, Upload, Saved, Settings, Community Guidelines, Log out; signed out, log in); the
- * UniBuzz wordmark in the middle (it reads "Following" while that feed shows); on the right the Notifications bell (it
- * opens the notifications screen; its badge counts the unread; search is the Discover tab). Row 2: the Home tabs (Orbit | Buzz | Reels) spread across the row
+ * UniBuzz wordmark in the middle (it reads "Following" while that feed shows); on the right the magnifier (the search
+ * screen) and the Notifications bell (it opens the notifications screen; its badge counts the unread). Row 2: the Home tabs (Orbit | Buzz | Reels) spread across the row
  * with X's sliding underline (violet, as wide as the label) over a hairline. Row 3: the Campus | Global toggle, a small
  * segmented pill whose thumb slides to the choice (see useHomeScope: it scopes For you, Buzz, Posts and Reels alike;
  * Campus is the person's own university, Global every university; "Following" joins it only while Posts has a tab,
@@ -115,8 +115,8 @@ export function campusSegments(profile: { university_id: string | null; universi
  * is the pager's offset in points and `pageWidth` the width of one page: the underline slides, the labels crossfade (see
  * SlidingTabs) and the bar's solid background (colors.bar and its hairline) fades out towards Reels with the finger, all
  * on the native driver. `overVideo` says when the text, icons and the toggle turn white and glassy for the video: Home
- * flips it halfway between Posts and Reels. Creating starts from Orbit's floating "+" and the menu's Upload; over the
- * Reels video the left slot holds a "+" instead of your photo, white like the rest of the bar. `section` is the section committed once the pager settles: what screen readers hear as selected
+ * flips it halfway between Posts and Reels. Creating starts from the floating "+" at the bottom right (X's compose
+ * button) and the menu's Upload; your photo keeps the left slot over the Reels video too. `section` is the section committed once the pager settles: what screen readers hear as selected
  * follows it. `translateY` slides the whole bar up out of the way as the page on screen scrolls down and back as soon as
  * it scrolls up, Instagram style (see useCollapsingHeader). Memoized: Home mounting a page ahead of time leaves it alone.
  */
@@ -127,7 +127,6 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
   const [scope, setScope] = useHomeScope();
   const colors = useColors();
   const styles = useStyles();
-  const create = useCreateMenu();
   const [menuOpen, setMenuOpen] = useState(false);
   const overVideo = useOverVideo(overVideoStore);
   // Whether the page under the finger is Posts: flipped halfway, like overVideo, so the title and the toggle follow the swipe, not the settle.
@@ -137,6 +136,30 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
   const solid = useMemo(() => (pageWidth > 0 ? scrollX.interpolate({ inputRange: SOLID.map((_, i) => i * pageWidth), outputRange: SOLID, extrapolate: "clamp" }) : null), [pageWidth, scrollX]);
   // Near Buzz the bar is Phosphor (see useBuzzBar): light words, a lime underline, no photo of you at rest.
   const buzzBar = useBuzzBar(scrollX, pageWidth, section);
+  /**
+   * Nothing opaque stays under the status bar: once the bar slides away the feed runs on to the screen's top edge, under
+   * the clock, as Reddit's does, clearly visible. Only a faint tint of the bar's colour (statusShade) stays behind the
+   * status bar's icons, and only while something is under them: it fades in as the bar's own background leaves the status
+   * bar (`away`, 0 to 1 over the last status-bar height of its slide), in the theme's colour, Buzz's near Buzz, and not at
+   * all over Reels' video (`solid`).
+   */
+  const [barHeight, setBarHeight] = useState(insets.top + HOME_TOP_BAR_HEIGHT);
+  const measure = (e: LayoutChangeEvent) => {
+    onLayout(e);
+    const h = e.nativeEvent.layout.height;
+    setBarHeight((prev) => (Math.abs(prev - h) > 0.5 ? h : prev));
+  };
+  const away = useMemo(() => {
+    const status = Math.max(insets.top, 1);
+    const height = Math.max(barHeight, status + 1);
+    return translateY.interpolate({ inputRange: [-height, status - height, 0], outputRange: [1, 0, 0], extrapolate: "clamp" });
+  }, [translateY, barHeight, insets.top]);
+  const shadeOpacity = useMemo(() => {
+    const look = solid ?? new Animated.Value(overVideo ? 0 : 1);
+    // Near Buzz its own shade takes over (BuzzStatusShade): the two never mix to grey.
+    const plain = buzzBar.layer ? Animated.subtract(1, buzzBar.layer) : 1;
+    return Animated.multiply(Animated.multiply(away, look), plain);
+  }, [away, solid, overVideo, buzzBar.layer]);
   const onBuzz = buzzBar.near && !overVideo;
   const fg = overVideo ? colors.onMedia : onBuzz ? phosphor.ink : colors.text;
   const dim = overVideo ? colors.onMediaMuted : onBuzz ? phosphor.ink3 : colors.muted;
@@ -167,30 +190,25 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
 
   return (
     <>
-      <Animated.View onLayout={onLayout} pointerEvents={overVideo ? "box-none" : "auto"} style={[styles.bar, { paddingTop: insets.top + TOP_GAP, transform: [{ translateY }] }]}>
+      <Animated.View onLayout={measure} pointerEvents={overVideo ? "box-none" : "auto"} style={[styles.bar, { paddingTop: insets.top + TOP_GAP, transform: [{ translateY }] }]}>
         <Animated.View pointerEvents="none" style={[styles.solid, { opacity: solid ?? (overVideo ? 0 : 1) }]} />
         <BuzzBarLayer layer={buzzBar.layer} />
         <View style={styles.row}>
           <View style={styles.sideSlot}>
-            {overVideo ? (
-              <Pressable onPress={create} hitSlop={8} accessibilityRole="button" accessibilityLabel="Create" style={styles.side}>
-                <Icon name="add-circle-outline" size={30} color={fg} style={styles.shadow} />
-              </Pressable>
-            ) : (
-              <View style={styles.side}>
-                {/* Your photo is not drawn at all while the pager rests on Buzz; near it, it crossfades to a neutral glyph. */}
-                {buzzBar.avatarShown ? (
-                  <Animated.View style={[styles.sideLayer, buzzBar.avatarOpacity ? { opacity: buzzBar.avatarOpacity } : null]}>
-                    <Pressable onPress={() => (user ? setMenuOpen(true) : router.push("/(auth)/login"))} hitSlop={4} accessibilityRole="button" accessibilityLabel="Your menu" accessibilityHint="Your profile, Upload, Saved, Settings and more" style={styles.ring}>
-                      <View style={styles.ringGap}>
-                        {profile ? <Avatar name={profile.full_name} url={profile.avatar_url} size={PHOTO} online={false} transition={0} /> : <Icon name="person-circle" size={PHOTO} color={colors.faint} />}
-                      </View>
-                    </Pressable>
-                  </Animated.View>
-                ) : null}
-                {buzzBar.glyphShown ? <BuzzMeGlyph opacity={buzzBar.layer} onPress={() => router.push("/(tabs)/profile")} size={RING_SIZE - 6} /> : null}
-              </View>
-            )}
+            {/* Your photo and its menu on every page, Reels included: creating starts from the "+" at the bottom right (X's way), not up here. */}
+            <View style={styles.side}>
+              {/* Your photo is not drawn at all while the pager rests on Buzz; near it, it crossfades to a neutral glyph. */}
+              {buzzBar.avatarShown ? (
+                <Animated.View style={[styles.sideLayer, buzzBar.avatarOpacity ? { opacity: buzzBar.avatarOpacity } : null]}>
+                  <Pressable onPress={() => (user ? setMenuOpen(true) : router.push("/(auth)/login"))} hitSlop={4} accessibilityRole="button" accessibilityLabel="Your menu" accessibilityHint="Your profile, Upload, Saved, Settings and more" style={styles.ring}>
+                    <View style={styles.ringGap}>
+                      {profile ? <Avatar name={profile.full_name} url={profile.avatar_url} size={PHOTO} online={false} transition={0} /> : <Icon name="person-circle" size={PHOTO} color={colors.faint} />}
+                    </View>
+                  </Pressable>
+                </Animated.View>
+              ) : null}
+              {buzzBar.glyphShown ? <BuzzMeGlyph opacity={buzzBar.layer} onPress={() => router.push("/(tabs)/profile")} size={RING_SIZE - 6} /> : null}
+            </View>
           </View>
           {/* Two equal side slots keep the wordmark truly centred. */}
           <View style={styles.middle}>
@@ -216,10 +234,9 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
           </View>
         ) : null}
       </Animated.View>
-      {/* The status bar's strip stays put while the bar slides away under it, as on iOS: the wordmark and the feed pass
-          beneath the clock, never through it. Faded with the bar's solid look, so Reels keeps its video edge to edge. */}
-      <Animated.View pointerEvents="none" style={[styles.statusStrip, { height: insets.top, opacity: solid ?? (overVideo ? 0 : 1) }]} />
-      <BuzzStatusStripLayer layer={buzzBar.layer} height={insets.top} />
+      {/* Behind the status bar, only a faint tint (see `away`): the feed passes under the clock, to the screen's top edge. */}
+      <Animated.View pointerEvents="none" style={[styles.statusShade, { height: insets.top, opacity: shadeOpacity }]} />
+      <BuzzStatusShade layer={buzzBar.layer} away={away} height={insets.top} />
       <ProfileMenuSheet visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </>
   );
@@ -265,7 +282,7 @@ const useStyles = makeStyles((colors, scheme) => ({
   bar: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "transparent" },
   // The solid look behind the rows, safe area included, its hairline on the bar's bottom edge: faded by the pager (see `solid`).
   solid: { position: "absolute", top: 0, left: 0, right: 0, bottom: -StyleSheet.hairlineWidth, backgroundColor: colors.bar, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  statusStrip: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 11, backgroundColor: colors.bar },
+  statusShade: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 11, experimental_backgroundImage: statusShade(colors.bar) },
   row: { height: ROW, flexDirection: "row", alignItems: "center", paddingHorizontal: SIDE_PAD },
   side: { width: SIDE, height: ROW, alignItems: "center", justifyContent: "center" },
   // Your photo and, near Buzz, the glyph in its place: layers over each other in the same square.

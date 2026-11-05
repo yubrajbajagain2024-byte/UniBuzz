@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import {
   BUZZ_FEED_COPY,
   BUZZ_PAGE,
+  BUZZ_PROMPT_COPY,
   BUZZ_SORT_OPTIONS,
   BUZZ_TOP_WINDOWS,
   getBuzzFeed,
@@ -14,12 +15,11 @@ import {
   type BuzzTopWindow,
 } from "@apartment-book/shared";
 import { Icon } from "@/components/icon";
-import { BuzzCardById, BuzzCardSkeleton, CARD_GAP } from "@/components/buzz/card";
+import { BuzzCardById, BuzzCardSkeleton, CARD_GAP, openThread } from "@/components/buzz/card";
 import { BuzzComposer } from "@/components/buzz/composer";
 import { BuzzFab } from "@/components/buzz/fab";
 import { BuzzGatePanel, BuzzSignedOutPanel, useBuzzGate } from "@/components/buzz/gate";
 import { BuzzActionsHost } from "@/components/buzz/item-menu";
-import { BuzzMediaActive } from "@/components/buzz/media";
 import { BuzzToastHost } from "@/components/buzz/toast";
 import { Chip, EmptyState, ErrorState, GUTTER, HERO_SOFT_GRADIENT, P, PButton, PIconButton, R, Segmented, T } from "@/components/buzz/ui";
 import { useBuzzList, type BuzzListPage } from "@/components/buzz/use-buzz-list";
@@ -31,6 +31,7 @@ import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useTabBarInset } from "@/lib/tab-bar";
 import { useTabReselect } from "@/lib/tab-reselect";
+import { BuzzViewerList } from "@/components/buzz/media";
 
 /*
  * Home → Buzz (UniVerse's BuzzPane, design §7.2, SPEC §5.3), in Phosphor whatever the app's theme.
@@ -39,9 +40,11 @@ import { useTabReselect } from "@/lib/tab-reselect";
  *    the page is the one on screen; otherwise an empty canvas, nothing loaded), "Not now" back to the section before.
  *  - Accepted: under Home's bar a filter bar (search pill, Hot | New | Top, Campus | Global) that slides up under the bar
  *    as the feed scrolls down and comes back as it scrolls up; Top adds Today | This week | All time; today's prompt (Hot
- *    only); the small-campus note; the cold start (an empty campus Hot feed moves to Global with a banner); the cards;
+ *    only: "Answer anonymously" and, once anyone has, its thread with the answers, which Hot then leaves out of the
+ *    list below); the small-campus note; the cold start (an empty campus Hot feed moves to Global with a banner); the cards;
  *    skeletons, empty states, the error state, more as you scroll ("That's everything for now"); the FAB (pen + mask)
- *    and the composer. Home's own bar stays put on this page, as on UniVerse: Buzz never feeds its collapse.
+ *    and the composer. Home's own bar stays put on this page, as on UniVerse: Buzz never feeds its collapse. The bottom
+ *    bar does collapse to its Home button as the feed scrolls on, as on For you, and the FAB stays, beside it (X's way).
  *
  * Because posts publish after a random delay (jitter), there is no live push: the feed loads when it comes up, on pull to
  * refresh and after your own writes.
@@ -67,14 +70,21 @@ const META_FRESH_MS = 5 * 60_000;
 
 type Row = { id: string };
 
-export function BuzzSection({ active, topInset }: { active: boolean; topInset: number; onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void }) {
+/**
+ * Home's scroll wiring for Buzz's list (see useCollapsingHeader): its `onScroll` writes the list's offset into `scrollY`,
+ * which slides Home's top bar away (`barShift`) and, from the same value, Buzz's filter bar under it; the bottom bar's
+ * collapse hears it through Home too.
+ */
+export type BuzzScroll = { onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void; scrollY: Animated.Value; barShift: Animated.AnimatedInterpolation<number> };
+
+export function BuzzSection({ active, topInset, scroll }: { active: boolean; topInset: number; scroll: BuzzScroll }) {
   const { user, loading } = useSession();
   const gate = useBuzzGate();
   const tabBar = useTabBarInset();
 
   let content = null;
   if (!loading && !user) content = active ? <Centered topInset={topInset} bottom={tabBar}><BuzzSignedOutPanel /></Centered> : null;
-  else if (gate.status === "accepted") content = <Feed active={active} topInset={topInset} />;
+  else if (gate.status === "accepted") content = <Feed active={active} topInset={topInset} scroll={scroll} />;
   else if (!active) content = null;
   else if (gate.status === "required")
     content = (
@@ -122,7 +132,7 @@ const CardRow = memo(function CardRow({ id }: { id: string }) {
   );
 });
 
-function Feed({ active, topInset }: { active: boolean; topInset: number }) {
+function Feed({ active, topInset, scroll }: { active: boolean; topInset: number; scroll: BuzzScroll }) {
   const router = useRouter();
   const focused = useIsFocused();
   const tabBar = useTabBarInset();
@@ -210,16 +220,26 @@ function Feed({ active, topInset }: { active: boolean; topInset: number }) {
     if (r) openComposer(r.promptId ? { promptId: r.promptId } : undefined);
   }, [active, composerRequest, openComposer]);
 
-  /* ---------- the filter bar and the FAB slide away as the feed scrolls down ---------- */
-
-  const scrollY = useRef(new Animated.Value(ios ? -insetTop : 0)).current;
-  const onScroll = useMemo(() => Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true }), [scrollY]);
+  /*
+   * ---------- Reddit's header: Home's top bar and the filter bar slide away together as the feed scrolls down ----------
+   * The list writes its offset into Home's value for Buzz (`scroll`): Home's bar slides away by its own height once the
+   * filter bar has slid under it, and the filter bar rides up with it, so the feed runs on up to the screen's top edge,
+   * under the status bar. Both come back the moment it scrolls up. The bottom bar's collapse hears it through Home.
+   */
+  const { onScroll, scrollY, barShift } = scroll;
+  // Where this list rests (its inset is Home's bar and the filter bar), not Home's bar alone, until it reports.
+  useEffect(() => {
+    if (ios) scrollY.setValue(-insetTop);
+    // Once, as the list mounts: later inset changes are placed below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const hidden = useMemo(() => {
     const clampTop = { inputRange: [0, 1], outputRange: [0, 1], extrapolateLeft: "clamp" as const, extrapolateRight: "extend" as const };
     const fromTop = ios ? Animated.add(scrollY, insetTop).interpolate(clampTop) : scrollY.interpolate(clampTop);
     return Animated.diffClamp(fromTop, 0, Math.max(1, filterHeight));
   }, [scrollY, ios, insetTop, filterHeight]);
-  const barY = useMemo(() => Animated.multiply(hidden, -1), [hidden]);
+  // Its own slide under Home's bar, plus Home's bar's slide away.
+  const barY = useMemo(() => Animated.add(Animated.multiply(hidden, -1), barShift), [hidden, barShift]);
   // iOS: a list resting at the top stays there when the inset above it changes (the filter bar measured, a new text size).
   const restingY = useRef<number | null>(null);
   const placedInset = useRef(insetTop);
@@ -234,7 +254,6 @@ function Feed({ active, topInset }: { active: boolean; topInset: number }) {
   const noteRest = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     restingY.current = e.nativeEvent.contentOffset.y;
   }, []);
-  const fabY = useMemo(() => hidden.interpolate({ inputRange: [0, Math.max(1, filterHeight)], outputRange: [0, tabBar + 96], extrapolate: "clamp" }), [hidden, filterHeight, tabBar]);
   const onFilterLayout = useCallback((e: LayoutChangeEvent) => {
     const h = Math.round(e.nativeEvent.layout.height);
     setFilterHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
@@ -246,6 +265,10 @@ function Feed({ active, topInset }: { active: boolean; topInset: number }) {
   /* ---------- the list ---------- */
 
   const where = scope === "campus" ? (campus?.shortName ?? meta?.campus?.shortName ?? "campus") : "Global";
+  // Today's prompt thread is the prompt card in Hot (with its answers): not a second time in the list below it.
+  const promptThread = meta?.prompt?.threadId ?? null;
+  const promptAnswers = meta?.prompt?.answers ?? 0;
+  const rows = useMemo(() => (sort === "hot" && promptThread ? list.rows.filter((r) => r.id !== promptThread) : list.rows), [sort, promptThread, list.rows]);
   const university = campus?.name ?? meta?.campus?.name ?? "your campus";
   const header = (
     <View style={styles.header}>
@@ -275,7 +298,17 @@ function Feed({ active, topInset }: { active: boolean; topInset: number }) {
             <Text style={[T.overline, { color: P.accentInk }]}>{BUZZ_FEED_COPY.promptOverline}</Text>
           </View>
           <Text style={[T.headline, { color: P.ink, fontSize: 17, lineHeight: 23 }]}>{meta.prompt.text}</Text>
-          <PButton title={BUZZ_FEED_COPY.promptAction} variant="secondary" size="sm" onPress={() => openComposer({ promptId: meta.prompt!.id })} style={styles.selfStart} />
+          <View style={styles.promptActions}>
+            <PButton title={BUZZ_FEED_COPY.promptAction} variant="secondary" size="sm" onPress={() => openComposer({ promptId: meta.prompt!.id, promptMode: "thread" })} />
+            {promptThread && promptAnswers > 0 ? (
+              <Pressable onPress={() => openThread(router, promptThread)} hitSlop={8} accessibilityRole="link" accessibilityHint="Opens the prompt's thread" style={({ pressed }) => [styles.promptLink, pressed && { opacity: 0.75 }]}>
+                <Text style={[T.labelSm, { color: P.accentInk }]}>{BUZZ_PROMPT_COPY.seeAnswers(promptAnswers)}</Text>
+                <Icon name="chevron-forward" size={14} color={P.accentInk} />
+              </Pressable>
+            ) : meta.prompt.threadId !== undefined ? (
+              <Text style={[T.caption, styles.flex, { color: P.ink3 }]}>{BUZZ_PROMPT_COPY.first}</Text>
+            ) : null}
+          </View>
         </View>
       ) : null}
     </View>
@@ -309,12 +342,12 @@ function Feed({ active, topInset }: { active: boolean; topInset: number }) {
   ) : null;
 
   return (
-    <BuzzMediaActive.Provider value={active && focused}>
+    <BuzzViewerList.Provider value={list.viewerPages}>
       <BuzzActionsHost>
         <View style={styles.flex}>
           <AnimatedFlatList
             ref={listRef}
-            data={list.status === "ready" ? list.rows : []}
+            data={list.status === "ready" ? rows : []}
             keyExtractor={(r) => r.id}
             renderItem={({ item }) => <CardRow id={item.id} />}
             ItemSeparatorComponent={Separator}
@@ -362,12 +395,12 @@ function Feed({ active, topInset }: { active: boolean; topInset: number }) {
               <Segmented<BuzzScope> label="Feed scope" value={scope} options={SCOPES} onChange={chooseScope} />
             </View>
           </Animated.View>
-          <BuzzFab onPress={() => openComposer()} bottom={tabBar + 12} translateY={fabY} />
+          <BuzzFab onPress={() => openComposer()} bottom={tabBar + 12} />
           <BuzzToastHost bottom={tabBar + 84} enabled={active && focused} />
         </View>
-        <BuzzComposer visible={composerOpen} onClose={() => setComposerOpen(false)} />
+        <BuzzComposer visible={composerOpen} onClose={() => setComposerOpen(false)} onAnswered={(threadId, replyId) => openThread(router, threadId, replyId)} />
       </BuzzActionsHost>
-    </BuzzMediaActive.Provider>
+    </BuzzViewerList.Provider>
   );
 }
 
@@ -385,7 +418,6 @@ function FeedEmpty({ sort, window, scope, university, onSeeGlobal, onCheckNew, o
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   page: { flex: 1, backgroundColor: P.canvas },
-  selfStart: { alignSelf: "flex-start" },
   header: { gap: 12, paddingBottom: CARD_GAP },
   cards: { paddingHorizontal: GUTTER, gap: CARD_GAP },
   cardRow: { paddingHorizontal: GUTTER },
@@ -394,6 +426,8 @@ const styles = StyleSheet.create({
   smallCampus: { marginHorizontal: GUTTER, paddingHorizontal: 12, paddingVertical: 8, borderRadius: R.md, borderCurve: "continuous", backgroundColor: P.surface2 },
   prompt: { marginHorizontal: GUTTER, gap: 12, padding: 16, borderRadius: R.lg, borderCurve: "continuous", borderWidth: 1, borderColor: P.accentLine, backgroundColor: P.surface1, experimental_backgroundImage: HERO_SOFT_GRADIENT },
   promptHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  promptActions: { flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap" },
+  promptLink: { flexDirection: "row", alignItems: "center", gap: 2, minHeight: 36 },
   end: { alignItems: "center", paddingVertical: 20 },
   filterBar: { position: "absolute", left: 0, right: 0, gap: 8, paddingHorizontal: GUTTER, paddingTop: 8, paddingBottom: 10, backgroundColor: P.canvas },
   searchPill: { height: 42, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, borderRadius: R.pill, backgroundColor: P.surface2 },

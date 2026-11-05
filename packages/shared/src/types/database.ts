@@ -25,6 +25,8 @@ export type Database = {
           longitude: number | null;
           email_domain: string | null;
           geog: unknown | null;
+          /** Migration 61: the campus's IANA time zone, for its calendars' local times. Missing on a database before it. */
+          timezone: string;
           created_at: string;
         };
         Insert: {
@@ -35,6 +37,7 @@ export type Database = {
           latitude?: number | null;
           longitude?: number | null;
           email_domain?: string | null;
+          timezone?: string;
           created_at?: string;
         };
         Update: {
@@ -45,6 +48,7 @@ export type Database = {
           latitude?: number | null;
           longitude?: number | null;
           email_domain?: string | null;
+          timezone?: string;
           created_at?: string;
         };
         Relationships: [];
@@ -689,6 +693,8 @@ export type Database = {
           sender_id: string | null;
           content: string;
           image_url: string | null;
+          hidden_at: string | null;
+          hidden_reason: string | null;
           shared_post: Json | null;
           /** Migration 20: [{kind, path, name, size, mime, width?, height?, duration?}]; read it with parseAttachments(). */
           attachments: Json;
@@ -711,6 +717,8 @@ export type Database = {
           sender_id?: string | null;
           content: string;
           image_url?: string | null;
+          hidden_at?: string | null;
+          hidden_reason?: string | null;
           shared_post?: Json | null;
           attachments?: Json;
           snap?: Json | null;
@@ -725,6 +733,8 @@ export type Database = {
           sender_id?: string | null;
           content?: string;
           image_url?: string | null;
+          hidden_at?: string | null;
+          hidden_reason?: string | null;
           shared_post?: Json | null;
           attachments?: Json;
           snap?: Json | null;
@@ -1098,6 +1108,10 @@ export type Database = {
           reason: string;
           details: string | null;
           status: string;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          decision: string | null;
+          notes: string | null;
           created_at: string;
         };
         Insert: {
@@ -1108,6 +1122,10 @@ export type Database = {
           reason: string;
           details?: string | null;
           status?: string;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          decision?: string | null;
+          notes?: string | null;
           created_at?: string;
         };
         Update: {
@@ -1118,12 +1136,23 @@ export type Database = {
           reason?: string;
           details?: string | null;
           status?: string;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          decision?: string | null;
+          notes?: string | null;
           created_at?: string;
         };
         Relationships: [
           {
             foreignKeyName: "reports_reporter_id_fkey";
             columns: ["reporter_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reports_reviewed_by_fkey";
+            columns: ["reviewed_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -1148,6 +1177,86 @@ export type Database = {
         Row: { post_id: string; user_id: string; created_at: string };
         Insert: { post_id: string; user_id: string; created_at?: string };
         Update: { post_id?: string; user_id?: string; created_at?: string };
+        Relationships: [];
+      };
+      stories: {
+        Row: { id: string; author_id: string; university_id: string | null; kind: string; image_url: string | null; image_meta: Json | null; video: Json | null; audience: string; created_at: string; expires_at: string };
+        Insert: { id?: string; author_id: string; university_id?: string | null; kind: string; image_url?: string | null; image_meta?: Json | null; video?: Json | null; audience?: string; created_at?: string; expires_at?: string };
+        Update: { id?: string; author_id?: string; university_id?: string | null; kind?: string; image_url?: string | null; image_meta?: Json | null; video?: Json | null; audience?: string; created_at?: string; expires_at?: string };
+        Relationships: [];
+      };
+      story_viewers: {
+        Row: { story_id: string; user_id: string; created_at: string };
+        Insert: { story_id: string; user_id: string; created_at?: string };
+        Update: { story_id?: string; user_id?: string; created_at?: string };
+        Relationships: [];
+      };
+      story_views: {
+        Row: { story_id: string; viewer_id: string; created_at: string };
+        Insert: { story_id: string; viewer_id: string; created_at?: string };
+        Update: { story_id?: string; viewer_id?: string; created_at?: string };
+        Relationships: [];
+      };
+      // Migration 62: a heart on someone else's story (read by the liker and the author), and the people whose stories
+      // someone has muted (their own to read). The API writes only the ids.
+      story_likes: {
+        Row: { story_id: string; user_id: string; created_at: string };
+        Insert: { story_id: string; user_id: string };
+        Update: { story_id?: string; user_id?: string };
+        Relationships: [];
+      };
+      story_mutes: {
+        Row: { user_id: string; author_id: string; created_at: string };
+        Insert: { user_id: string; author_id: string };
+        Update: { user_id?: string; author_id?: string };
+        Relationships: [];
+      };
+      organizations: {
+        Row: { id: string; university_id: string; name: string; kind: string; description: string | null; avatar_url: string | null; website: string | null; verified: boolean; verified_at: string | null; verified_by: string | null; status: string; follower_count: number; created_by: string | null; created_at: string; updated_at: string };
+        Insert: { id?: string; university_id?: string; name: string; kind?: string; description?: string | null; avatar_url?: string | null; website?: string | null; verified?: boolean; verified_at?: string | null; verified_by?: string | null; status?: string; follower_count?: number; created_by?: string | null; created_at?: string; updated_at?: string };
+        Update: { id?: string; university_id?: string; name?: string; kind?: string; description?: string | null; avatar_url?: string | null; website?: string | null; verified?: boolean; verified_at?: string | null; verified_by?: string | null; status?: string; follower_count?: number; created_by?: string | null; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      organization_members: {
+        Row: { organization_id: string; user_id: string; role: string; created_at: string };
+        Insert: { organization_id: string; user_id: string; role?: string; created_at?: string };
+        Update: { organization_id?: string; user_id?: string; role?: string; created_at?: string };
+        Relationships: [];
+      };
+      organization_follows: {
+        Row: { organization_id: string; user_id: string; created_at: string };
+        Insert: { organization_id: string; user_id: string; created_at?: string };
+        Update: { organization_id?: string; user_id?: string; created_at?: string };
+        Relationships: [];
+      };
+      event_feeds: {
+        Row: { id: string; university_id: string; organization_id: string | null; name: string; url: string; kind: string; enabled: boolean; default_category: string; etag: string | null; last_synced_at: string | null; last_status: string | null; last_error: string | null; items_seen: number; created_by: string | null; created_at: string; updated_at: string };
+        Insert: { id?: string; university_id: string; organization_id?: string | null; name: string; url: string; kind: string; enabled?: boolean; default_category?: string; etag?: string | null; last_synced_at?: string | null; last_status?: string | null; last_error?: string | null; items_seen?: number; created_by?: string | null; created_at?: string; updated_at?: string };
+        Update: { id?: string; university_id?: string; organization_id?: string | null; name?: string; url?: string; kind?: string; enabled?: boolean; default_category?: string; etag?: string | null; last_synced_at?: string | null; last_status?: string | null; last_error?: string | null; items_seen?: number; created_by?: string | null; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      events: {
+        Row: { id: string; university_id: string; organization_id: string | null; feed_id: string | null; external_uid: string | null; title: string; description: string | null; starts_at: string; ends_at: string | null; all_day: boolean; location: string | null; category: string; image_url: string | null; registration_url: string | null; source: string; status: string; save_count: number; click_count: number; created_by: string | null; created_at: string; updated_at: string; tsv: unknown; title_key: string };
+        Insert: { id?: string; university_id?: string; organization_id?: string | null; feed_id?: string | null; external_uid?: string | null; title: string; description?: string | null; starts_at: string; ends_at?: string | null; all_day?: boolean; location?: string | null; category?: string; image_url?: string | null; registration_url?: string | null; source: string; status?: string; save_count?: number; click_count?: number; created_by?: string | null; created_at?: string; updated_at?: string };
+        Update: { id?: string; university_id?: string; organization_id?: string | null; feed_id?: string | null; external_uid?: string | null; title?: string; description?: string | null; starts_at?: string; ends_at?: string | null; all_day?: boolean; location?: string | null; category?: string; image_url?: string | null; registration_url?: string | null; source?: string; status?: string; save_count?: number; click_count?: number; created_by?: string | null; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      event_saves: {
+        Row: { event_id: string; user_id: string; created_at: string };
+        Insert: { event_id: string; user_id: string; created_at?: string };
+        Update: { event_id?: string; user_id?: string; created_at?: string };
+        Relationships: [];
+      };
+      event_interests: {
+        Row: { user_id: string; category: string; created_at: string };
+        Insert: { user_id: string; category: string; created_at?: string };
+        Update: { user_id?: string; category?: string; created_at?: string };
+        Relationships: [];
+      };
+      event_engagement: {
+        Row: { event_id: string; user_id: string; kind: string; day: string; created_at: string };
+        Insert: { event_id: string; user_id: string; kind: string; day?: string; created_at?: string };
+        Update: { event_id?: string; user_id?: string; kind?: string; day?: string; created_at?: string };
         Relationships: [];
       };
       feed_posts: {
@@ -1377,6 +1486,8 @@ export type Database = {
           reviewed_by: string | null;
           created_at: string;
           updated_at: string;
+          /** Opening hours (migration 57): { timezone, week, special }, read with parseBusinessHours(); null for none. Public. */
+          hours: Json | null;
         };
         Insert: {
           id?: string;
@@ -1390,6 +1501,7 @@ export type Database = {
           address?: string | null;
           city?: string | null;
           logo_url?: string | null;
+          hours?: Json | null;
           university_ids?: string[];
           status?: string;
           verified_partner?: boolean;
@@ -1414,6 +1526,7 @@ export type Database = {
           address?: string | null;
           city?: string | null;
           logo_url?: string | null;
+          hours?: Json | null;
           university_ids?: string[];
           status?: string;
           verified_partner?: boolean;
@@ -1488,11 +1601,14 @@ export type Database = {
           expires_at: string;
           accepted_at: string | null;
           accepted_by: string | null;
+          /** Migration 49: what the invite joins as: admin | editor | analyst. */
+          role: string;
         };
         Insert: {
           id?: string;
           business_id: string;
           email: string;
+          role?: string;
           token?: string;
           invited_by?: string | null;
           created_at?: string;
@@ -1510,6 +1626,7 @@ export type Database = {
           expires_at?: string;
           accepted_at?: string | null;
           accepted_by?: string | null;
+          role?: string;
         };
         Relationships: [
           {
@@ -1528,7 +1645,10 @@ export type Database = {
           },
         ];
       };
-      /** Migration 39: a business's offer with campus targeting; students see it while active and the business is approved. */
+      /**
+       * Migration 39: a business's offer with campus targeting; students see it while active and the business is approved.
+       * Since migration 50 every business post (the table kept its name): kind, media, price, event date.
+       */
       deals: {
         Row: {
           id: string;
@@ -1548,6 +1668,14 @@ export type Database = {
           created_by: string | null;
           created_at: string;
           updated_at: string;
+          /** Migration 50: update | product | service | deal | event | promotion. */
+          kind: string;
+          /** Migration 50: up to 10 photos or one video ({type, url} / {type, media_id, playback_id, poster_url, width, height, duration_seconds}). */
+          media: Json;
+          price_cents: number | null;
+          currency: string;
+          /** When an event happens (kind 'event' only). */
+          event_at: string | null;
         };
         Insert: {
           id?: string;
@@ -1565,6 +1693,11 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          kind?: string;
+          media?: Json;
+          price_cents?: number | null;
+          currency?: string;
+          event_at?: string | null;
         };
         Update: {
           id?: string;
@@ -1582,6 +1715,11 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          kind?: string;
+          media?: Json;
+          price_cents?: number | null;
+          currency?: string;
+          event_at?: string | null;
         };
         Relationships: [
           {
@@ -1604,7 +1742,8 @@ export type Database = {
       listing_promotions: {
         Row: {
           id: string;
-          business_id: string;
+          /** Null once the business was deleted (migration 56 keeps its payments on record). */
+          business_id: string | null;
           apartment_id: string | null;
           deal_id: string | null;
           starts_at: string;
@@ -1616,6 +1755,8 @@ export type Database = {
           created_by: string | null;
           created_at: string;
           cancelled_at: string | null;
+          /** Migration 50: the ad this payment is for (the table is the ledger of ad payments now). */
+          ad_id: string | null;
         };
         Insert: {
           id?: string;
@@ -1631,6 +1772,7 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           cancelled_at?: string | null;
+          ad_id?: string | null;
         };
         Update: {
           id?: string;
@@ -1646,6 +1788,7 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           cancelled_at?: string | null;
+          ad_id?: string | null;
         };
         Relationships: [
           {
@@ -1653,6 +1796,336 @@ export type Database = {
             columns: ["business_id"];
             isOneToOne: false;
             referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      /**
+       * Migration 50: a business's ad. The team writes drafts (and rejected ads); the status moves only through the ad_*
+       * and admin_*_ad functions. Students never read this table: they get ads from ads_for_feed().
+       */
+      ads: {
+        Row: {
+          id: string;
+          business_id: string;
+          created_by: string | null;
+          name: string;
+          /** awareness | traffic | engagement | messages */
+          objective: string;
+          /** general | housing (set by the database) */
+          vertical: string;
+          /** for_you | reels | housing */
+          placements: string[];
+          /** The campuses whose students see it; empty only for v1's promotions (every campus). */
+          university_ids: string[];
+          headline: string | null;
+          caption: string;
+          media: Json;
+          cta: string;
+          cta_url: string | null;
+          promoted_deal_id: string | null;
+          promoted_apartment_id: string | null;
+          budget_cents: number;
+          currency: string;
+          starts_at: string | null;
+          ends_at: string | null;
+          /** draft | pending_review | scheduled | active | paused | completed | rejected */
+          status: string;
+          /** business | admin, while paused */
+          paused_by: string | null;
+          /** Why it is rejected, paused by the UniBuzz team, ended early, or back in draft. */
+          status_reason: string | null;
+          review_note: string | null;
+          needs_review_reason: string | null;
+          fair_housing_flags: string[];
+          fair_housing_checked_by: string | null;
+          fair_housing_checked_at: string | null;
+          submitted_at: string | null;
+          submitted_by: string | null;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          started_at: string | null;
+          completed_at: string | null;
+          legacy_promotion_id: string | null;
+          /** Migration 56: the promoted post or listing as it was reviewed, which students see (set by the database). */
+          promoted_snapshot: Json | null;
+          /** Migration 56: what the UniBuzz team last approved it as ({ vertical, flags }); a resume compares. */
+          reviewed_screen: Json | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          created_by?: string | null;
+          name: string;
+          objective?: string;
+          placements?: string[];
+          university_ids?: string[];
+          headline?: string | null;
+          caption?: string;
+          media?: Json;
+          cta?: string;
+          cta_url?: string | null;
+          promoted_deal_id?: string | null;
+          promoted_apartment_id?: string | null;
+          budget_cents?: number;
+          currency?: string;
+          starts_at?: string | null;
+          ends_at?: string | null;
+        };
+        Update: {
+          name?: string;
+          objective?: string;
+          placements?: string[];
+          university_ids?: string[];
+          headline?: string | null;
+          caption?: string;
+          media?: Json;
+          cta?: string;
+          cta_url?: string | null;
+          promoted_deal_id?: string | null;
+          promoted_apartment_id?: string | null;
+          budget_cents?: number;
+          currency?: string;
+          starts_at?: string | null;
+          ends_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ads_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      /** Migration 50: ads a student hid (their own rows). */
+      ad_hides: {
+        Row: { user_id: string; ad_id: string; created_at: string };
+        Insert: { user_id: string; ad_id: string; created_at?: string };
+        Update: { user_id?: string; ad_id?: string; created_at?: string };
+        Relationships: [];
+      };
+      /** Migration 50: ads a student saved (their own rows; save_ad() also counts the save). */
+      ad_saves: {
+        Row: { user_id: string; ad_id: string; created_at: string };
+        Insert: { user_id: string; ad_id: string; created_at?: string };
+        Update: { user_id?: string; ad_id?: string; created_at?: string };
+        Relationships: [];
+      };
+      /** Migration 50: businesses a student blocked (their own rows). */
+      business_blocks: {
+        Row: { user_id: string; business_id: string; created_at: string };
+        Insert: { user_id: string; business_id: string; created_at?: string };
+        Update: { user_id?: string; business_id?: string; created_at?: string };
+        Relationships: [];
+      };
+      // CampConnect Admin's tables (step-admin's migrations 14 to 18, applied to production outside supabase/migrations).
+      account_restrictions: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: string;
+          reason: string;
+          internal_note: string | null;
+          expires_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          lifted_at: string | null;
+          lifted_by: string | null;
+          lift_note: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          kind?: string;
+          reason: string;
+          internal_note?: string | null;
+          expires_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          lifted_at?: string | null;
+          lifted_by?: string | null;
+          lift_note?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          kind?: string;
+          reason?: string;
+          internal_note?: string | null;
+          expires_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          lifted_at?: string | null;
+          lifted_by?: string | null;
+          lift_note?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "account_restrictions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "account_restrictions_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "account_restrictions_lifted_by_fkey";
+            columns: ["lifted_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      media_jobs: {
+        Row: {
+          id: number;
+          kind: string;
+          ref: string;
+          target_type: string | null;
+          target_id: string | null;
+          attempts: number;
+          last_error: string | null;
+          next_attempt_at: string;
+          claimed_at: string | null;
+          created_at: string;
+          done_at: string | null;
+        };
+        Insert: {
+          id?: never;
+          kind: string;
+          ref: string;
+          target_type?: string | null;
+          target_id?: string | null;
+          attempts?: number;
+          last_error?: string | null;
+          next_attempt_at?: string;
+          claimed_at?: string | null;
+          created_at?: string;
+          done_at?: string | null;
+        };
+        Update: {
+          id?: never;
+          kind?: string;
+          ref?: string;
+          target_type?: string | null;
+          target_id?: string | null;
+          attempts?: number;
+          last_error?: string | null;
+          next_attempt_at?: string;
+          claimed_at?: string | null;
+          created_at?: string;
+          done_at?: string | null;
+        };
+        Relationships: [];
+      };
+      staff: {
+        Row: {
+          user_id: string;
+          role: string;
+          granted_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          role: string;
+          granted_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          role?: string;
+          granted_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "staff_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "staff_granted_by_fkey";
+            columns: ["granted_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      staff_audit_log: {
+        Row: {
+          id: number;
+          actor_id: string | null;
+          actor_email: string | null;
+          action: string;
+          target_type: string | null;
+          target_id: string | null;
+          details: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: never;
+          actor_id?: string | null;
+          actor_email?: string | null;
+          action: string;
+          target_type?: string | null;
+          target_id?: string | null;
+          details?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: never;
+          actor_id?: string | null;
+          actor_email?: string | null;
+          action?: string;
+          target_type?: string | null;
+          target_id?: string | null;
+          details?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      staff_invites: {
+        Row: {
+          email: string;
+          role: string;
+          invited_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          email: string;
+          role: string;
+          invited_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          email?: string;
+          role?: string;
+          invited_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "staff_invites_invited_by_fkey";
+            columns: ["invited_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -1665,6 +2138,22 @@ export type Database = {
       set_post_viewers: {
         Args: { p_post_id: string; p_user_ids: string[] };
         Returns: number;
+      };
+      set_story_viewers: {
+        Args: { p_story_id: string; p_user_ids: string[] };
+        Returns: number;
+      };
+      mark_story_seen: {
+        Args: { p_story_id: string };
+        Returns: boolean;
+      };
+      stories_sweep: {
+        Args: { p_now?: string };
+        Returns: number;
+      };
+      record_event_click: {
+        Args: { p_event: string; p_kind?: string };
+        Returns: undefined;
       };
       start_listing_inquiry: {
         Args: { p_target_type: string; p_target_id: string };
@@ -2089,12 +2578,210 @@ export type Database = {
       };
       business_invite_lookup: {
         Args: { p_token: string };
-        Returns: { business_name: string; email: string; valid: boolean }[];
+        Returns: { business_name: string; email: string; valid: boolean; role: string }[];
       };
+      /** Migration 49: the role defaults to editor. */
       business_invite_create: {
-        Args: { p_email: string };
+        Args: { p_email: string; p_role?: string };
         Returns: Database["public"]["Tables"]["business_invites"]["Row"];
       };
+      /** Migration 49: the owner or an admin changes a member's role (admin, editor or analyst). */
+      business_member_set_role: {
+        Args: { p_user: string; p_role: string };
+        Returns: undefined;
+      };
+      /** Migration 49: may the caller do this (view, analytics, publish, reply, manage_team, edit_profile, manage_ads) now. */
+      business_can: {
+        Args: { p_business: string; p_capability: string };
+        Returns: boolean;
+      };
+      /** Migration 49: the business audit log, newest first (the UniBuzz team: every business; owners and admins: their own). */
+      business_audit: {
+        Args: { p_business?: string | null; p_limit?: number; p_before?: number | null };
+        Returns: {
+          id: number;
+          business_id: string | null;
+          business_name: string | null;
+          actor_id: string | null;
+          actor_name: string;
+          actor_kind: string;
+          action: string;
+          target_type: string | null;
+          target_id: string | null;
+          detail: Json;
+          created_at: string;
+        }[];
+      };
+      /** Migration 50: what still stops an ad from being submitted, in the portal's words. */
+      ad_problems: {
+        Args: { p_ad: string };
+        Returns: string[];
+      };
+      ad_submit: { Args: { p_ad: string }; Returns: Database["public"]["Tables"]["ads"]["Row"] };
+      ad_withdraw: { Args: { p_ad: string }; Returns: Database["public"]["Tables"]["ads"]["Row"] };
+      ad_pause: { Args: { p_ad: string }; Returns: Database["public"]["Tables"]["ads"]["Row"] };
+      ad_resume: { Args: { p_ad: string }; Returns: Database["public"]["Tables"]["ads"]["Row"] };
+      ad_end: { Args: { p_ad: string }; Returns: Database["public"]["Tables"]["ads"]["Row"] };
+      ad_duplicate: { Args: { p_ad: string }; Returns: string };
+      admin_list_ads: {
+        Args: { p_status?: string | null };
+        Returns: {
+          id: string;
+          business_id: string;
+          business_name: string;
+          business_category: string;
+          business_status: string;
+          business_logo_url: string | null;
+          name: string;
+          objective: string;
+          vertical: string;
+          placements: string[];
+          university_ids: string[];
+          headline: string | null;
+          caption: string;
+          media: Json;
+          cta: string;
+          cta_url: string | null;
+          promoted_deal_id: string | null;
+          promoted_apartment_id: string | null;
+          promoted_title: string | null;
+          budget_cents: number;
+          currency: string;
+          starts_at: string | null;
+          ends_at: string | null;
+          status: string;
+          paused_by: string | null;
+          status_reason: string | null;
+          review_note: string | null;
+          needs_review_reason: string | null;
+          fair_housing_flags: string[];
+          submitted_at: string | null;
+          reviewed_at: string | null;
+          paid_cents: number;
+          payment_reference: string | null;
+          open_reports: number;
+          created_at: string;
+        }[];
+      };
+      admin_approve_ad: {
+        Args: { p_ad: string; p_amount_cents: number; p_currency: string; p_payment_reference: string; p_note?: string | null; p_fair_housing_checked?: boolean };
+        Returns: Database["public"]["Tables"]["ads"]["Row"];
+      };
+      admin_reject_ad: { Args: { p_ad: string; p_reason: string }; Returns: Database["public"]["Tables"]["ads"]["Row"] };
+      admin_pause_ad: { Args: { p_ad: string; p_reason: string }; Returns: Database["public"]["Tables"]["ads"]["Row"] };
+      admin_resume_ad: { Args: { p_ad: string }; Returns: Database["public"]["Tables"]["ads"]["Row"] };
+      admin_list_business_reports: {
+        Args: { p_status?: string | null };
+        Returns: {
+          id: string;
+          business_id: string;
+          business_name: string;
+          ad_id: string | null;
+          ad_name: string | null;
+          deal_id: string | null;
+          deal_title: string | null;
+          reason: string;
+          details: string | null;
+          status: string;
+          resolution_note: string | null;
+          reporter_name: string | null;
+          created_at: string;
+          resolved_at: string | null;
+        }[];
+      };
+      admin_resolve_business_report: { Args: { p_report: string; p_status: string; p_note?: string | null }; Returns: undefined };
+      business_ad_stats: {
+        Args: { p_business: string };
+        Returns: {
+          ad_id: string;
+          name: string;
+          status: string;
+          placements: string[];
+          starts_at: string | null;
+          ends_at: string | null;
+          budget_cents: number;
+          currency: string;
+          impressions: number;
+          reach: number;
+          clicks: number;
+          saves: number;
+          profile_visits: number;
+          inquiries: number;
+        }[];
+      };
+      business_daily_stats: {
+        Args: { p_business: string; p_days?: number; p_ad?: string | null };
+        Returns: { day: string; impressions: number; reach: number; clicks: number; saves: number; profile_visits: number; inquiries: number }[];
+      };
+      business_analytics_overview: {
+        Args: { p_business: string; p_days?: number };
+        Returns: {
+          impressions: number;
+          reach: number;
+          clicks: number;
+          saves: number;
+          profile_visits: number;
+          inquiries: number;
+          post_views: number;
+          active_ads: number;
+          spend_cents: number;
+        }[];
+      };
+      /** Migration 50: a signed-in student saw, tapped, saved or messaged a business's ad, post or listing, or opened its profile. */
+      record_business_event: {
+        Args: { p_event: string; p_business?: string | null; p_ad?: string | null; p_deal?: string | null; p_apartment?: string | null; p_placement?: string | null };
+        Returns: undefined;
+      };
+      /** Migration 50: running, paid ads for one placement and the caller's campus (signed-in students only). */
+      ads_for_feed: {
+        Args: { p_placement: string; p_limit?: number; p_offset?: number };
+        Returns: {
+          id: string;
+          business_id: string;
+          business_name: string;
+          business_logo_url: string | null;
+          business_category: string;
+          verified_partner: boolean;
+          objective: string;
+          headline: string | null;
+          caption: string;
+          media: Json;
+          cta: string;
+          cta_url: string | null;
+          placement: string;
+          ends_at: string;
+          promoted: Json | null;
+        }[];
+      };
+      my_saved_ads: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          business_id: string;
+          business_name: string;
+          business_logo_url: string | null;
+          verified_partner: boolean;
+          headline: string | null;
+          caption: string;
+          media: Json;
+          cta: string;
+          cta_url: string | null;
+          promoted_deal_id: string | null;
+          promoted_apartment_id: string | null;
+          running: boolean;
+          saved_at: string;
+        }[];
+      };
+      hide_ad: { Args: { p_ad: string }; Returns: undefined };
+      save_ad: { Args: { p_ad: string; p_saved?: boolean }; Returns: undefined };
+      set_business_blocked: { Args: { p_business: string; p_blocked?: boolean }; Returns: undefined };
+      business_blocked_by_me: { Args: { p_business: string }; Returns: boolean };
+      report_business: {
+        Args: { p_business: string | null; p_reason: string; p_details?: string | null; p_ad?: string | null; p_deal?: string | null };
+        Returns: undefined;
+      };
+      /** Migration 50: the Fair Housing screen's hits ("Category: \"phrase\""), for the portal's preview. */
+      fair_housing_flags: { Args: { p_text: string }; Returns: string[] };
       business_invite_revoke: {
         Args: { p_id: string };
         Returns: undefined;
@@ -2199,6 +2886,308 @@ export type Database = {
       admin_review_business: {
         Args: { p_business: string; p_decision: string; p_note?: string | null };
         Returns: undefined;
+      };
+      // CampConnect Admin's functions (step-admin's migrations 14 to 18, and the report auto-hide migration on auto-hide-reports).
+      admin_audit_list: {
+        Args: { p_limit?: number; p_before?: number | null };
+        Returns: {
+          id: number;
+          actor_id: string | null;
+          actor_email: string | null;
+          actor_name: string | null;
+          action: string;
+          target_type: string | null;
+          target_id: string | null;
+          details: Json;
+          created_at: string;
+        }[];
+      };
+      admin_auto_hidden_counts: { Args: Record<string, never>; Returns: Json };
+      admin_auto_hidden_list: {
+        Args: { p_status?: string; p_limit?: number; p_before?: string | null; p_target_type?: string | null; p_target_id?: string | null };
+        Returns: {
+          id: string;
+          target_type: string;
+          target_id: string;
+          source: string;
+          reporter_count: number;
+          reasons: Json;
+          hidden_at: string;
+          created_at: string;
+          status: string;
+          reviewed_by: string | null;
+          reviewer_name: string | null;
+          reviewed_at: string | null;
+          review_note: string | null;
+          target_exists: boolean;
+          target_hidden: boolean;
+          title: string | null;
+          preview: string | null;
+          author_id: string | null;
+          author_name: string | null;
+        }[];
+      };
+      admin_auto_hide_uphold: { Args: { p_id: string; p_note?: string | null }; Returns: undefined };
+      admin_bootstrap_owner: {
+        Args: { p_email: string };
+        Returns: string;
+      };
+      admin_content_delete: {
+        Args: { p_target_type: string; p_target_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      admin_content_get: {
+        Args: { p_target_type: string; p_target_id: string };
+        Returns: Json;
+      };
+      admin_content_hide: {
+        Args: { p_target_type: string; p_target_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      admin_content_restore: {
+        Args: { p_target_type: string; p_target_id: string };
+        Returns: undefined;
+      };
+      admin_hidden_content_list: {
+        Args: { p_type?: string | null; p_limit?: number; p_before?: string | null };
+        Returns: {
+          target_type: string;
+          target_id: string;
+          hidden_at: string;
+          hidden_reason: string | null;
+          title: string | null;
+          preview: string | null;
+          author_id: string | null;
+          author_name: string | null;
+          created_at: string;
+        }[];
+      };
+      admin_invite_email_result: {
+        Args: { p_email: string; p_ok: boolean; p_user_id?: string | null; p_error?: string | null };
+        Returns: undefined;
+      };
+      admin_invite_resend: {
+        Args: { p_email: string };
+        Returns: string;
+      };
+      admin_invite_revoke: {
+        Args: { p_email: string };
+        Returns: boolean;
+      };
+      admin_invites_list: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          email: string;
+          role: string;
+          invited_by: string | null;
+          invited_by_name: string | null;
+          created_at: string;
+          expires_at: string | null;
+          expired: boolean;
+          email_status: string;
+          email_sent_at: string | null;
+          email_attempts: number;
+          email_error: string | null;
+          account_created: boolean;
+        }[];
+      };
+      admin_me: {
+        Args: Record<PropertyKey, never>;
+        Returns: { user_id: string; role: string; mfa_verified: boolean; mfa_enrolled: boolean; last_owner: boolean }[];
+      };
+      admin_media_jobs_list: {
+        Args: { p_pending_only?: boolean; p_limit?: number };
+        Returns: {
+          id: number;
+          kind: string;
+          ref: string;
+          target_type: string | null;
+          target_id: string | null;
+          attempts: number;
+          last_error: string | null;
+          next_attempt_at: string;
+          claimed_at: string | null;
+          created_at: string;
+          done_at: string | null;
+        }[];
+      };
+      admin_media_jobs_retry: {
+        Args: { p_id: number };
+        Returns: undefined;
+      };
+      admin_media_jobs_stats: {
+        Args: Record<PropertyKey, never>;
+        Returns: { pending: number; failing: number; done: number }[];
+      };
+      admin_overview_stats: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      admin_report_get: {
+        Args: { p_id: string };
+        Returns: {
+          id: string;
+          reporter_id: string;
+          reporter_name: string | null;
+          reporter_email: string | null;
+          target_type: string;
+          target_id: string;
+          reason: string;
+          details: string | null;
+          status: string;
+          decision: string | null;
+          notes: string | null;
+          reviewed_by: string | null;
+          reviewer_name: string | null;
+          reviewed_at: string | null;
+          created_at: string;
+          target_preview: string;
+          target_hidden: boolean;
+          target_exists: boolean;
+          target_author_id: string | null;
+        }[];
+      };
+      admin_report_reopen: {
+        Args: { p_id: string };
+        Returns: undefined;
+      };
+      admin_report_resolve: {
+        Args: { p_id: string; p_decision: string; p_notes?: string | null };
+        Returns: undefined;
+      };
+      admin_reports_list: {
+        Args: { p_status?: string; p_limit?: number; p_before?: string | null };
+        Returns: {
+          id: string;
+          reporter_id: string;
+          reporter_name: string | null;
+          reporter_email: string | null;
+          target_type: string;
+          target_id: string;
+          reason: string;
+          details: string | null;
+          status: string;
+          decision: string | null;
+          notes: string | null;
+          reviewed_by: string | null;
+          reviewer_name: string | null;
+          reviewed_at: string | null;
+          created_at: string;
+          target_preview: string;
+          target_hidden: boolean;
+          target_exists: boolean;
+          target_author_id: string | null;
+        }[];
+      };
+      admin_restrictions_list: {
+        Args: { p_active_only?: boolean; p_limit?: number };
+        Returns: {
+          id: string;
+          user_id: string;
+          full_name: string;
+          email: string | null;
+          kind: string;
+          reason: string;
+          internal_note: string | null;
+          expires_at: string | null;
+          created_by: string | null;
+          created_by_name: string | null;
+          created_at: string;
+          lifted_at: string | null;
+          lifted_by_name: string | null;
+          lift_note: string | null;
+          active: boolean;
+        }[];
+      };
+      admin_staff_add: {
+        Args: { p_email: string; p_role: string };
+        Returns: string;
+      };
+      admin_staff_list: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          user_id: string;
+          email: string | null;
+          full_name: string;
+          avatar_url: string | null;
+          role: string;
+          granted_by: string | null;
+          granted_by_name: string | null;
+          created_at: string;
+          mfa_enrolled: boolean | null;
+        }[];
+      };
+      admin_staff_remove: {
+        Args: { p_user_id: string };
+        Returns: undefined;
+      };
+      admin_staff_set_role: {
+        Args: { p_user_id: string; p_role: string };
+        Returns: undefined;
+      };
+      admin_user_get: {
+        Args: { p_user_id: string };
+        Returns: Json;
+      };
+      admin_user_search: {
+        Args: { p_q: string; p_limit?: number };
+        Returns: {
+          user_id: string;
+          full_name: string;
+          email: string | null;
+          avatar_url: string | null;
+          university_name: string | null;
+          created_at: string;
+          suspended: boolean;
+          staff_role: string | null;
+        }[];
+      };
+      admin_user_suspend: {
+        Args: { p_user_id: string; p_reason: string; p_expires_at?: string | null; p_note?: string | null };
+        Returns: string;
+      };
+      admin_user_unsuspend: {
+        Args: { p_user_id: string; p_note?: string | null };
+        Returns: undefined;
+      };
+      admin_users_list: {
+        Args: { p_filter?: string; p_limit?: number; p_before?: string | null };
+        Returns: {
+          user_id: string;
+          full_name: string;
+          email: string | null;
+          avatar_url: string | null;
+          university_name: string | null;
+          created_at: string;
+          last_seen_at: string | null;
+          suspended: boolean;
+          staff_role: string | null;
+        }[];
+      };
+      content_visible: {
+        Args: { p_author: string | null; p_hidden_at: string | null };
+        Returns: boolean;
+      };
+      is_suspended: {
+        Args: { p_user: string | null };
+        Returns: boolean;
+      };
+      media_jobs_claim: {
+        Args: { p_limit?: number };
+        Returns: Database["public"]["Tables"]["media_jobs"]["Row"][];
+        SetofOptions: { from: "*"; to: "media_jobs"; isOneToOne: false; isSetofReturn: true };
+      };
+      media_jobs_done: {
+        Args: { p_id: number };
+        Returns: undefined;
+      };
+      media_jobs_failed: {
+        Args: { p_id: number; p_error: string };
+        Returns: undefined;
+      };
+      my_restriction: {
+        Args: Record<PropertyKey, never>;
+        Returns: { kind: string; reason: string; expires_at: string | null; created_at: string }[];
       };
     };
     Enums: {

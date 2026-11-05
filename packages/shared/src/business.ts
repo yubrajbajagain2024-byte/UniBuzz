@@ -1,4 +1,5 @@
-import type { BusinessSummary, ConversationSummary, Deal, ProfileSummary } from "./types/models";
+import type { Json } from "./types/database";
+import type { Ad, AdPlacement, BusinessCapability, BusinessMediaItem, BusinessSummary, BusinessTeamRole, ConversationSummary, Deal, FeedAd, ProfileSummary } from "./types/models";
 
 /** profiles.role (migration 39). Everyone before it is a student. */
 export const USER_ROLES = ["student", "business_owner", "business_staff", "admin"] as const;
@@ -101,4 +102,505 @@ export function dealStatusLabel(deal: Pick<Deal, "status" | "starts_at" | "ends_
   if (deal.status === "archived") return "Archived";
   if (new Date(deal.starts_at).getTime() > now) return "Scheduled";
   return dealIsLive(deal, now) ? "Live" : "Ended";
+}
+
+// --- UniBuzz Business v2: the team -------------------------------------------------------------------------------
+
+/** A team role as stored; v1's "staff" (and anything unknown) reads as an editor, what staff could do. */
+export function teamRoleOf(role: string | null | undefined): BusinessTeamRole {
+  return role === "owner" || role === "admin" || role === "analyst" ? role : "editor";
+}
+
+/**
+ * What a role may do, whatever the business's standing: the same table as business_role_allows() in migration 49. The
+ * portal uses it to show only what will work; the database decides every request on its own.
+ */
+export function teamRoleAllows(role: string | null | undefined, capability: BusinessCapability): boolean {
+  const r = teamRoleOf(role);
+  switch (capability) {
+    case "view":
+    case "analytics":
+      return true;
+    case "publish":
+    case "reply":
+      return r !== "analyst";
+    case "manage_team":
+    case "edit_profile":
+    case "manage_ads":
+      return r === "owner" || r === "admin";
+  }
+}
+
+/** Which roles a member may hand out: the owner makes admins, editors and analysts; an admin, editors and analysts. */
+export function assignableRoles(myRole: string | null | undefined): BusinessTeamRole[] {
+  const r = teamRoleOf(myRole);
+  if (r === "owner") return ["admin", "editor", "analyst"];
+  if (r === "admin") return ["editor", "analyst"];
+  return [];
+}
+
+/** May `myRole` change or remove someone who is `theirRole`? Never the owner; only the owner touches admins. */
+export function canManageMember(myRole: string | null | undefined, theirRole: string | null | undefined): boolean {
+  const me = teamRoleOf(myRole);
+  const them = teamRoleOf(theirRole);
+  if (them === "owner" || !teamRoleAllows(me, "manage_team")) return false;
+  return them !== "admin" || me === "owner";
+}
+
+// --- The portal's sidebar -----------------------------------------------------------------------------------------
+
+/** The portal's sections, top to bottom; Settings sits apart at the bottom of the sidebar. The inbox comes right after
+ * Overview: students waiting for an answer come first. */
+export const PORTAL_SECTIONS = ["overview", "inbox", "ads", "products", "analytics", "billing"] as const;
+export type PortalSection = (typeof PORTAL_SECTIONS)[number];
+
+/**
+ * Who sees Billing: the owner and admins, who decide ad spend, and analysts, who read the numbers. Editors draft ads
+ * but never pay for them. (Every member can read the business's payments in the database; this keeps the portal lean.)
+ */
+export function canSeeBilling(role: string | null | undefined): boolean {
+  return teamRoleAllows(role, "manage_ads") || teamRoleOf(role) === "analyst";
+}
+
+/**
+ * The sections a member's sidebar shows, in PORTAL_SECTIONS's order, and whether Settings is there: everything their
+ * role allows, whether the business is approved or still pending (a pending business's inbox says it opens on
+ * approval, since students write only to an approved business); when it is rejected, the front page and Settings (to
+ * fix the profile); when suspended, nothing. Analysts never get the inbox: they do not read students' messages.
+ */
+export function portalSectionsFor(business: { role: string | null | undefined; standing: BusinessStanding }): { main: PortalSection[]; settings: boolean } {
+  if (business.standing === "suspended") return { main: [], settings: false };
+  if (business.standing === "rejected") return { main: ["overview"], settings: true };
+  const main = PORTAL_SECTIONS.filter((s) => {
+    if (s === "inbox") return teamRoleAllows(business.role, "reply");
+    if (s === "billing") return canSeeBilling(business.role);
+    return true;
+  });
+  return { main, settings: true };
+}
+
+/**
+ * What a complete business profile has, as Settings › Verification lists it: the UniBuzz team reads the profile first
+ * when it reviews a business and when it decides on Verified Partner.
+ */
+export function businessProfileChecklist(b: {
+  logo_url: string | null;
+  description: string | null;
+  website: string | null;
+  address: string | null;
+  city: string | null;
+  contact_email: string | null;
+  phone: string | null;
+  university_ids: string[];
+}): { key: string; label: string; done: boolean }[] {
+  return [
+    { key: "logo", label: "A logo", done: Boolean(b.logo_url) },
+    { key: "description", label: "A description of at least 40 characters", done: (b.description ?? "").trim().length >= 40 },
+    { key: "website", label: "A website", done: Boolean(b.website) },
+    { key: "place", label: "Where you are: an address or a city", done: Boolean(b.address || b.city) },
+    { key: "contact", label: "A way to reach you: an email or a phone number", done: Boolean(b.contact_email || b.phone) },
+    { key: "campuses", label: "The campuses you serve", done: b.university_ids.length > 0 },
+  ];
+}
+
+// --- The inbox --------------------------------------------------------------------------------------------------------
+
+/** What a student opened an inquiry from (conversations.inquiry_target_type): a listing, a post, an ad or the profile. */
+export type InquiryKind = "listing" | "post" | "ad" | "profile";
+export function inquiryKindOf(targetType: string | null | undefined): InquiryKind | null {
+  switch (targetType) {
+    case "apartment":
+      return "listing";
+    case "deal":
+      return "post";
+    case "ad":
+      return "ad";
+    case "business":
+      return "profile";
+    default:
+      return null;
+  }
+}
+export function inquiryKindLabel(kind: InquiryKind): string {
+  return { listing: "Listing", post: "Post", ad: "Ad", profile: "Your profile" }[kind];
+}
+
+/**
+ * Waiting for the business: the student wrote last. A chat appears in the inbox only once the student has written
+ * (migration 56), so there is always a student message somewhere in it.
+ */
+export function inquiryNeedsReply(lastSenderId: string | null | undefined, teamIds: ReadonlySet<string>): boolean {
+  return Boolean(lastSenderId) && !teamIds.has(lastSenderId as string);
+}
+
+/** A new message as an alert shows it: its words, or what it carries. */
+export function inquiryMessagePreview(m: { content?: string | null; image_url?: string | null; attachments?: unknown; shared_post?: unknown }): string {
+  const text = (m.content ?? "").replace(/\s+/g, " ").trim();
+  if (text) return text.length > 120 ? `${text.slice(0, 119)}…` : text;
+  if (Array.isArray(m.attachments) && m.attachments.length) return "Sent an attachment";
+  if (m.image_url) return "Sent a photo";
+  if (m.shared_post) return "Shared a post";
+  return "Sent a message";
+}
+
+/** The inbox's filters, in the order the inbox shows them. */
+export const INQUIRY_FILTERS = [
+  { value: "all", label: "All" },
+  { value: "unread", label: "Unread" },
+  { value: "needs_reply", label: "Needs reply" },
+  { value: "listing", label: "Listings" },
+  { value: "post", label: "Posts" },
+  { value: "ad", label: "Ads" },
+  { value: "profile", label: "Profile" },
+] as const;
+export type InquiryFilter = (typeof INQUIRY_FILTERS)[number]["value"];
+
+/** Whether an inquiry shows under a filter and a search (the student's name, the message, or what it is about). */
+export function inquiryMatches(
+  inquiry: { unreadCount: number; needsReply: boolean; kind: InquiryKind | null; text: string },
+  filter: InquiryFilter,
+  query = "",
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (q && !inquiry.text.toLowerCase().includes(q)) return false;
+  if (filter === "all") return true;
+  if (filter === "unread") return inquiry.unreadCount > 0;
+  if (filter === "needs_reply") return inquiry.needsReply;
+  return inquiry.kind === filter;
+}
+
+/** A message as Realtime delivers it to the inbox (the columns the list needs). */
+export type InboxMessageEvent = { conversation_id: string; sender_id: string | null; created_at: string; content?: string | null; image_url?: string | null; attachments?: unknown; shared_post?: unknown };
+
+/** One row of the inbox's list, as far as a message or a read receipt changes it. */
+export type InboxRow = {
+  conversation: Pick<ConversationSummary, "id" | "lastMessageAt" | "lastMessagePreview" | "unreadCount">;
+  needsReply: boolean;
+  lastBy: string | null;
+};
+
+const timeOf = (iso: string | null | undefined) => (iso ? new Date(iso).getTime() : 0);
+
+/**
+ * The inbox's list after a message, applied in the browser without asking the server: the chat moves to the top with
+ * the message as its preview; who wrote it decides "Needs reply" (a student) and "You:" or the teammate's first name;
+ * and the unread count grows for anyone else's message unless that chat is open on screen (opening it marks it read).
+ * `team` maps every member's id, the viewer's included, to their first name. Null when the chat is not in the list yet
+ * (a student's first message): then only the server knows what it is about. A message older than the chat's newest
+ * (one delivered late) changes nothing.
+ */
+export function inboxAfterMessage<T extends InboxRow>(rows: T[], message: InboxMessageEvent, me: { userId: string; team: ReadonlyMap<string, string>; openConversationId: string | null }): T[] | null {
+  const index = rows.findIndex((r) => r.conversation.id === message.conversation_id);
+  if (index < 0) return null;
+  const row = rows[index];
+  const c = row.conversation;
+  if (c.lastMessageAt && timeOf(message.created_at) < timeOf(c.lastMessageAt)) return rows;
+  const mine = message.sender_id === me.userId;
+  const teammate = Boolean(message.sender_id && me.team.has(message.sender_id));
+  const next: T = {
+    ...row,
+    conversation: {
+      ...c,
+      lastMessageAt: message.created_at,
+      lastMessagePreview: inquiryMessagePreview(message),
+      unreadCount: mine || message.conversation_id === me.openConversationId ? c.unreadCount : c.unreadCount + 1,
+    },
+    needsReply: !mine && !teammate && Boolean(message.sender_id),
+    lastBy: mine ? "You" : teammate ? (me.team.get(message.sender_id as string) ?? null) : null,
+  };
+  return [next, ...rows.slice(0, index), ...rows.slice(index + 1)];
+}
+
+/**
+ * The inbox's list after the viewer's own membership row changed (they read the chat, here or on another device): its
+ * unread count is 0 once they have read up to its newest message. Any other change to the row (delivery times) leaves
+ * the list as it is.
+ */
+export function inboxAfterRead<T extends InboxRow>(rows: T[], membership: { conversation_id: string; last_read_at: string | null }): T[] {
+  const index = rows.findIndex((r) => r.conversation.id === membership.conversation_id);
+  if (index < 0) return rows;
+  const row = rows[index];
+  if (row.conversation.unreadCount === 0 || timeOf(membership.last_read_at) < timeOf(row.conversation.lastMessageAt)) return rows;
+  const next: T = { ...row, conversation: { ...row.conversation, unreadCount: 0 } };
+  return [...rows.slice(0, index), next, ...rows.slice(index + 1)];
+}
+
+/**
+ * Whether the inbox's list, rendered by the server, already reflects the newest message the portal saw arrive while
+ * open (inbox-live.ts). False when it does not: the list is from before that message and should be read again. With
+ * no message seen there is nothing to check.
+ */
+export function inboxReflects(rows: readonly InboxRow[], last: { conversationId: string; createdAt: string } | null): boolean {
+  if (!last) return true;
+  const row = rows.find((r) => r.conversation.id === last.conversationId);
+  return Boolean(row) && timeOf(row?.conversation.lastMessageAt) >= timeOf(last.createdAt);
+}
+
+// --- Billing --------------------------------------------------------------------------------------------------------
+
+/** How a payment stands: running now, not started, over, or cancelled by the UniBuzz team. */
+export type PaymentStanding = "active" | "upcoming" | "ended" | "cancelled";
+export function paymentStanding(p: { status: string; starts_at: string; ends_at: string }, now: number = Date.now()): PaymentStanding {
+  if (p.status === "cancelled") return "cancelled";
+  if (new Date(p.ends_at).getTime() <= now) return "ended";
+  return new Date(p.starts_at).getTime() > now ? "upcoming" : "active";
+}
+
+export function paymentStandingLabel(s: PaymentStanding): string {
+  return { active: "Running", upcoming: "Scheduled", ended: "Ended", cancelled: "Cancelled" }[s];
+}
+
+/** Money by currency (a business may have paid in more than one), as "$120 + €40". */
+export type MoneyByCurrency = Record<string, number>;
+export function formatMoneyByCurrency(totals: MoneyByCurrency): string {
+  const parts = Object.entries(totals).filter(([, cents]) => cents > 0).map(([currency, cents]) => formatCents(cents, currency));
+  return parts.length ? parts.join(" + ") : formatCents(0);
+}
+
+/**
+ * What a business has paid, counting payments by when the UniBuzz team recorded them; cancelled ones count in none
+ * of the totals. `thisMonth` is the calendar month of `now` (UTC), `last30` the 30 days up to it.
+ */
+export function paymentTotals(payments: { status: string; amount_cents: number; currency: string; created_at: string; starts_at: string; ends_at: string }[], now: number = Date.now()): {
+  thisMonth: MoneyByCurrency;
+  last30: MoneyByCurrency;
+  allTime: MoneyByCurrency;
+  running: number;
+} {
+  const out = { thisMonth: {} as MoneyByCurrency, last30: {} as MoneyByCurrency, allTime: {} as MoneyByCurrency, running: 0 };
+  const d = new Date(now);
+  const monthStart = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+  const add = (into: MoneyByCurrency, currency: string, cents: number) => {
+    into[currency] = (into[currency] ?? 0) + cents;
+  };
+  for (const p of payments) {
+    if (p.status === "cancelled") continue;
+    const at = new Date(p.created_at).getTime();
+    add(out.allTime, p.currency, p.amount_cents);
+    if (at >= monthStart && at <= now) add(out.thisMonth, p.currency, p.amount_cents);
+    if (at > now - 30 * 864e5 && at <= now) add(out.last30, p.currency, p.amount_cents);
+    if (paymentStanding(p, now) === "active") out.running += 1;
+  }
+  return out;
+}
+
+/**
+ * A CSV of payments for a spreadsheet: one row each, the amount in the currency's units. A cell that a spreadsheet
+ * would run as a formula (starting with =, +, -, @ or a tab) is written as text, since ad and listing names are the
+ * business's own words.
+ */
+export function paymentsCsv(rows: { recorded_at: string; reference: string; paid_for: string; starts_at: string; ends_at: string; amount_cents: number; currency: string; status: string }[]): string {
+  const cell = (v: string) => {
+    const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+    return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  };
+  const day = (iso: string) => iso.slice(0, 10);
+  const lines = [["Recorded", "Reference", "Paid for", "From", "To", "Amount", "Currency", "Status"].join(",")];
+  for (const r of rows) {
+    lines.push([day(r.recorded_at), r.reference, r.paid_for, day(r.starts_at), day(r.ends_at), (r.amount_cents / 100).toFixed(2), r.currency, r.status].map((v) => cell(String(v))).join(","));
+  }
+  return lines.join("\r\n") + "\r\n";
+}
+
+// --- UniBuzz Business v2: ads ------------------------------------------------------------------------------------
+
+/** An ad's status as it stands now, whether or not the database's sweep has run since its dates came (ad_effective_status()). */
+export function adDisplayStatus(ad: Pick<Ad, "status" | "starts_at" | "ends_at">, now: number = Date.now()): Ad["status"] {
+  const ends = ad.ends_at ? new Date(ad.ends_at).getTime() : null;
+  const starts = ad.starts_at ? new Date(ad.starts_at).getTime() : null;
+  if ((ad.status === "scheduled" || ad.status === "active" || ad.status === "paused") && ends !== null && ends <= now) return "completed";
+  if (ad.status === "scheduled" && starts !== null && starts <= now) return "active";
+  return ad.status;
+}
+
+/** Whether the team may still change an ad's content: drafts and rejected ads only (an approved ad is copied instead). */
+export function adIsEditable(ad: Pick<Ad, "status">): boolean {
+  return ad.status === "draft" || ad.status === "rejected";
+}
+
+/**
+ * Where an ad may run: a housing ad (a housing business's, or one promoting a listing) only in Housing; any other in
+ * For You and Reels. The database applies the same rule to every write.
+ */
+export function placementsFor(isHousing: boolean): AdPlacement[] {
+  return isHousing ? ["housing"] : ["for_you", "reels"];
+}
+
+/** A housing ad: from a business in the housing category, or promoting one of its listings. */
+export function isHousingAd(businessCategory: string | null | undefined, promotesListing: boolean): boolean {
+  return promotesListing || businessCategory === "housing";
+}
+
+/** The media list of a post or an ad, as stored (jsonb), with anything unrecognisable left out. */
+export function mediaItems(media: Json | null | undefined): BusinessMediaItem[] {
+  if (!Array.isArray(media)) return [];
+  return media.filter((m): m is BusinessMediaItem => {
+    if (!m || typeof m !== "object" || Array.isArray(m)) return false;
+    const item = m as Record<string, unknown>;
+    return (item.type === "image" && typeof item.url === "string") || (item.type === "video" && typeof item.media_id === "string");
+  });
+}
+
+/** The picture that stands for a post or an ad in a grid: its first photo, or its video's poster. */
+export function mediaCover(media: BusinessMediaItem[]): string | null {
+  for (const m of media) {
+    if (m.type === "image") return m.url;
+    if (m.poster_url) return m.poster_url;
+  }
+  return null;
+}
+
+/** Whether a video is vertical (taller than wide), as Reels needs; unknown sizes are not. */
+export function isVerticalVideo(item: { width?: number | null; height?: number | null }): boolean {
+  return typeof item.width === "number" && typeof item.height === "number" && item.height > item.width;
+}
+
+/**
+ * Where a feed's ads go besides `every`. `first`: the organic row the first ad follows (ADS_FIRST_AFTER in the apps;
+ * `every` when left out). `ended`: the feed has no more pages, so a feed shorter than `first` (but not empty) ends
+ * with its one ad instead of having none.
+ */
+export type AdSpacing = { first?: number; ended?: boolean };
+
+/** Whether an ad goes after organic row `index` (0-based) of a feed of `total` rows so far. */
+function isAdSlot(index: number, total: number, every: number, spacing: AdSpacing): boolean {
+  if (every < 1) return false;
+  const first = Math.max(1, spacing.first ?? every);
+  const n = index + 1;
+  if (n === first || (n > first && (n - first) % every === 0)) return true;
+  return Boolean(spacing.ended) && total < first && n === total;
+}
+
+/**
+ * The organic positions after which an ad goes, for the rows numbered `start` to `start + count - 1` of a feed (0-based,
+ * counted over the whole feed so pages agree): after row `first`, then every `every` rows. Never two in a row, never
+ * before the first organic row.
+ */
+export function adSlotsAfter(start: number, count: number, every: number, spacing: AdSpacing = {}): number[] {
+  const out: number[] = [];
+  for (let i = Math.max(0, start); i < start + count; i++) if (isAdSlot(i, start + count, every, spacing)) out.push(i);
+  return out;
+}
+
+export type FeedRow<T> = { kind: "item"; item: T; index: number } | { kind: "ad"; ad: FeedAd; slot: number };
+
+/**
+ * A feed's rows with its ads between them, at the positions adSlotsAfter() gives, while there are ads. The ads keep
+ * their order (the database's rotation) and each runs once. A student never meets the same thing twice: when an ad
+ * promotes a listing or post that is also in the feed, the ad keeps its slot and the organic copy is left out
+ * (docs/decisions.md). Skipping the ad instead left its slot empty, since a feed asks for only as many ads as it has
+ * slots, so on a campus with a page or less of listings a Housing ad never showed.
+ */
+export function interleaveAds<T extends { id: string }>(items: T[], ads: FeedAd[], every: number, spacing: AdSpacing = {}): FeedRow<T>[] {
+  const slots = items.map((_, index) => isAdSlot(index, items.length, every, spacing));
+  const placed = ads.filter((a, i) => ads.findIndex((b) => b.id === a.id) === i).slice(0, slots.filter(Boolean).length);
+  const shownByAd = new Set(placed.flatMap((a) => (a.promoted ? [a.promoted.id] : [])));
+  const rows: FeedRow<T>[] = [];
+  let slot = 0;
+  items.forEach((item, index) => {
+    if (!shownByAd.has(item.id)) rows.push({ kind: "item", item, index });
+    if (slots[index] && slot < placed.length) {
+      rows.push({ kind: "ad", ad: placed[slot], slot });
+      slot += 1;
+    }
+  });
+  return rows;
+}
+
+/** How many ads a feed of `count` organic rows has room for (what the feed asks ads_for_feed() for). */
+export function adSlotCount(count: number, every: number, spacing: AdSpacing = {}): number {
+  if (every < 1 || count <= 0) return 0;
+  const first = Math.max(1, spacing.first ?? every);
+  if (count < first) return spacing.ended ? 1 : 0;
+  return 1 + Math.floor((count - first) / every);
+}
+
+/**
+ * The ads a feed holds and the round they belong to. A round starts each time the feed loads its first page again
+ * (opening it, a pull-to-refresh, a new filter or campus), and its ads are asked for again from the first: an ad paused,
+ * ended, hidden or no longer paid for leaves, one approved, resumed or started since comes in (ads_for_feed() decides by
+ * the clock and the ad's state on every call). Within a round, more are asked for only as the feed grows.
+ */
+export type FeedAdsState = { round: number; ads: FeedAd[]; done: boolean };
+export type FeedAdsRequest = { round: number; offset: number; limit: number };
+export const emptyFeedAds = (): FeedAdsState => ({ round: 0, ads: [], done: false });
+
+/**
+ * What a feed asks ads_for_feed() for next, or null when it has what it needs. In a new round, every slot from the first
+ * ad (the round before keeps its ads on screen until the new ones arrive, so no gap opens in the list); in the same round,
+ * only the slots still empty, unless the database already had no more.
+ */
+export function nextAdsRequest(state: FeedAdsState, round: number, slots: number): FeedAdsRequest | null {
+  if (round !== state.round) return { round, offset: 0, limit: Math.max(0, slots) };
+  if (state.done || state.ads.length >= slots) return null;
+  return { round, offset: state.ads.length, limit: slots - state.ads.length };
+}
+
+/**
+ * The state once a request's ads arrive: a new round's replace the old (the same objects are kept when nothing changed,
+ * so the list does not re-render while it scrolls), a later page of the round is added after them with each ad once, and
+ * an answer for a round already over is dropped.
+ */
+export function receiveAds(state: FeedAdsState, request: FeedAdsRequest, ads: FeedAd[]): FeedAdsState {
+  if (request.round < state.round) return state;
+  const done = ads.length < request.limit;
+  if (request.round !== state.round) {
+    const fresh = ads.filter((a, i) => ads.findIndex((b) => b.id === a.id) === i);
+    const same = fresh.length === state.ads.length && fresh.every((a, i) => JSON.stringify(a) === JSON.stringify(state.ads[i]));
+    return { round: request.round, ads: same ? state.ads : fresh, done };
+  }
+  const more = ads.filter((a, i) => ads.findIndex((b) => b.id === a.id) === i && !state.ads.some((b) => b.id === a.id));
+  return { round: state.round, ads: more.length ? [...state.ads, ...more] : state.ads, done };
+}
+
+/**
+ * The ads on screen not counted yet in this view, remembered in `seen`. The set outlives refreshes, so pulling to
+ * refresh never sends an impression twice from one screen (the database also keeps one per student, ad and hour).
+ */
+export function adsToCount(seen: Set<string>, onScreen: string[]): string[] {
+  const out: string[] = [];
+  for (const id of onScreen) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+export type AdDestination =
+  | { kind: "url"; url: string }
+  | { kind: "listing"; id: string }
+  | { kind: "post"; id: string; businessId: string }
+  | { kind: "message"; adId: string }
+  | { kind: "profile"; businessId: string };
+
+/**
+ * Where an ad's button leads: its link for the link buttons; the listing or the post it promotes for "View listing"
+ * and "Get offer" (or the link when it has one); a chat with the business for "Send message" (started by the student,
+ * so the business never writes first); the business's profile for "Visit profile" and whenever nothing else fits.
+ */
+export function adDestination(ad: Pick<FeedAd, "id" | "business_id" | "cta" | "cta_url" | "promoted">): AdDestination {
+  if (ad.cta === "message") return { kind: "message", adId: ad.id };
+  if (ad.cta === "view_listing" && ad.promoted?.type === "apartment") return { kind: "listing", id: ad.promoted.id };
+  if (ad.cta_url && ad.cta !== "visit_profile") return { kind: "url", url: ad.cta_url };
+  if (ad.cta === "get_offer" && ad.promoted?.type === "deal") return { kind: "post", id: ad.promoted.id, businessId: ad.business_id };
+  if (ad.promoted?.type === "apartment") return { kind: "listing", id: ad.promoted.id };
+  return { kind: "profile", businessId: ad.business_id };
+}
+
+/** "$12.50" style money from cents. */
+export function formatCents(cents: number | null | undefined, currency = "USD"): string {
+  const amount = (cents ?? 0) / 100;
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency, minimumFractionDigits: amount % 1 === 0 ? 0 : 2 }).format(amount);
+  } catch {
+    return `${amount.toFixed(2)} ${currency}`;
+  }
+}
+
+/** Clicks as a share of impressions, "2.4%", or "–" before anyone has seen it. */
+export function clickRate(clicks: number, impressions: number): string {
+  if (!impressions) return "–";
+  const rate = (clicks / impressions) * 100;
+  return `${rate >= 10 ? rate.toFixed(0) : rate.toFixed(1)}%`;
 }

@@ -1,30 +1,34 @@
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
-import { Image } from "expo-image";
+import { Image, type ImageLoadEventData } from "expo-image";
 import type { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useVideoPlayer, VideoView, type VideoPlayer } from "expo-video";
 import { GestureDetector } from "react-native-gesture-handler";
 import Reanimated, { cancelAnimation, runOnJS, useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from "react-native-reanimated";
 import type { SFSymbol } from "expo-symbols";
-import { APP_NAME, captionParts, deleteFeedPost, getFeedPost, getOrCreateDirectConversation, hasPublicComments, likePost, listingChatPrefill, reelPath, REPORT_REASONS, reportContent, setPostPinned, sharedPostPath, toggleSaved, unlikePost, type FeedMedia, type Reel, type ReportReason } from "@apartment-book/shared";
+import { APP_NAME, captionParts, deleteFeedPost, type Buzz, getApartmentsByIds, getFeedPost, getOrCreateDirectConversation, hasPublicComments, inquiryPrefill, likePost, listingChatPrefill, reelPath, REPORT_REASONS, reportContent, setPostPinned, sharedPostPath, startBusinessInquiry, toggleSaved, unlikePost, type BusinessSummary, type FeedMedia, type Reel, type ReportReason } from "@apartment-book/shared";
 import { hapticLike, hapticSelect, hapticTap, alertWithHaptic } from "@/lib/haptics";
 import { errorText } from "@/lib/hooks";
 import { emitPostPinned, onPostPinned } from "@/lib/posts-events";
 import { canShareAudience, postLink, useOpenMention } from "@/lib/post-details";
 import { asViewerItem, posterAt, viewerThumb, type ViewerItem } from "@/lib/reel-viewer";
+import { shareBuzz, voteOnBuzz } from "@/lib/buzz-actions";
+import { useBuzzItem } from "@/lib/buzz-store";
+import { AliasAvatar } from "@/components/buzz/parts";
 import { useSession } from "@/lib/session";
 import { SITE_URL, supabase } from "@/lib/supabase";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { useActionSheet } from "../action-sheet";
-import { POST_LINK_HEIGHT, PostLink } from "../post-bits";
+import { BlurredBackdrop } from "../blurred-backdrop";
+import { PostLink } from "../post-bits";
 import { useShareSheet } from "../share-sheet";
 import { Icon, useBounceOn } from "@/components/icon";
-import { ProgressiveBlur } from "@/components/progressive-blur";
 import { ViewerChromeContext, ViewerClockContext, ViewerClosingContext, ViewerZoomContext } from "@/lib/viewer-chrome";
 import { hasDrawn, lendPlayer, returnPlayer } from "@/lib/video-handoff";
 import { setVideosMuted, useVideosMuted, VIDEO_AUDIO_MODE, videosMuted } from "@/lib/video-sound";
 import { usePageSwipe, type PageSlides } from "@/lib/viewer-swipe";
+import { useOpenProfile } from "@/lib/open-profile";
 
 /**
  * The shades over a reel are true gradients of a media colour (the same in both themes), each stop that colour at a
@@ -54,28 +58,17 @@ const TOP_SHADE_MIN = 170;
 const TOP_SHADE_EXTRA = 96;
 /** Tall enough to sit under the whole rail (like, comments, share, save, "…") with room to fade in above the like. */
 const SHADE_HEIGHT = 540;
-/** How far above the bottom inset (the tab bar, or the home indicator) the frosted blur reaches: past the name and the words. */
-const BLUR_REACH = 230;
 /** The overlay's own bottom padding: the "…" centre 46pt above the bottom inset, Instagram's geometry. */
 const OVERLAY_PAD = 31;
-/**
- * What a photo on its page leaves free above the bottom inset for the words: the overlay's padding, the name and a line
- * of words, and a little air between the photo and the name. A photo too tall to leave it is shown full screen instead.
- */
-const WORDS_ROOM = OVERLAY_PAD + 64;
-/** What a page's link adds under its words: the pill (see PostLink) and the words' gap above it. */
-const LINK_ROOM = POST_LINK_HEIGHT + 6;
-/** An opened description on a photo's page reads on the page's own colour, which fades in this far above it. */
-const UNDERLAY_FADE = 28;
 /** The sound button sits this far above the play button's centre, Instagram style: its 44pt disc, then a gap. */
 const SOUND_ABOVE = 44 + 26;
 /**
- * Under the row drawn over a page's top (Back, the toggle): a lone photo starts PHOTO_GAP below it; a carousel's dots get
- * a line of their own first (DOTS_LINE tall, the dots DOTS_TOP down it), and its photos start under that.
+ * A carousel's dots sit this far under the row drawn over a page's top (Back, the toggle), over the picture, on a dark
+ * pill DOTS_PAD bigger than them all round, as iOS draws its page dots over a photo, so they show on a white one too.
  */
-const PHOTO_GAP = 6;
-const DOTS_LINE = 22;
 const DOTS_TOP = 8;
+const DOT_SIZE = 6;
+const DOTS_PAD = 5;
 
 /** How long "…" waits for your reel's pin state when the read-ahead has not answered yet. */
 const PIN_READ_WAIT_MS = 1200;
@@ -99,6 +92,8 @@ type Props = {
   topInset: number;
   /** How much of the page's bottom the floating bar covers: the caption and the rail sit above it. */
   bottomInset: number;
+  /** The rail's inset from the screen's right edge (8 by default; the full-screen viewer's sits nearer the edge). */
+  railRight?: number;
   /** Close enough to the visible page (one behind, two ahead) to have its player loaded and waiting. */
   near: boolean;
   /** This is the visible reel and the Reels section is on screen. */
@@ -112,10 +107,13 @@ type Props = {
   startAt?: number;
   /** The feed's own player for that video (iOS): played on here as it is, with no reload (see video-handoff.ts). */
   borrowed?: VideoPlayer;
-  /** Where the page's own content may start: the bottom of the row drawn over its top. A photo sits below it, whole. */
+  /**
+   * The bottom of the row drawn over the page's top. The page's pictures start at the screen's top edge, under the status
+   * bar and that row; a carousel's dots sit just below it.
+   */
   contentTop?: number;
-  /** The slide on screen changed, or what it sits on did (and once at the start): the screen's own chrome follows it. */
-  onSlideChange?: (key: string, slide: number, surface: ViewerSurface) => void;
+  /** The slide on screen changed (and once at the start): the viewer's zoom closes onto it. */
+  onSlideChange?: (key: string, slide: number) => void;
   /** The slide it starts on has drawn its picture (its photo, its video's frame): the viewer's zoom waits for that. */
   onShown?: () => void;
   /** The same, by its key: the viewer takes away the picture that stood in for a page loaded by its id. */
@@ -135,15 +133,24 @@ type Props = {
 /**
  * One full-screen page: a reel's video, or a post's photos and videos swiped sideways (dots show where you are), under
  * the same overlay for every page: the creator's name and words, and the rail (like, comments, share, save, "…"). A
- * video fills the screen and plays while its page (and its slide) is on screen; a tap pauses it. A photo sits whole at
- * the top, as wide as the screen, on the theme's own colour, with the words below it in the theme's ink and each of the
- * rail's buttons white over the photo or inked over the page (see ViewerSurface, photoLayout); one too tall to leave the
- * words their space is shown full screen like a video. A double tap anywhere likes.
+ * video fills the screen and plays while its page (and its slide) is on screen; a tap pauses it. A photo sits whole from
+ * the screen's very top edge, as wide as the screen (see photoLayout), and in the viewer so does a video that does not
+ * fill the screen (see placeVideo); round either, a blurred, dimmed copy of the same picture fills the rest of the screen,
+ * never a flat colour (see MediaFrame). The words and the rail are white over shades on every page. A double tap likes.
  */
-export const ReelItem = memo(function ReelItem({ reel: source, width, height, topInset, bottomInset, near, playing, onPatch, onOpenComments, onRemoved, initialSlide = 0, startAt, borrowed, contentTop = topInset + 54, onSlideChange, onShown, onDrawn, standIn, pictures = true }: Props) {
+export const ReelItem = memo(function ReelItem({ reel: source, width, height, topInset, bottomInset, railRight = 8, near, playing, onPatch, onOpenComments, onRemoved, initialSlide = 0, startAt, borrowed, contentTop = topInset + 54, onSlideChange, onShown, onDrawn, standIn, pictures = true }: Props) {
   const reel = useMemo(() => asViewerItem(source), [source]);
+  /**
+   * A buzz's page: anonymous. Its alias, words and votes are the Buzz item's own, live from Buzz's store, so a vote here
+   * shows on its card at once and the other way round; nothing of the post overlay (a name, a profile, likes, saves, the
+   * post menu) is drawn, and every post action below returns at once for it.
+   */
+  const isBuzz = reel.sourceType === "buzz";
+  const liveBuzz = useBuzzItem<Buzz>(reel.buzz?.id);
+  const buzz = reel.buzz ? (liveBuzz ?? reel.buzz) : null;
   const { user } = useSession();
   const router = useRouter();
+  const openProfile = useOpenProfile();
   const show = useActionSheet();
   const shareSheet = useShareSheet();
   const muted = useVideosMuted();
@@ -151,8 +158,36 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
   const styles = useStyles();
   const [userPaused, setUserPaused] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [likeBusy, setLikeBusy] = useState(false);
+  /**
+   * The heart's taps, TikTok's way: felt and shown at once, sent one at a time with only the newest wish going next, so
+   * quick taps are never dropped or land out of order. `likeShown` is the heart as last shown (taps can come faster than
+   * renders); `likeConfirmed` what the server last agreed to, put back if it refuses.
+   */
+  const likeShown = useRef({ likedByMe: false, likes: 0 });
+  const likeWanted = useRef<boolean | null>(null);
+  const likeSending = useRef(false);
+  const likeConfirmed = useRef<{ likedByMe: boolean; likes: number } | null>(null);
+  // Between taps the heart is the reel's own (a like in the viewer, a fresh load); while taps are sent it is theirs.
+  if (likeWanted.current === null && !likeSending.current) {
+    likeShown.current = { likedByMe: reel.likedByMe, likes: reel.likes };
+    likeConfirmed.current = null;
+  }
   const [messageBusy, setMessageBusy] = useState(false);
+  // A business's video tour (reels_feed knows only the person who posted the listing): the business, shown and linked,
+  // and "Message" opens the inquiry chat, where the business can only reply.
+  const [business, setBusiness] = useState<BusinessSummary | null>(null);
+  useEffect(() => {
+    if (source.sourceType !== "apartment") return;
+    let live = true;
+    getApartmentsByIds(supabase, [source.sourceId])
+      .then(([a]) => {
+        if (live && a?.business) setBusiness(a.business);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [source.sourceType, source.sourceId]);
   /** The rail heart's pop (scale) and the big heart a double tap flashes over the video, like Instagram. */
   const pop = useRef(new Animated.Value(1)).current;
   const bigHeart = useRef(new Animated.Value(0)).current;
@@ -173,7 +208,7 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
   /** How far each video has got, for the viewer to hand back to the feed as it closes (none on the Reels tab). */
   const clocks = useContext(ViewerClockContext);
   const onClock = useCallback((index: number, read: (() => number) | null) => clocks?.set(key, index, read), [clocks, key]);
-  const own = user?.id === reel.author.id;
+  const own = !isBuzz && user?.id === reel.author.id;
   const isTour = reel.sourceType === "apartment" || reel.sourceType === "roommate";
   /** What the menus and alerts call it. */
   const noun = isTour || reel.kind === "reel" ? "reel" : "post";
@@ -229,11 +264,6 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
   const unlessSwiped = (act: () => void) => () => {
     if (!swipedJustNow()) act();
   };
-  /** Where the overlay (the words and the rail) sits on the page, and the words and the rail within it, as laid out. */
-  const [overlayTop, setOverlayTop] = useState(0);
-  const [infoTop, setInfoTop] = useState(0);
-  const [railBox, setRailBox] = useState({ y: 0, height: 0 });
-  const railTop = railBox.y;
   /** Photos uploaded without their size: measured as they load, so each still sits in its own shape. */
   const [aspects, setAspects] = useState<Record<number, number>>({});
   const onAspect = useCallback((i: number, aspect: number) => setAspects((prev) => (prev[i] === aspect ? prev : { ...prev, [i]: aspect })), []);
@@ -241,15 +271,9 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
     const m = media[i];
     return m ? (aspectOf(m) ?? aspects[i] ?? null) : null;
   };
-  const photoAt = photoTop(contentTop, media.length);
-  const floor = photoFloor(height, bottomInset, reel);
-  /** A photo on its page: the theme's colours. A video, or a photo too tall for a page: dark, white words over shades. */
-  const surface = surfaceOf(media[slide], aspectAt(slide), width, height, photoAt, floor);
-  const onPage = surface === "page";
-  // The screen's own chrome (its top row, the status bar) follows the slide on screen.
   useEffect(() => {
-    onSlideChange?.(key, slide, surface);
-  }, [onSlideChange, key, slide, surface]);
+    onSlideChange?.(key, slide);
+  }, [onSlideChange, key, slide]);
   /**
    * Collapsed, the description is one line like Instagram's. Whether it was cut is measured, not guessed (see
    * onTextLayout).
@@ -259,7 +283,7 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
   const canExpand = clipped || oneLine.includes("\n");
   /** A posted reel's or post's link (migration 44), in a pill under the words. Video tours have none. */
   const link = postLink(reel.link);
-  /** Comments turned off by the author: no comment button (and, in the viewer, no comment bar). */
+  /** Comments turned off by the author: no comment button. */
   const commentsOff = reel.commentsOff ?? false;
   /** Only a Global or campus post can be sent into a chat (see canShareAudience); a video tour is always Global. */
   const shareable = canShareAudience(reel.audience ?? "global");
@@ -285,11 +309,11 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
   }, [playing, own, isTour, pinned, reel.sourceId]);
   // Pinned or unpinned elsewhere (the profile grid, the post screen) while this reel is mounted.
   useEffect(() => {
-    if (isTour) return;
+    if (isTour || isBuzz) return;
     return onPostPinned((id, next) => {
       if (id === reel.sourceId) setPinned(next);
     });
-  }, [isTour, reel.sourceId]);
+  }, [isTour, isBuzz, reel.sourceId]);
 
   // Scrolling away clears a manual pause and a stretched-out caption, so coming back starts fresh.
   useEffect(() => {
@@ -338,26 +362,65 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
     burstAnim.current.start();
   }
 
-  async function toggleLike() {
-    if (!user) return login();
-    if (likeBusy) return;
-    const next = !reel.likedByMe;
-    const before = { likedByMe: reel.likedByMe, likes: reel.likes };
-    animateHeart(next);
-    if (next) hapticLike();
-    setLikeBusy(true);
-    onPatch(key, { likedByMe: next, likes: Math.max(0, reel.likes + (next ? 1 : -1)) });
+  /** The heart (or a double tap's like) changes now; the server hears it after, one tap at a time. */
+  function setLike(next: boolean) {
+    const now = likeShown.current;
+    likeConfirmed.current ??= { ...now };
+    likeWanted.current = next;
+    const shown = { likedByMe: next, likes: Math.max(0, now.likes + (next === now.likedByMe ? 0 : next ? 1 : -1)) };
+    likeShown.current = shown;
+    onPatch(key, shown);
+    void sendLikes();
+  }
+  async function sendLikes() {
+    const { sourceType, sourceId } = reel;
+    // A buzz has votes, not likes (toggleLike never gets here for one).
+    if (likeSending.current || !user || sourceType === "buzz") return;
+    likeSending.current = true;
     try {
-      if (next) await likePost(supabase, user.id, reel.sourceType, reel.sourceId);
-      else await unlikePost(supabase, user.id, reel.sourceType, reel.sourceId);
+      let sent: boolean | null = null;
+      while (likeWanted.current !== null && likeWanted.current !== sent) {
+        const next: boolean = likeWanted.current;
+        if (next) await likePost(supabase, user.id, sourceType, sourceId);
+        else await unlikePost(supabase, user.id, sourceType, sourceId);
+        sent = next;
+      }
+      likeConfirmed.current = { ...likeShown.current };
     } catch {
-      onPatch(key, before);
+      if (likeConfirmed.current) {
+        likeShown.current = { ...likeConfirmed.current };
+        onPatch(key, likeConfirmed.current);
+      }
     } finally {
-      setLikeBusy(false);
+      likeSending.current = false;
+      likeWanted.current = null;
+    }
+  }
+
+  function toggleLike() {
+    if (reel.sourceType === "buzz") return;
+    if (!user) return login();
+    const next = !likeShown.current.likedByMe;
+    // Felt before anything else happens: no render, animation or request stands in front of it.
+    if (next) hapticLike();
+    else hapticTap();
+    animateHeart(next);
+    setLike(next);
+  }
+
+  /** A double tap's like: always felt, never an unlike. */
+  function likeNow() {
+    if (reel.sourceType === "buzz") return;
+    if (!user) return login();
+    hapticLike();
+    if (!likeShown.current.likedByMe) {
+      animateHeart(true);
+      setLike(true);
     }
   }
 
   async function toggleSave() {
+    if (reel.sourceType === "buzz") return;
     if (!user) return login();
     // A selection tick as the bookmark fills (or empties), as everywhere else you save.
     hapticSelect();
@@ -373,6 +436,11 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
   /** Double tap on the picture: like (never unlike) with a big heart, like Instagram; a lone tap pauses a video (a photo has nothing to pause). */
   function onVideoTap() {
     if (swipedJustNow()) return;
+    // A buzz has votes, not likes: a tap pauses or plays at once, with no wait for a second tap.
+    if (isBuzz) {
+      if (slideIsVideo) setUserPaused((p) => !p);
+      return;
+    }
     const now = Date.now();
     if (pendingTap.current) {
       clearTimeout(pendingTap.current);
@@ -380,8 +448,8 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
     }
     if (now - lastTap.current < 260) {
       lastTap.current = 0;
+      likeNow();
       burst();
-      if (!reel.likedByMe) void toggleLike();
       return;
     }
     lastTap.current = now;
@@ -395,6 +463,7 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
 
   /** Instagram's share sheet: send the reel to friends as a chat card, or "Share to…" the link with the system sheet. */
   function share() {
+    if (reel.sourceType === "buzz") return;
     const type = reel.sourceType;
     const url = `${SITE_URL}${reelPath({ sourceType: type, sourceId: reel.sourceId })}`;
     const label = reel.title ?? (reel.caption ? reel.caption.slice(0, 80) : `${reel.author.name} on ${APP_NAME}`);
@@ -409,15 +478,28 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
         image_url: poster || null,
         author: { id: reel.author.id, name: reel.author.name, avatar_url: reel.author.avatarUrl },
       },
-      { url, label, restricted: (reel.audience ?? "global") !== "global" },
+      { url, label },
     );
   }
 
   async function message() {
+    if (isBuzz) return;
     if (!user) return login();
     if (messageBusy) return;
     setMessageBusy(true);
     try {
+      // A tour of a business's listing opens the inquiry chat; when the business has not loaded yet, the inquiry is
+      // tried first anyway (a student's own listing answers "not from a business", and the direct chat follows).
+      if (business || reel.sourceType === "apartment") {
+        const inquiry = await startBusinessInquiry(supabase, "apartment", reel.sourceId).catch((e: unknown) => {
+          if (!business && e instanceof Error && e.message.includes("not from a business")) return null;
+          throw e;
+        });
+        if (inquiry) {
+          router.push({ pathname: "/messages/[id]", params: { id: inquiry, prefill: inquiryPrefill(business?.name ?? "there", reel.title ?? "your listing") } });
+          return;
+        }
+      }
       const conv = await getOrCreateDirectConversation(supabase, reel.author.id);
       // A roommate tour opens the chat with a first message about the post, as the listing's own Inbox button does.
       const listing = reel.sourceType === "roommate";
@@ -435,6 +517,8 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
   }
 
   function report() {
+    // A buzz is reported through Buzz's own menu and moderation, never into the posts' reports.
+    if (reel.sourceType === "buzz") return;
     const targetType = reel.sourceType;
     if (!user) return login();
     show(
@@ -482,6 +566,7 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
 
   // The overlay is name and caption only (like TikTok), so the listing and the chat live behind "…".
   async function more() {
+    if (isBuzz) return;
     // Usually known already (read while the reel plays). If that read has not answered or failed, ask again, but hold
     // the menu for a moment at most: without an answer it opens without the Pin item, which the next tap will have.
     let pinNow = own && !isTour ? pinned : null;
@@ -500,7 +585,7 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
     }
     show([
       ...(isTour ? [{ label: "View listing", icon: "open-outline" as const, onPress: openListing }] : []),
-      ...(own ? [] : [{ label: `Message ${reel.author.name.split(" ")[0]}`, icon: "chatbubble-ellipses-outline" as const, onPress: () => void message() }]),
+      ...(own ? [] : [{ label: `Message ${business ? business.name : reel.author.name.split(" ")[0]}`, icon: "chatbubble-ellipses-outline" as const, onPress: () => void message() }]),
       ...(pinNow !== null ? [{ label: pinNow ? "Unpin from profile" : "Pin to profile", icon: pinNow ? ("pin" as const) : ("pin-outline" as const), onPress: () => void togglePin(!pinNow) }] : []),
       ...(own && !isTour ? [{ label: `Delete ${noun}`, icon: "trash-outline" as const, destructive: true, onPress: confirmDelete }] : []),
       ...(own ? [] : [{ label: "Report", icon: "flag-outline" as const, destructive: true, onPress: report }]),
@@ -508,76 +593,88 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
   }
 
   /** The photo on its page, when that is what is on screen. */
-  const pagePhoto = onPage ? photoLayout(aspectAt(slide), width, height, photoAt, floor).place : null;
-  // The big heart a double tap flashes: in the middle of the photo on a photo's page, of the screen otherwise.
-  const heartBox = pagePhoto ? frame(pagePhoto) : { left: 0, top: 0, width, height };
-  /**
-   * Where the picture behind the rail ends, in the rail's own points: each button takes white over the picture and the
-   * theme's ink over the page below it. On a video's page the picture runs under the whole rail. An opened description
-   * on a photo's page brings the page's colour up behind it, and the buttons there go with the page.
-   */
-  const underlayTop = pagePhoto && expanded ? overlayTop + infoTop - UNDERLAY_FADE : Infinity;
-  const railEdge = pagePhoto ? Math.min(pagePhoto.top + pagePhoto.height, underlayTop) - (overlayTop + railTop) : Infinity;
+  // The big heart a double tap flashes: in the middle of the photo or video on screen (the screen, for one that fills it).
+  const shown = media[slide];
+  const heartBox = shown ? frame(shown.type === "photo" ? photoLayout(aspectAt(slide), width, height) : placeVideo(aspectAt(slide), width, height, chrome !== null)) : { left: 0, top: 0, width, height };
 
   return (
     <PicturesContext.Provider value={pictures}>
     <GestureDetector gesture={swipe}>
     {/* On the Reels tab the page trims what runs past it (a video's sides, a carousel's next slides); in the viewer the
         screen and the zoom's opening do, so the opening can show a whole video (see wholeVideo). */}
-    <View style={{ width, height, overflow: chrome ? "visible" : "hidden", backgroundColor: onPage ? colors.bg : colors.mediaBg }}>
+    <View style={{ width, height, overflow: chrome ? "visible" : "hidden", backgroundColor: colors.mediaBg }}>
       {single ? (
         <>
-          <VideoSlide uri={single.playbackUrl} poster={poster} aspect={aspectOf(single)} width={width} height={height} mounted={near} playing={playing && (closing || !userPaused)} muted={muted} topInset={topInset} bottomInset={bottomInset} frost={near} index={0} startAt={startFrom} borrowed={lentPlayer} onStarted={started} onClock={onClock} onShown={firstShown} standIn={standIn} />
+          <VideoSlide uri={single.playbackUrl} poster={poster} aspect={aspectOf(single)} width={width} height={height} mounted={near} playing={playing && (closing || !userPaused)} muted={muted} topInset={topInset} bottomInset={bottomInset} index={0} startAt={startFrom} borrowed={lentPlayer} onStarted={started} onClock={onClock} onShown={firstShown} standIn={standIn} />
           <Pressable style={StyleSheet.absoluteFill} onPress={onVideoTap} accessibilityRole="button" accessibilityLabel={userPaused ? "Play" : "Pause"} />
         </>
       ) : (
-        <SlideStrip media={media} aspects={aspects} pos={stripPos} settled={settled} shown={slide} width={width} height={height} photoTop={photoAt} photoFloor={floor} topInset={topInset} bottomInset={bottomInset} near={near} playing={playing && (closing || !userPaused)} muted={muted} onAspect={onAspect} onTap={onVideoTap} goTo={goTo} startAt={startFrom} borrowed={lentPlayer} startSlide={firstSlide} onStarted={started} onClock={onClock} onShown={firstShown} standIn={standIn} />
+        <SlideStrip media={media} aspects={aspects} pos={stripPos} settled={settled} shown={slide} width={width} height={height} topInset={topInset} bottomInset={bottomInset} near={near} playing={playing && (closing || !userPaused)} muted={muted} onAspect={onAspect} onTap={onVideoTap} goTo={goTo} startAt={startFrom} borrowed={lentPlayer} startSlide={firstSlide} onStarted={started} onClock={onClock} onShown={firstShown} standIn={standIn} />
       )}
       <Animated.View pointerEvents="none" style={[styles.heartBox, heartBox, styles.bigHeart, { opacity: bigHeart, transform: [{ scale: bigHeart.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }]}>
         <Icon name="heart" size={110} color={colors.onMedia} />
       </Animated.View>
 
       <Reanimated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, chromeStyle]}>
-      {/* Several photos or videos: where you are, on a line of their own under the top row (a photo starts below it). */}
+      {/* Several photos or videos: where you are, just under the top row, over the picture (which starts above it). */}
       {media.length > 1 ? (
-        <View pointerEvents="none" style={[styles.dots, { top: contentTop + DOTS_TOP }]} accessibilityLabel={`${slide + 1} of ${media.length}`}>
-          {media.map((_, i) => (
-            <View key={i} style={[styles.dot, onPage && styles.dotPage, i === slide && (onPage ? styles.dotOnPage : styles.dotOn)]} />
-          ))}
+        <View pointerEvents="none" style={[styles.dots, { top: contentTop + DOTS_TOP - DOTS_PAD }]} accessibilityLabel={`${slide + 1} of ${media.length}`}>
+          <View style={styles.dotsRow}>
+            {media.map((_, i) => (
+              <View key={i} style={[styles.dot, i === slide && styles.dotOn]} />
+            ))}
+          </View>
         </View>
       ) : null}
 
-      {/* An opened description on a photo's page: the page's colour comes up behind it, over the photo's lower part. */}
-      {pagePhoto && expanded ? (
-        <View pointerEvents="none" style={[styles.underlay, { top: underlayTop }]}>
-          <View style={styles.underlayFade} />
-          <View style={styles.underlaySolid} />
-        </View>
-      ) : null}
-
-      <View style={[styles.overlay, { paddingBottom: OVERLAY_PAD + bottomInset }]} pointerEvents="box-none" onLayout={(e) => setOverlayTop(e.nativeEvent.layout.y)}>
-        <View style={styles.info} pointerEvents="box-none" onLayout={(e) => setInfoTop(e.nativeEvent.layout.y)}>
-          <Pressable onPress={unlessSwiped(() => router.push({ pathname: "/profile/[id]", params: { id: reel.author.id } }))} style={{ flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start" }} accessibilityRole="link" accessibilityLabel={`${reel.author.name}'s profile`}>
-            <Text style={[styles.author, onPage && styles.authorPage]} numberOfLines={1}>
-              {reel.author.name}
-            </Text>
-            {reel.author.verified ? <Icon name="checkmark-circle" sf="checkmark.seal.fill" size={16} color={onPage ? colors.brand : colors.verifiedOnMedia} accessibilityLabel="Verified student" /> : null}
-          </Pressable>
+      <View style={[styles.overlay, { paddingBottom: OVERLAY_PAD + bottomInset, paddingRight: railRight }]} pointerEvents="box-none">
+        <View style={styles.info} pointerEvents="box-none">
+          {buzz ? (
+            // Who wrote it, as the Buzz card says it: the thread's alias (Buzz's own mark, an emoji in a dashed ring of its
+            // colour, and "Anon Comet"), "You" on your own, and nothing that leads anywhere.
+            <View style={styles.alias} accessible accessibilityLabel={`${buzz.isMine ? "You, " : ""}${buzz.alias.label}${buzz.isOp ? ", original poster" : ""}, Buzz`}>
+              <AliasAvatar alias={buzz.alias} />
+              <Text style={styles.author} numberOfLines={1}>
+                {buzz.isMine ? `You · ${buzz.alias.label}` : buzz.alias.label}
+              </Text>
+              <Text style={[styles.author, { fontSize: 12, fontWeight: "600", opacity: 0.85 }]}>· Buzz</Text>
+            </View>
+          ) : business ? (
+            <Pressable onPress={unlessSwiped(() => router.push({ pathname: "/businesses/[id]", params: { id: business.id } }))} style={{ flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start" }} accessibilityRole="link" accessibilityLabel={`${business.name}'s profile`}>
+              <Text style={styles.author} numberOfLines={1}>
+                {business.name}
+              </Text>
+              {business.verified_partner ? <Icon name="checkmark-circle" sf="checkmark.seal.fill" size={16} color={colors.verifiedOnMedia} accessibilityLabel="Verified Partner" /> : null}
+              <Text style={[styles.author, { fontSize: 12, fontWeight: "600", opacity: 0.85 }]}>· Business</Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={unlessSwiped(() => openProfile(reel.author.id))} style={{ flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start" }} accessibilityRole="link" accessibilityLabel={`${reel.author.name}'s profile`}>
+              <Text style={styles.author} numberOfLines={1}>
+                {reel.author.name}
+              </Text>
+              {reel.author.verified ? <Icon name="checkmark-circle" sf="checkmark.seal.fill" size={16} color={colors.verifiedOnMedia} accessibilityLabel="Verified student" /> : null}
+            </Pressable>
+          )}
           {/* Short by default, like TikTok: one line of title and one of caption, "… more" opens the rest. */}
           {oneLine ? (
             expanded ? (
               <View style={{ gap: 2 }}>
                 {reel.title ? (
-                  <Text style={[styles.title, onPage && styles.titlePage]} numberOfLines={3}>
+                  <Text style={styles.title} numberOfLines={3}>
                     {reel.title}
                   </Text>
                 ) : null}
-                {reel.caption ? (
+                {reel.caption && isBuzz ? (
+                  // A buzz's words as they were written: no links out of them, as on its card.
+                  <Text style={styles.caption} numberOfLines={10}>
+                    {reel.caption}
+                  </Text>
+                ) : reel.caption ? (
                   // Opened, hashtags and @mentions stand out (white and bold over a picture), and a mention opens its profile.
-                  <Text style={[styles.caption, onPage && styles.captionPage]} numberOfLines={10}>
+                  <Text style={styles.caption} numberOfLines={10}>
                     {captionParts(reel.caption).map((part, i) =>
                       part.tag || part.mention ? (
-                        <Text key={i} style={onPage ? styles.tagPage : styles.tag} onPress={part.mention ? unlessSwiped(() => openMention(part.mention!)) : undefined} accessibilityRole={part.mention ? "link" : undefined}>
+                        <Text key={i} style={styles.tag} onPress={part.mention ? unlessSwiped(() => openMention(part.mention!)) : undefined} accessibilityRole={part.mention ? "link" : undefined}>
                           {part.text}
                         </Text>
                       ) : (
@@ -586,7 +683,7 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
                     )}
                   </Text>
                 ) : null}
-                <Text onPress={unlessSwiped(() => setExpanded(false))} style={[styles.more, onPage && styles.morePage]} accessibilityRole="button" accessibilityLabel="Show less">
+                <Text onPress={unlessSwiped(() => setExpanded(false))} style={styles.more} accessibilityRole="button" accessibilityLabel="Show less">
                   less
                 </Text>
               </View>
@@ -594,7 +691,7 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
               /* One line with a tail "…", like Instagram; the line itself is the button, so VoiceOver reads the text and the hint. */
               <>
                 <Text
-                  style={[styles.caption, onPage && styles.captionPage]}
+                  style={styles.caption}
                   numberOfLines={1}
                   onPress={canExpand ? unlessSwiped(() => setExpanded(true)) : undefined}
                   accessibilityRole={canExpand ? "button" : "text"}
@@ -610,22 +707,33 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
               </>
             )
           ) : null}
-          {link ? <PostLink url={link} media={!onPage} guard={unlessSwiped} /> : null}
+          {link ? <PostLink url={link} media guard={unlessSwiped} /> : null}
         </View>
 
-        <View style={styles.rail} onLayout={(e) => setRailBox({ y: e.nativeEvent.layout.y, height: e.nativeEvent.layout.height })}>
-          <RailButton icon={reel.likedByMe ? "heart" : "heart-outline"} tint={reel.likedByMe ? { media: colors.like, page: colors.like } : undefined} label={compact(reel.likes)} onPress={unlessSwiped(() => void toggleLike())} a11y={reel.likedByMe ? "Unlike" : "Like"} selected={reel.likedByMe} scale={pop} edge={railEdge} />
+        {buzz ? (
+          // Buzz's own rail: the votes (up, the score, down; your own buzz, or one that is not active, takes none), the
+          // replies on the thread's screen, and Share, which sends the thread's link and headline only (shareBuzz).
+          <View style={styles.rail}>
+            <RailButton icon="arrow-up" sf={buzz.myVote === 1 ? "arrowshape.up.fill" : "arrowshape.up"} label={compact(buzz.score)} onPress={unlessSwiped(() => voteOnBuzz(buzz.id, 1))} a11y={buzz.myVote === 1 ? `Remove upvote, score ${buzz.score}` : `Upvote, score ${buzz.score}`} selected={buzz.myVote === 1} disabled={buzz.isMine || buzz.status !== "active"} />
+            <RailButton icon="arrow-down" sf={buzz.myVote === -1 ? "arrowshape.down.fill" : "arrowshape.down"} onPress={unlessSwiped(() => voteOnBuzz(buzz.id, -1))} a11y={buzz.myVote === -1 ? "Remove downvote" : "Downvote"} selected={buzz.myVote === -1} disabled={buzz.isMine || buzz.status !== "active"} />
+            <RailButton icon="chatbubble-ellipses-outline" label={compact(buzz.replyCount)} onPress={unlessSwiped(() => onOpenComments(reel))} a11y={`${buzz.replyCount} ${buzz.replyCount === 1 ? "reply" : "replies"}, open the thread`} />
+            {buzz.status === "active" ? <RailButton icon="paper-plane-outline" label="Share" onPress={unlessSwiped(() => shareBuzz(buzz))} a11y="Share the thread's link" /> : null}
+          </View>
+        ) : (
+        <View style={styles.rail}>
+          <RailButton icon={reel.likedByMe ? "heart" : "heart-outline"} tint={reel.likedByMe ? colors.like : undefined} label={compact(reel.likes)} onPress={unlessSwiped(toggleLike)} a11y={reel.likedByMe ? "Unlike" : "Like"} selected={reel.likedByMe} scale={pop} />
           {hasPublicComments(reel.sourceType) ? (
-            commentsOff ? null : <RailButton icon="chatbubble-ellipses-outline" label={compact(reel.comments)} onPress={unlessSwiped(() => onOpenComments(reel))} a11y="Comments" edge={railEdge} />
+            commentsOff ? null : <RailButton icon="chatbubble-ellipses-outline" label={compact(reel.comments)} onPress={unlessSwiped(() => onOpenComments(reel))} a11y="Comments" />
           ) : (
             // A roommate tour has no public comments: the poster is reached in private (your own opens your Inbox).
-            <RailButton icon="chatbubble-ellipses-outline" label="Inbox" onPress={unlessSwiped(() => (own ? router.push("/messages") : void message()))} a11y={own ? "Inbox" : `Message ${reel.author.name.split(" ")[0]}`} edge={railEdge} />
+            <RailButton icon="chatbubble-ellipses-outline" label="Inbox" onPress={unlessSwiped(() => (own ? router.push("/messages") : void message()))} a11y={own ? "Inbox" : `Message ${reel.author.name.split(" ")[0]}`} />
           )}
-          {shareable ? <RailButton icon="paper-plane-outline" label="Share" onPress={unlessSwiped(share)} a11y="Share" edge={railEdge} /> : null}
+          {shareable ? <RailButton icon="paper-plane-outline" label="Share" onPress={unlessSwiped(share)} a11y="Share" /> : null}
           {/* Saved: the filled bookmark, in the same colour as the rest of the rail (white over a picture). */}
-          <RailButton icon={reel.savedByMe ? "bookmark" : "bookmark-outline"} label={reel.savedByMe ? "Saved" : "Save"} onPress={unlessSwiped(() => void toggleSave())} a11y={reel.savedByMe ? "Unsave" : "Save"} selected={reel.savedByMe} edge={railEdge} />
-          <RailButton icon="ellipsis-horizontal" onPress={unlessSwiped(() => void more())} a11y="More options" small edge={railEdge} />
+          <RailButton icon={reel.savedByMe ? "bookmark" : "bookmark-outline"} label={reel.savedByMe ? "Saved" : "Save"} onPress={unlessSwiped(() => void toggleSave())} a11y={reel.savedByMe ? "Unsave" : "Save"} selected={reel.savedByMe} />
+          <RailButton icon="ellipsis-horizontal" onPress={unlessSwiped(() => void more())} a11y="More options" small />
         </View>
+        )}
       </View>
 
       {/* Paused: the play button in the middle and the sound button just above it, Instagram style. Both fade away the
@@ -650,40 +758,29 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
 });
 
 /**
- * One of the rail's buttons. Over a picture its icon and its count are white with a shadow; over the page's own colour
- * (below a photo on its page) they take the theme's ink: each decides by where it sits, as iOS tints a control by what
- * is behind it. `edge` is where the picture behind the rail ends, in the rail's points (Infinity: it runs under the whole
- * rail); `tint` colours an icon that is on (the red heart, the saved bookmark) over a picture and over the page.
+ * One of the rail's buttons: its icon and its count white over the picture, with a crisp shadow; `tint` colours an icon
+ * that is on (the red heart).
  */
-function RailButton({ icon, sf, label, tint, onPress, a11y, selected, small, scale, edge = Infinity }: { icon: keyof typeof Ionicons.glyphMap; sf?: SFSymbol; label?: string; tint?: { media: string; page: string }; onPress: () => void; a11y: string; selected?: boolean; small?: boolean; scale?: Animated.Value; edge?: number }) {
+function RailButton({ icon, sf, label, tint, onPress, a11y, selected, small, scale, disabled }: { icon: keyof typeof Ionicons.glyphMap; sf?: SFSymbol; label?: string; tint?: string; onPress: () => void; a11y: string; selected?: boolean; small?: boolean; scale?: Animated.Value; disabled?: boolean }) {
   const colors = useColors();
   const styles = useStyles();
   // A heart or a bookmark that turns on bounces like the system's symbols.
   const bounce = useBounceOn(Boolean(selected));
   const size = small ? 30 : 34;
-  /** Where the button sits in the rail, once laid out; until then it goes with the page wherever there is one. */
-  const [box, setBox] = useState<{ y: number; height: number } | null>(null);
-  const overPicture = (centre: number) => (box ? centre < edge : edge === Infinity);
-  const iconOver = overPicture((box?.y ?? 0) + size / 2);
-  const labelOver = overPicture((box?.y ?? 0) + (size + 3 + (box?.height ?? 0)) / 2);
-  const ink = tint ? (iconOver ? tint.media : tint.page) : iconOver ? colors.onMedia : colors.text;
   return (
     <Pressable
       onPress={onPress}
-      onLayout={(e) => {
-        const { y, height } = e.nativeEvent.layout;
-        setBox((b) => (b && b.y === y && b.height === height ? b : { y, height }));
-      }}
       hitSlop={6}
-      style={({ pressed }) => [styles.railButton, pressed && { opacity: 0.7 }]}
+      disabled={disabled}
+      style={({ pressed }) => [styles.railButton, disabled ? { opacity: 0.45 } : pressed && { opacity: 0.7 }]}
       accessibilityRole="button"
       accessibilityLabel={a11y}
-      accessibilityState={selected === undefined ? undefined : { selected }}
+      accessibilityState={selected === undefined && !disabled ? undefined : { selected, disabled }}
     >
       <Animated.View style={scale ? { transform: [{ scale }] } : undefined}>
-        <Icon name={icon} sf={sf} size={size} color={ink} style={iconOver ? styles.iconShadow : undefined} bounce={bounce} />
+        <Icon name={icon} sf={sf} size={size} color={tint ?? colors.onMedia} style={styles.iconShadow} bounce={bounce} />
       </Animated.View>
-      {label ? <Text style={[styles.railLabel, !labelOver && styles.railLabelPage]}>{label}</Text> : null}
+      {label ? <Text style={styles.railLabel}>{label}</Text> : null}
     </Pressable>
   );
 }
@@ -691,30 +788,6 @@ function RailButton({ icon, sf, label, tint, onPress, a11y, selected, small, sca
 /** Width over height, when the upload recorded both. */
 export function aspectOf(m: FeedMedia): number | null {
   return m.width && m.height ? m.width / m.height : null;
-}
-
-/**
- * What a page's words and buttons sit on while a slide is on screen. "page": a photo on the screen's own colour (white in
- * light, black in dark), with the theme's own ink, as on any other screen of the app. "media": a video, or a photo too
- * tall for a page (a phone screenshot), full screen and dark, with white words over shades in both themes.
- */
-export type ViewerSurface = "media" | "page";
-/** The surface of a slide of this shape on a page of this size, its photos between `top` and `floor` (see photoLayout). */
-export function surfaceOf(m: FeedMedia | undefined, aspect: number | null, pageW: number, pageH: number, top: number, floor: number): ViewerSurface {
-  return m?.type === "photo" ? photoLayout(aspect, pageW, pageH, top, floor).surface : "media";
-}
-
-/** Where a page's photos start: under the row over its top (`contentTop`) and, on a carousel, the dots' own line. */
-export function photoTop(contentTop: number, count: number): number {
-  return contentTop + (count > 1 ? DOTS_LINE : PHOTO_GAP);
-}
-
-/**
- * The lowest a photo on its page may reach: the name and the words keep the space below it (see WORDS_ROOM), and the
- * page's link, if it has one, its pill under them.
- */
-export function photoFloor(pageH: number, bottomInset: number, item?: Pick<ViewerItem, "link"> | null): number {
-  return pageH - bottomInset - WORDS_ROOM - (item && postLink(item.link) ? LINK_ROOM : 0);
 }
 
 /** TikTok's canvas: a 9:16 column, as wide as the screen on a phone (as tall as the screen allows on a wider one). */
@@ -726,31 +799,27 @@ export type Placement = { left: number; top: number; width: number; height: numb
 const frame = (p: Placement) => ({ left: p.left, top: p.top, width: p.width, height: p.height });
 
 /**
- * Where a photo sits, TikTok style, always whole and in its own shape, never cropped or stretched. As wide as the page,
- * at the top of the space under the top row (`top`), on the page's own colour, which stays free below it (from `floor`)
- * for the name and the words ("page"): a landscape, square, 4:5 or 3:4 photo. One too tall to leave that space (9:16, a
- * phone screenshot) is shown like a vertical video instead: full screen, as wide as the page (or as tall, whichever
- * comes first), in the middle, on black ("media"). Until a photo's shape is known (an upload that did not record it,
- * still loading) it is drawn whole at the top of the space.
+ * Where a photo sits: always whole and in its own shape, never cropped or stretched, from the screen's very top edge (the
+ * status bar and the row over the page's top float over it, on a shade, rather than pushing it down), as wide as the
+ * page, or as tall as it where the photo is taller than the page's own shape, centred across it. Whatever of the page it
+ * leaves shows a blurred copy of it (see MediaFrame), never a flat colour. Until a photo's shape is known (an upload that
+ * did not record it, still loading) it is drawn whole at the top of the page.
  */
-export function photoLayout(aspect: number | null, pageW: number, pageH: number, top: number, floor: number): { place: Placement; surface: ViewerSurface } {
-  const room = Math.max(floor - top, 1);
-  if (aspect === null || !(aspect > 0)) return { place: { left: 0, top, width: pageW, height: room, fit: "contain" }, surface: "page" };
-  const tall = pageW / aspect;
-  if (tall <= room) return { place: { left: 0, top, width: pageW, height: tall, fit: "contain" }, surface: "page" };
+export function photoLayout(aspect: number | null, pageW: number, pageH: number): Placement {
+  if (aspect === null || !(aspect > 0)) return { left: 0, top: 0, width: pageW, height: pageH, fit: "contain" };
   const width = Math.min(pageW, pageH * aspect);
-  const height = width / aspect;
-  return { place: { left: (pageW - width) / 2, top: (pageH - height) / 2, width, height, fit: "contain" }, surface: "media" };
+  return { left: (pageW - width) / 2, top: 0, width, height: width / aspect, fit: "contain" };
 }
 
 /**
  * Where a video sits: a vertical one (9:16, or within a hair of it) fills the whole screen, its sides trimmed a little on
  * a phone taller than 9:16 (on a page wider than the video, an iPad's, it keeps its full height, whole, in the middle); a
- * square, landscape, 4:5 or 3:4 one stays whole, as wide as the 9:16 canvas, in the middle, the blurred backdrop round
- * it. An unknown shape fits whole on the page.
+ * square, landscape, 4:5 or 3:4 one stays whole, as wide as the 9:16 canvas, the blurred backdrop round it: in the
+ * middle on the Reels tab, where Home's own bar floats over the top, and `atTop` in the full-screen viewer, from the
+ * screen's top edge under the status bar, as a photo sits there (see photoLayout). An unknown shape fits whole on the page.
  */
-export function placeVideo(aspect: number | null, pageW: number, pageH: number): Placement {
-  const centred = (width: number, height: number, fit: Placement["fit"]): Placement => ({ left: (pageW - width) / 2, top: (pageH - height) / 2, width, height, fit });
+export function placeVideo(aspect: number | null, pageW: number, pageH: number, atTop = false): Placement {
+  const centred = (width: number, height: number, fit: Placement["fit"]): Placement => ({ left: (pageW - width) / 2, top: atTop ? 0 : (pageH - height) / 2, width, height, fit });
   if (aspect === null || !(aspect > 0)) return centred(pageW, pageH, "contain");
   if (aspect <= CANVAS * FILL_TOLERANCE) return pageW / pageH <= aspect ? centred(pageW, pageH, "cover") : centred(pageH * aspect, pageH, "cover");
   const canvasW = Math.min(pageW, pageH * CANVAS);
@@ -763,8 +832,8 @@ export function placeVideo(aspect: number | null, pageW: number, pageH: number):
  * viewer's zoom can show those strips through its opening, as the feed did (it trims the top and bottom instead), and
  * open and close on exactly the feed's picture.
  */
-export function wholeVideo(aspect: number | null, pageW: number, pageH: number): Placement {
-  const place = placeVideo(aspect, pageW, pageH);
+export function wholeVideo(aspect: number | null, pageW: number, pageH: number, atTop = false): Placement {
+  const place = placeVideo(aspect, pageW, pageH, atTop);
   if (aspect === null || !(aspect > 0)) return place;
   // Whether the video spans its place's whole width (its height following from its shape), or its whole height.
   const acrossFull = place.width / place.height > aspect === (place.fit === "cover");
@@ -773,16 +842,10 @@ export function wholeVideo(aspect: number | null, pageW: number, pageH: number):
   return { left: place.left + (place.width - width) / 2, top: place.top + (place.height - height) / 2, width, height, fit: place.fit };
 }
 
-/** The soft, darkened blur of a video's poster that fills whatever of the page the video itself leaves empty. */
+/** The picture's own blurred copy behind it (see BlurredBackdrop), drawn only once the page draws its pictures. */
 function Backdrop({ uri }: { uri: string }) {
-  const styles = useStyles();
   const pictures = useContext(PicturesContext);
-  return (
-    <>
-      {pictures ? <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={45} transition={0} /> : null}
-      <View style={[StyleSheet.absoluteFill, styles.backdropDim]} />
-    </>
-  );
+  return pictures ? <BlurredBackdrop source={uri} /> : <BlurredBackdrop />;
 }
 
 /** Does the picture cover the whole page (no backdrop needed)? */
@@ -791,24 +854,25 @@ function coversPage(place: Placement, pageW: number, pageH: number) {
 }
 
 /**
- * A full-screen slide (a video, or a photo too tall for a page): dark, the picture's blurred backdrop wherever the picture
- * leaves the page empty, and over the picture the frost and the shades that keep the white words and the rail readable.
+ * Every slide, photo or video: `backdrop`, the picture's own blurred and dimmed copy filling the whole page, wherever the
+ * picture leaves it (never black or a flat colour), and over the picture the shades that keep the white status bar, the
+ * row, the words and the rail readable. Shades only, as Instagram draws them: a blur under the words would be sampled
+ * again every frame the video plays, and re-drawn every frame the page zooms or is pulled back, which is where frames were
+ * being dropped. The backdrop is a still, blurred once.
  */
-function MediaFrame({ place, whole, backdrop, width, height, topInset, bottomInset, frost, children }: { place: Placement; whole?: Placement; backdrop: string | null; width: number; height: number; topInset: number; bottomInset: number; frost: boolean; children: ReactNode }) {
+function MediaFrame({ whole, backdrop, width, height, topInset, bottomInset, children }: { whole?: Placement; backdrop: string | null; width: number; height: number; topInset: number; bottomInset: number; children: ReactNode }) {
   const colors = useColors();
   const styles = useStyles();
-  // The frost and the shades are there for the words and the rail, so in the viewer they come and go with them: the zoom
-  // opens on the bare picture, exactly as the feed showed it, and lands back on it.
+  // The shades are there for the words and the rail, so in the viewer they come and go with them: the zoom opens on the
+  // bare picture, exactly as the feed showed it, and lands back on it.
   const chrome = useContext(ViewerChromeContext);
   const shadesStyle = useAnimatedStyle(() => ({ opacity: chrome ? chrome.value : 1 }));
   // As wide as the picture, where a video runs past the page's sides (see wholeVideo): fading, they leave no edge on it.
   const across = whole ? { left: Math.min(0, whole.left), right: Math.min(0, width - whole.left - whole.width) } : null;
   return (
     <View style={{ width, height, backgroundColor: colors.mediaBg }} pointerEvents="none">
-      {backdrop && !coversPage(place, width, height) ? <Backdrop uri={backdrop} /> : null}
+      {backdrop ? <Backdrop uri={backdrop} /> : null}
       {children}
-      {/* Behind the words and the tab bar, the picture frosts over gradually towards the bottom, as under an iOS bar. */}
-      {frost ? <ProgressiveBlur height={bottomInset + BLUR_REACH} shown={chrome} style={across} /> : null}
       {/* Soft shades so white words and icons stay readable over a bright picture: at the top under the bar, at the bottom under the name and the rail. */}
       <Reanimated.View style={[StyleSheet.absoluteFill, across, shadesStyle]}>
         <View style={[styles.topShade, { height: Math.max(TOP_SHADE_MIN, topInset + TOP_SHADE_EXTRA) }]} />
@@ -821,22 +885,31 @@ function MediaFrame({ place, whole, backdrop, width, height, topInset, bottomIns
 /** What a video slide needs to go on from the feed (`startAt`, then `onStarted`) and to tell the viewer how far it has got (`onClock`). */
 type VideoHandover = { index: number; startAt?: number; borrowed?: VideoPlayer; onStarted?: () => void; onClock?: (index: number, read: (() => number) | null) => void; onShown?: () => void; standIn?: string };
 
-/** A video's slide, full screen when it is vertical: its player (only near the page on screen, so at most a few exist at a time) or its poster. */
-function VideoSlide({ uri, poster, aspect, width, height, mounted, playing, muted, topInset, bottomInset, frost, ...handover }: { uri: string; poster: string; aspect: number | null; width: number; height: number; mounted: boolean; playing: boolean; muted: boolean; topInset: number; bottomInset: number; frost: boolean } & VideoHandover) {
+/**
+ * A video's slide, full screen when it is vertical: its player (only near the page on screen, so at most a few exist at a
+ * time) or its poster. A video uploaded without its size takes the shape of its poster (a frame of it) once that loads,
+ * so it is placed like any other instead of letterboxed in the middle on black.
+ */
+function VideoSlide({ uri, poster, aspect: recorded, width, height, mounted, playing, muted, topInset, bottomInset, ...handover }: { uri: string; poster: string; aspect: number | null; width: number; height: number; mounted: boolean; playing: boolean; muted: boolean; topInset: number; bottomInset: number } & VideoHandover) {
   const styles = useStyles();
-  const place = placeVideo(aspect, width, height);
+  const [measured, setMeasured] = useState<number | null>(null);
+  const aspect = recorded ?? measured;
+  const measure = recorded === null && measured === null ? (e: ImageLoadEventData) => (e.source.width > 0 && e.source.height > 0 ? setMeasured(e.source.width / e.source.height) : undefined) : undefined;
+  // In the full-screen viewer (which supplies the chrome's fade) a video that leaves the page room starts at its top.
+  const atTop = useContext(ViewerChromeContext) !== null;
+  const place = placeVideo(aspect, width, height, atTop);
   // Drawn whole; the page (or the carousel's slide) trims it to its place (see wholeVideo).
-  const whole = wholeVideo(aspect, width, height);
+  const whole = wholeVideo(aspect, width, height, atTop);
   // The video's very first frame as its still (the poster is a frame a second in): when the player takes over, the
   // picture does not jump back.
   const first = poster ? posterAt(poster, 0) : "";
   const pictures = useContext(PicturesContext);
   return (
-    <MediaFrame place={place} whole={whole} backdrop={poster || null} width={width} height={height} topInset={topInset} bottomInset={bottomInset} frost={frost}>
+    <MediaFrame whole={whole} backdrop={poster && !(aspect !== null && coversPage(place, width, height)) ? poster : null} width={width} height={height} topInset={topInset} bottomInset={bottomInset}>
       {mounted ? (
-        <PageVideo uri={uri} poster={poster} first={first} whole={whole} playing={playing} muted={muted} {...handover} />
+        <PageVideo uri={uri} poster={poster} first={first} whole={whole} playing={playing} muted={muted} onMeasure={measure} {...handover} />
       ) : first && pictures ? (
-        <Image source={{ uri: first }} placeholder={handover.standIn || poster ? { uri: handover.standIn || poster } : undefined} style={[styles.whole, frame(whole)]} contentFit={whole.fit} placeholderContentFit={whole.fit} transition={0} onDisplay={handover.onShown} />
+        <Image source={{ uri: first }} placeholder={handover.standIn || poster ? { uri: handover.standIn || poster } : undefined} style={[styles.whole, frame(whole)]} contentFit={whole.fit} placeholderContentFit={whole.fit} transition={0} onLoad={measure} onDisplay={handover.onShown} />
       ) : null}
     </MediaFrame>
   );
@@ -852,7 +925,7 @@ const HANDOVER_WAIT_MS = 1500;
  * then plays. Meanwhile the poster (already loaded by the feed) covers the wait, and the still from that very moment over
  * it as soon as it arrives, so it never flashes its first frame. `onShown`: the first picture it drew.
  */
-function PageVideo({ uri, poster, first, whole, playing, muted, index, startAt, borrowed, onStarted, onClock, onShown, standIn }: { uri: string; poster: string; first: string; whole: Placement; playing: boolean; muted: boolean } & VideoHandover) {
+function PageVideo({ uri, poster, first, whole, playing, muted, onMeasure, index, startAt, borrowed, onStarted, onClock, onShown, standIn }: { uri: string; poster: string; first: string; whole: Placement; playing: boolean; muted: boolean; onMeasure?: (e: ImageLoadEventData) => void } & VideoHandover) {
   const styles = useStyles();
   /** The feed's player, played on as it is, for this mount's whole life. */
   const [shared] = useState(borrowed ?? null);
@@ -918,7 +991,7 @@ function PageVideo({ uri, poster, first, whole, playing, muted, index, startAt, 
         }}
       />
       {(!hasFrame || !arrived) && poster ? (
-        <Image source={{ uri: poster }} placeholder={standIn ? { uri: standIn } : undefined} placeholderContentFit={whole.fit} style={StyleSheet.absoluteFill} contentFit={whole.fit} transition={0} onDisplay={onShown} />
+        <Image source={{ uri: poster }} placeholder={standIn ? { uri: standIn } : undefined} placeholderContentFit={whole.fit} style={StyleSheet.absoluteFill} contentFit={whole.fit} transition={0} onLoad={onMeasure} onDisplay={onShown} />
       ) : null}
       {/* Over the poster, the first frame itself (when it is not taking over part way through): what the player shows next. */}
       {!hasFrame && !still && first ? <Image source={{ uri: first }} style={StyleSheet.absoluteFill} contentFit={whole.fit} transition={0} /> : null}
@@ -963,41 +1036,32 @@ function goOnFrom(player: VideoPlayer, seconds: number, done: () => void): () =>
 }
 
 /**
- * A photo's slide, TikTok style (see photoLayout): whole and as wide as the screen at the top, under the top row, on the
- * page's own colour, which stays free below it for the words; or, too tall for that, full screen on black like a video.
- * Its tiny blurred preview shows at once; a photo uploaded without its size reports its shape once loaded (`onAspect`).
+ * A photo's slide (see photoLayout): whole and as wide as the screen from its top edge, under the status bar and the top
+ * row, over a blurred copy of itself that fills the rest of the screen. Its tiny blurred preview shows at once; a photo
+ * uploaded without its size reports its shape once loaded (`onAspect`), and its copy behind it shows from then on.
  */
-function PhotoSlide({ uri, blur, aspect, width, height, top, floor, topInset, bottomInset, frost, onAspect, onShown, standIn }: { uri: string; blur: string | null; aspect: number | null; width: number; height: number; top: number; floor: number; topInset: number; bottomInset: number; frost: boolean; onAspect: (aspect: number) => void; onShown?: () => void; standIn?: string }) {
-  const colors = useColors();
+function PhotoSlide({ uri, blur, aspect, width, height, topInset, bottomInset, onAspect, onShown, standIn }: { uri: string; blur: string | null; aspect: number | null; width: number; height: number; topInset: number; bottomInset: number; onAspect: (aspect: number) => void; onShown?: () => void; standIn?: string }) {
   const styles = useStyles();
-  const { place, surface } = photoLayout(aspect, width, height, top, floor);
+  const place = photoLayout(aspect, width, height);
   const pictures = useContext(PicturesContext);
-  const image = !pictures ? null : (
-    <Image
-      source={{ uri }}
-      // Its tiny blurred preview (inline, so it shows at once), else the page's stand-in when that is another picture.
-      placeholder={blur ? { uri: blur } : standIn && standIn !== uri ? { uri: standIn } : undefined}
-      placeholderContentFit="contain"
-      style={[styles.placed, frame(place)]}
-      contentFit="contain"
-      contentPosition="top"
-      // The photo the viewer opened on is the feed's, already loaded: it shows at once, with no fade in.
-      transition={onShown ? 0 : 200}
-      onLoad={aspect !== null ? undefined : (e) => (e.source.width > 0 && e.source.height > 0 ? onAspect(e.source.width / e.source.height) : undefined)}
-      onDisplay={onShown}
-    />
-  );
-  if (surface === "media") {
-    return (
-      <MediaFrame place={place} backdrop={null} width={width} height={height} topInset={topInset} bottomInset={bottomInset} frost={frost}>
-        {image}
-      </MediaFrame>
-    );
-  }
   return (
-    <View style={{ width, height, backgroundColor: colors.bg }} pointerEvents="none">
-      {image}
-    </View>
+    <MediaFrame backdrop={aspect !== null && !coversPage(place, width, height) ? uri : null} width={width} height={height} topInset={topInset} bottomInset={bottomInset}>
+      {pictures ? (
+        <Image
+          source={{ uri }}
+          // Its tiny blurred preview (inline, so it shows at once), else the page's stand-in when that is another picture.
+          placeholder={blur ? { uri: blur } : standIn && standIn !== uri ? { uri: standIn } : undefined}
+          placeholderContentFit="contain"
+          style={[styles.placed, frame(place)]}
+          contentFit="contain"
+          contentPosition="top"
+          // The photo the viewer opened on is the feed's, already loaded: it shows at once, with no fade in.
+          transition={onShown ? 0 : 200}
+          onLoad={aspect !== null ? undefined : (e) => (e.source.width > 0 && e.source.height > 0 ? onAspect(e.source.width / e.source.height) : undefined)}
+          onDisplay={onShown}
+        />
+      ) : null}
+    </MediaFrame>
   );
 }
 
@@ -1011,7 +1075,7 @@ const ADJUST = [{ name: "increment" }, { name: "decrement" }] as const;
  * beside that one. Each slide takes the page's taps (a lone tap pauses a video, a double tap likes); VoiceOver reads the
  * slide showing, and a swipe up or down on it moves to the next or the previous one.
  */
-function SlideStrip({ media, aspects, pos, settled, shown, width, height, photoTop: top, photoFloor: floor, topInset, bottomInset, near, playing, muted, onAspect, onTap, goTo, startAt, borrowed, startSlide, onStarted, onClock, onShown, standIn }: { media: FeedMedia[]; aspects: Record<number, number>; pos: SharedValue<number>; settled: number; shown: number; width: number; height: number; photoTop: number; photoFloor: number; topInset: number; bottomInset: number; near: boolean; playing: boolean; muted: boolean; onAspect: (index: number, aspect: number) => void; onTap: () => void; goTo: (index: number) => void; startAt?: number; borrowed?: VideoPlayer; startSlide: number; onStarted: () => void; onClock: (index: number, read: (() => number) | null) => void; onShown?: () => void; standIn?: string }) {
+function SlideStrip({ media, aspects, pos, settled, shown, width, height, topInset, bottomInset, near, playing, muted, onAspect, onTap, goTo, startAt, borrowed, startSlide, onStarted, onClock, onShown, standIn }: { media: FeedMedia[]; aspects: Record<number, number>; pos: SharedValue<number>; settled: number; shown: number; width: number; height: number; topInset: number; bottomInset: number; near: boolean; playing: boolean; muted: boolean; onAspect: (index: number, aspect: number) => void; onTap: () => void; goTo: (index: number) => void; startAt?: number; borrowed?: VideoPlayer; startSlide: number; onStarted: () => void; onClock: (index: number, read: (() => number) | null) => void; onShown?: () => void; standIn?: string }) {
   const styles = useStyles();
   const stripStyle = useAnimatedStyle(() => ({ transform: [{ translateX: pos.value }] }));
   return (
@@ -1032,9 +1096,9 @@ function SlideStrip({ media, aspects, pos, settled, shown, width, height, photoT
           >
             <SlideClip settled={i === settled}>
               {item.type === "photo" ? (
-                <PhotoSlide uri={item.url} blur={item.blur} aspect={aspectOf(item) ?? aspects[i] ?? null} width={width} height={height} top={top} floor={floor} topInset={topInset} bottomInset={bottomInset} frost={close} onAspect={(a) => onAspect(i, a)} onShown={i === startSlide ? onShown : undefined} standIn={i === 0 ? standIn : undefined} />
+                <PhotoSlide uri={item.url} blur={item.blur} aspect={aspectOf(item) ?? aspects[i] ?? null} width={width} height={height} topInset={topInset} bottomInset={bottomInset} onAspect={(a) => onAspect(i, a)} onShown={i === startSlide ? onShown : undefined} standIn={i === 0 ? standIn : undefined} />
               ) : (
-                <VideoSlide uri={item.playbackUrl} poster={item.poster ?? ""} aspect={aspectOf(item)} width={width} height={height} mounted={close} playing={playing && i === settled} muted={muted} topInset={topInset} bottomInset={bottomInset} frost={close} index={i} startAt={i === startSlide ? startAt : undefined} borrowed={i === startSlide ? borrowed : undefined} onStarted={onStarted} onClock={onClock} onShown={i === startSlide ? onShown : undefined} standIn={i === 0 ? standIn : undefined} />
+                <VideoSlide uri={item.playbackUrl} poster={item.poster ?? ""} aspect={aspectOf(item)} width={width} height={height} mounted={close} playing={playing && i === settled} muted={muted} topInset={topInset} bottomInset={bottomInset} index={i} startAt={i === startSlide ? startAt : undefined} borrowed={i === startSlide ? borrowed : undefined} onStarted={onStarted} onClock={onClock} onShown={i === startSlide ? onShown : undefined} standIn={i === 0 ? standIn : undefined} />
               )}
             </SlideClip>
           </Pressable>
@@ -1055,12 +1119,6 @@ function SlideClip({ settled, children }: { settled: boolean; children: ReactNod
   return <Reanimated.View style={[StyleSheet.absoluteFill, clipStyle]}>{children}</Reanimated.View>;
 }
 
-/** A colour at no opacity (#rrggbb in), for a gradient that fades into it. */
-function clearOf(hex: string): string {
-  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
-  return m ? `rgba(${parseInt(m[1]!, 16)},${parseInt(m[2]!, 16)},${parseInt(m[3]!, 16)},0)` : "transparent";
-}
-
 /**
  * Over a picture, the media colours (light text, dark scrims) in both themes; on a photo's page (the `…Page` styles),
  * the theme's own ink on the page's own colour.
@@ -1069,8 +1127,6 @@ const useStyles = makeStyles((colors) => {
   // Under the white name, caption and labels: darker than mediaScrim, so the text stays sharp on bright footage.
   // A tight halo: a wide, soft one fades to nothing around thin 12pt digits on a bright frame.
   const shadow = { textShadowColor: colors.mediaTextShadow, textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 } as const;
-  // On the page's own colour the ink needs nothing behind it.
-  const plain = { textShadowColor: "transparent", textShadowRadius: 0 } as const;
   return {
     center: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
     heartBox: { position: "absolute", alignItems: "center", justifyContent: "center" },
@@ -1082,35 +1138,27 @@ const useStyles = makeStyles((colors) => {
     shade: { position: "absolute", left: 0, right: 0, bottom: 0, height: SHADE_HEIGHT, experimental_backgroundImage: scrimGradient(colors.mediaScrim, bottomShare) },
     // Drawn from the darker text-shadow colour: the top carries smaller, dimmer words than the bottom does.
     topShade: { position: "absolute", left: 0, right: 0, top: 0, experimental_backgroundImage: scrimGradient(colors.mediaTextShadow, topShare, 14) },
-    // An opened description on a photo's page: the page's colour, fading in above it, behind the words.
-    underlay: { position: "absolute", left: 0, right: 0, bottom: 0 },
-    underlayFade: { height: UNDERLAY_FADE, experimental_backgroundImage: `linear-gradient(to bottom, ${clearOf(colors.bg)}, ${colors.bg})` },
-    underlaySolid: { flex: 1, backgroundColor: colors.bg },
-    // Behind a video that leaves part of the page empty: its poster's blur, dimmed so it reads as background and the
-    // words over it stay readable.
-    backdropDim: { backgroundColor: "rgba(0,0,0,0.45)" },
     // A carousel's slides side by side, moved as one.
     strip: { position: "absolute", top: 0, left: 0, flexDirection: "row" },
     // A photo's place on the page (see photoLayout): clipped, so a cover fit never spills past it.
     placed: { position: "absolute", overflow: "hidden" },
     // A video, drawn whole (see wholeVideo): the page or its slide trims it.
     whole: { position: "absolute" },
-    dots: { position: "absolute", left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 5 },
-    dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.onMediaMuted },
+    dots: { position: "absolute", left: 0, right: 0, alignItems: "center" },
+    dotsRow: { flexDirection: "row", gap: 5, padding: DOTS_PAD, borderRadius: 999, backgroundColor: colors.mediaScrim },
+    dot: { width: DOT_SIZE, height: DOT_SIZE, borderRadius: DOT_SIZE / 2, backgroundColor: colors.onMediaMuted },
     dotOn: { width: 18, backgroundColor: colors.onMedia },
-    // On a photo's page, the feed's own carousel dots: grey, the one showing in the violet accent.
-    dotPage: { backgroundColor: colors.faint },
-    dotOnPage: { width: 18, backgroundColor: colors.accent },
     // Instagram's geometry on an iPhone: the "…" centre 46pt above the tab bar, then save, share, comment and like every 73pt or so; the caption line level with "…".
     overlay: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "flex-end", paddingLeft: 14, paddingRight: 8, paddingBottom: OVERLAY_PAD, gap: 10 },
     info: { flex: 1, gap: 6, paddingBottom: 2 },
     author: { color: colors.onMedia, fontSize: 16, fontWeight: "700", flexShrink: 1, ...shadow },
+    // A buzz's alias: Buzz's own mark, then its name.
+    alias: { flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start", maxWidth: "100%" },
     title: { color: colors.onMedia, fontSize: 15, fontWeight: "700", ...shadow },
     caption: { color: colors.onMedia, fontSize: 14, lineHeight: 19, ...shadow },
     more: { color: colors.onMediaMuted, fontSize: 13, fontWeight: "700", ...shadow },
-    // Hashtags and mentions in an opened caption: bold white over a picture, the feed's blue on a photo's page.
+    // Hashtags and mentions in an opened caption: bold white over the picture.
     tag: { fontWeight: "700" },
-    tagPage: { color: colors.hashtag },
     rail: { width: 60, alignItems: "center", gap: 21 },
     railButton: { alignItems: "center", gap: 3, minWidth: 48 },
     // The unseen copy of the description that tells whether its one line was cut.
@@ -1119,10 +1167,5 @@ const useStyles = makeStyles((colors) => {
     // smudge or shading round them.
     railLabel: { color: colors.onMedia, fontSize: 12, fontWeight: "700", textShadowColor: colors.mediaTextShadow, textShadowOffset: { width: 0, height: 0.5 }, textShadowRadius: 1.5 },
     iconShadow: { textShadowColor: colors.mediaTextShadow, textShadowOffset: { width: 0, height: 0.5 }, textShadowRadius: 2 },
-    authorPage: { color: colors.text, ...plain },
-    titlePage: { color: colors.text, ...plain },
-    captionPage: { color: colors.text, ...plain },
-    morePage: { color: colors.muted, ...plain },
-    railLabelPage: { color: colors.text, ...plain },
   };
 });

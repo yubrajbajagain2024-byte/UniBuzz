@@ -3,16 +3,20 @@
 // suspended) lets a team do; "Verified Partner" only with recorded verification and "Sponsored" only with a paid
 // promotion running; listings, deals, inquiries and the no-cold-messages rules; business sessions kept off the student
 // side; and the portal's numbers. The same rules on a real Supabase project: supabase/tests/staging/business-portal.mjs.
+// Since migrations 49 and 50 (UniBuzz Business v2) these rules run on every migration, so they also check that v2 kept
+// them; v2's own rules are in business-teams.test.mjs and business-ads.test.mjs.
 import { boot, read, expectOk, expectError, done } from "./harness.mjs";
-const { db, mk, as, asAnon } = await boot();
 const MIGRATION = "migrations/20261101000000_business_portal.sql";
-// Supabase's auth.users has these; the harness's stand-in does not. With them, the migration adds its confirmation trigger.
-await db.exec("alter table auth.users add column if not exists email_confirmed_at timestamptz, add column if not exists created_at timestamptz not null default now()");
-await expectOk("the migration re-runs cleanly (and adds the confirmation trigger now that auth.users has the column)", async () => {
-  await db.exec(read(MIGRATION));
-  const t = await db.query("select 1 from pg_trigger where tgname = 'business_invite_claim_on_confirm'");
+// Re-run on a database that stops at this migration: re-running it over later ones would bring back the functions they
+// replaced (migration 49's team roles among them).
+await expectOk("the migration re-runs cleanly, with the confirmation trigger auth.users' email_confirmed_at allows", async () => {
+  const { db: first } = await boot({ upTo: "20261101000000_business_portal.sql" });
+  await first.exec(read(MIGRATION));
+  const t = await first.query("select 1 from pg_trigger where tgname = 'business_invite_claim_on_confirm'");
   if (t.rows.length !== 1) throw new Error("no confirmation trigger");
+  await first.close();
 });
+const { db, mk, as, asAnon } = await boot();
 const one = async (p) => (await p).rows[0];
 const rows = async (p) => (await p).rows;
 const signUp = async (email, meta) => (await db.query("insert into auth.users (email, raw_user_meta_data) values ($1, $2) returning id", [email, JSON.stringify(meta)])).rows[0].id;
@@ -184,7 +188,7 @@ await expectOk("confirming the address joins the team and uses the invite up", a
   await confirm(staff);
   const m = await member(staff);
   const inv = await one(db.query("select accepted_at, accepted_by from public.business_invites where token = $1", [token]));
-  if (!m || m.business_id !== business || m.role !== "staff" || m.invited_by !== owner || !inv.accepted_at || inv.accepted_by !== staff) throw new Error(JSON.stringify({ m, inv }));
+  if (!m || m.business_id !== business || m.role !== "editor" || m.invited_by !== owner || !inv.accepted_at || inv.accepted_by !== staff) throw new Error(JSON.stringify({ m, inv }));
 });
 await expectOk("an invite revoked or expired before the address is confirmed joins nobody", async () => {
   const late = await as(owner, () => one(db.query("select id, token from public.business_invite_create('late@riverrock.example')")));
@@ -386,6 +390,9 @@ await expectOk("approved again: chats, deals and listings come back; nothing is 
   if (b.status !== "approved" || b.verified_partner || msgs.length !== 3) throw new Error(JSON.stringify({ b, msgs: msgs.length }));
   await as(owner, () => db.query("update public.apartments set status = 'active' where id = $1", [apt]));
   await as(ben, () => db.query("insert into public.messages (conversation_id, sender_id, content) values ($1, $2, 'Back?')", [chat, ben]));
+  // Migration 56: the staffer changed the listing after its promotion was approved (above), so its ad waits for the
+  // UniBuzz team to look again; once they resume it, the label comes back.
+  await as(admin, () => db.query("select public.admin_resume_ad(a.id) from public.ads a where a.promoted_apartment_id = $1 and a.status = 'paused'", [apt]));
   if ((await sponsored(apt)) !== true) throw new Error("the paid promotion did not come back");
 });
 

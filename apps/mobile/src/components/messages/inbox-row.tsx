@@ -159,7 +159,7 @@ export function InboxPersonRow({ person: p, busy = false, disabled = false, onPr
   const styles = useStyles();
   const colors = useColors();
   return (
-    <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={p.full_name} accessibilityHint="Opens a chat with them" accessibilityState={{ disabled, busy }} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+    <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={p.full_name} accessibilityHint="Opens a chat with them" accessibilityState={{ disabled, busy }} style={({ pressed }) => [styles.row, styles.personRow, pressed && styles.pressed]}>
       <Avatar name={p.full_name} url={p.avatar_url} size={48} userId={p.id} />
       <View style={[styles.body, styles.personBody]}>
         <Text style={styles.name} numberOfLines={1}>
@@ -203,7 +203,9 @@ const useStyles = makeStyles((colors) => ({
   row: { flexDirection: "row", alignItems: "center", gap: 14, paddingLeft: GUTTER },
   pressed: { backgroundColor: colors.input },
   body: { flex: 1, minWidth: 0, gap: 3, paddingVertical: 14, paddingRight: GUTTER },
+  // A person: 8 points above and below the 48-point photo, so the photos down the list never touch.
   personBody: { paddingVertical: 10 },
+  personRow: { paddingVertical: 8 },
   topLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   // Shrinks first, so a long name ends in "…" while the mark, the bell and the time keep their place.
   // Semibold like the Messages app; an unread chat steps up to bold beside its badge.

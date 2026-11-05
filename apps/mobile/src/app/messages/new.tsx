@@ -87,9 +87,7 @@ export default function NewMessageScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.top}>
-        <InboxSearchField value={text} onChangeText={setText} placeholder="Search people" autoFocus accessibilityLabel="Search people" />
-      </View>
+      <InboxSearchField value={text} onChangeText={setText} placeholder="Search people" autoFocus accessibilityLabel="Search people" compact />
       <FlatList
         data={people}
         keyExtractor={(p) => p.id}
@@ -118,6 +116,5 @@ export default function NewMessageScreen() {
 
 const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
-  top: { paddingTop: space.sm },
   empty: { paddingTop: space.xl },
 }));

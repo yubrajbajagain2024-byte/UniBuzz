@@ -8,6 +8,7 @@
 // migrations applied in production's order (with the two in supabase/applied-outside-repo after 36) and the seed.
 // Accounts are made with admin-generated confirmation links, so no email is sent; everything made is deleted at the end.
 import { createClient } from "@supabase/supabase-js";
+import { enrolAuthenticator, passSecondFactor } from "./mfa.mjs";
 
 const PRODUCTION = "dskbzoqreandwwpxiplh";
 const REF = process.env.STAGING_SUPABASE_REF;
@@ -66,16 +67,19 @@ async function confirm(u) {
   const { error } = await c.auth.verifyOtp({ type: "signup", token_hash: u.hashed });
   if (error) throw new Error(error.message);
 }
+/** A signed-in client; an account with an authenticator passes the second factor too (aal2). */
 async function session(u) {
   const c = createClient(URL, ANON, opts);
   const { error } = await c.auth.signInWithPassword({ email: u.email, password: u.password });
   if (error) throw new Error(error.message);
+  if (u.totp) await passSecondFactor(c, u.totp);
   return c;
 }
 const rpc = (c, fn, args) => must(c.rpc(fn, args));
 
 try {
   const txstate = (await sql("select id from public.universities where email_domain = 'txstate.edu'"))[0].id;
+  const v2 = (await sql("select to_regclass('public.ads') is not null as ok"))[0].ok;
   console.log(`Staging project ${project.name} (${REF}), run ${run}`);
 
   // --- Accounts -----------------------------------------------------------------------------------------------------
@@ -84,6 +88,13 @@ try {
   const benU = await signUp(`ben.${run}@txstate.edu`, { full_name: "Ben Student" }); await confirm(benU);
   const catU = await signUp(`cat.${run}@txstate.edu`, { full_name: "Cat Student" }); await confirm(catU);
   await sql(`select public.grant_role('${annU.id}', 'admin')`);
+  // The admin is an admin of the staff with an authenticator, as the staff console asks and (from migration 58) the
+  // portal's admin tools too: CampConnect Admin's public.staff where it exists, Trust & Safety's staff_members otherwise.
+  await sql(`do $$ begin
+    if to_regclass('public.staff') is not null then insert into public.staff (user_id, role) values ('${annU.id}', 'admin') on conflict (user_id) do update set role = excluded.role;
+    else insert into public.staff_members (user_id, role) values ('${annU.id}', 'admin') on conflict (user_id) do update set role = excluded.role; end if;
+  end $$`);
+  annU.totp = await enrolAuthenticator(await session(annU), "Staging check");
   const ann = await session(annU), ben = await session(benU), cat = await session(catU);
   await check("students sign up as students; the admin is an admin", async () => {
     if ((await rpc(ben, "my_role")) !== "student" || (await rpc(ann, "my_role")) !== "admin") throw new Error("roles");
@@ -174,7 +185,8 @@ try {
     await confirm(staffU);
     const m = (await sql(`select business_id, role from public.business_members where user_id = '${staffU.id}'`))[0];
     const i = (await sql(`select accepted_at, accepted_by from public.business_invites where id = '${inv.id}'`))[0];
-    if (!m || m.business_id !== business.id || m.role !== "staff" || !i.accepted_at || i.accepted_by !== staffU.id) throw new Error(JSON.stringify({ m, i }));
+    // Business v2 (migration 49) names v1's staff "editor", with the same rights.
+    if (!m || m.business_id !== business.id || m.role !== (v2 ? "editor" : "staff") || !i.accepted_at || i.accepted_by !== staffU.id) throw new Error(JSON.stringify({ m, i }));
   });
   const strangerU = await signUp(`stranger.${run}@elsewhere-staging.example`, { account_type: "business", full_name: "Stray", business_invite: inv.token });
   await confirm(strangerU);
@@ -270,7 +282,11 @@ try {
   });
   for (const [who, c, u] of [["owner", owner, ownerU], ["staff", staff, staffU]]) {
     await check(`the ${who}'s existing session reads no chats, messages, listings, deals, team or students at once`, async () => {
-      for (const t of ["conversations", "conversation_members", "messages", "apartments", "deals", "listing_promotions"]) if ((await must(c.from(t).select("*").limit(5))).length) throw new Error(t);
+      // Another approved business's live deals are public by design (other runs, other tests on staging): only its own must go.
+      for (const t of ["conversations", "conversation_members", "messages", "apartments", "deals", "listing_promotions"]) {
+        const q = c.from(t).select("*").limit(5);
+        if ((await must(t === "deals" ? q.eq("business_id", business.id) : q)).length) throw new Error(t);
+      }
       if ((await must(c.from("profiles").select("id").eq("id", benU.id))).length) throw new Error("a student");
       const m = await rpc(c, "my_business");
       if (m.business.status !== "suspended") throw new Error("standing");
@@ -310,6 +326,9 @@ try {
     await rpc(ann, "admin_review_business", { p_business: business.id, p_decision: "approved" });
     if ((await must(staff.from("messages").select("id").eq("conversation_id", chat))).length !== 4) throw new Error("chats");
     await must(owner.from("apartments").update({ status: "active" }).eq("id", apt).select("id"));
+    // Business v2 (migration 56): the listing changed after its promotion was approved, so its ad waits for the UniBuzz
+    // team to look again; once they resume it, the label comes back.
+    if (v2) for (const { id } of await sql(`select id from public.ads where promoted_apartment_id = '${apt}' and status = 'paused'`)) await rpc(ann, "admin_resume_ad", { p_ad: id });
     if ((await label()).sponsored !== true) throw new Error("promotion");
     await must(ben.from("messages").insert({ conversation_id: chat, sender_id: benU.id, content: "Back?" }));
   });
@@ -318,6 +337,8 @@ try {
   // Everything this run made: the accounts (their profiles, businesses, listings, chats and the rest cascade) and the upload.
   await sql(`delete from storage.objects where bucket_id = 'uploads' and name like 'apartments/%/${run}.jpg'`).catch(() => {});
   for (const id of made) await admin.auth.admin.deleteUser(id).catch((e) => console.log(`  ! could not delete ${id}: ${e.message}`));
+  // The staff audit log kept the admin's actions and their removal from the staff (staff_log_delete): not this run's to leave behind.
+  if (made.length) await sql(`delete from public.staff_audit_log where actor_id in (${made.map((id) => `'${id}'`).join(",")}) or target_id in (${made.map((id) => `'${id}'`).join(",")})`).catch(() => {});
   const left = await sql(`select count(*)::int as n from public.profiles where id in (${made.map((id) => `'${id}'`).join(",") || "null"})`).catch(() => [{ n: "?" }]);
   console.log(`  cleaned up ${made.length} accounts (${left[0].n} left)`);
 }

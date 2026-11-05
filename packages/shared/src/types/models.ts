@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { PostAudience } from "../constants";
+import type { PostAudience, AUTO_HIDE_STATUSES, MEDIA_JOB_KINDS, MODERATION_TARGET_TYPES, REPORT_DECISIONS, AdminStaffRole } from "../constants";
 import type { Database, Json } from "./database";
 import type { MessageAttachment } from "../message-media";
 
@@ -16,6 +16,11 @@ export type Enums<T extends keyof Database["public"]["Enums"]> =
   Database["public"]["Enums"][T];
 
 export type University = Tables<"universities">;
+/** Migration 61: an organization that publishes events, and a feed the sync reads (staff and the server alone see feeds). */
+export type Organization = Tables<"organizations">;
+export type OrganizationMember = Tables<"organization_members">;
+export type EventRow = Tables<"events">;
+export type EventFeed = Tables<"event_feeds">;
 export type Profile = Tables<"profiles">;
 export type Apartment = Tables<"apartments">;
 export type RoommatePost = Tables<"roommate_posts">;
@@ -44,15 +49,52 @@ export type AdminPromotionRow = Database["public"]["Functions"]["admin_list_prom
 /** A listing or deal of a business that an admin can promote. */
 export type PromotionTarget = Database["public"]["Functions"]["admin_business_targets"]["Returns"][number];
 export type BusinessMemberWithProfile = BusinessMember & { profile: ProfileSummary | null };
+/** A place on a business's team (migration 49; v1's "staff" became "editor"). */
+export type BusinessTeamRole = "owner" | "admin" | "editor" | "analyst";
+/** What a role may do, as business_can() decides it in the database (the table in migration 49's header). */
+export type BusinessCapability = "view" | "analytics" | "publish" | "reply" | "manage_team" | "edit_profile" | "manage_ads";
 /** The signed-in person's business and their place on its team. */
-export type MyBusiness = { business: Business; role: "owner" | "staff" };
+export type MyBusiness = { business: Business; role: BusinessTeamRole };
 export type BusinessListingStats = Database["public"]["Functions"]["business_listing_stats"]["Returns"][number];
 export type BusinessDealStats = Database["public"]["Functions"]["business_deal_stats"]["Returns"][number];
 export type BusinessOverview = Database["public"]["Functions"]["business_overview"]["Returns"][number];
 export type AdminBusinessRow = Database["public"]["Functions"]["admin_list_businesses"]["Returns"][number];
 export type BusinessDecision = "approved" | "rejected" | "suspended" | "pending";
-/** What a student may open a chat with a business from. */
-export type InquiryTargetType = "apartment" | "deal";
+/** What a student may open a chat with a business from: a listing, a post, the business's profile or one of its ads (migration 50). */
+export type InquiryTargetType = "apartment" | "deal" | "business" | "ad";
+
+// --- UniBuzz Business v2 (migrations 49 and 50) ------------------------------------------------------------------
+/** A business post: the deals table, which holds every kind since migration 50. */
+export type BusinessPost = Deal;
+export type PostKind = "update" | "product" | "service" | "deal" | "event" | "promotion";
+/** One item of a post's or an ad's media: a photo, or a video with the provider's numbers. */
+export type BusinessMediaItem =
+  | { type: "image"; url: string; width?: number | null; height?: number | null }
+  | { type: "video"; media_id: string; playback_id?: string | null; poster_url?: string | null; width?: number | null; height?: number | null; duration_seconds?: number | null };
+export type Ad = Tables<"ads">;
+export type AdStatus = "draft" | "pending_review" | "scheduled" | "active" | "paused" | "completed" | "rejected";
+export type AdPlacement = "for_you" | "reels" | "housing";
+export type AdObjective = "awareness" | "traffic" | "engagement" | "messages";
+export type AdCta = "learn_more" | "shop_now" | "order_now" | "book_now" | "sign_up" | "get_offer" | "view_listing" | "message" | "visit_profile";
+/** What a listing or post an ad promotes brings to the ad's card (ads_for_feed's `promoted`). */
+export type PromotedSummary =
+  | { type: "apartment"; id: string; title: string; price: number; currency: string; city: string | null; bedrooms: number; bathrooms: number; images: string[]; image_meta: Json }
+  | { type: "deal"; id: string; title: string; kind: PostKind; discount_label: string | null; media: BusinessMediaItem[]; price_cents: number | null; currency: string; link_url: string | null; event_at: string | null };
+/** An ad as students get it (ads_for_feed): no budget, no targeting, the business's name and label. */
+export type FeedAd = Omit<Database["public"]["Functions"]["ads_for_feed"]["Returns"][number], "media" | "promoted"> & {
+  media: BusinessMediaItem[];
+  promoted: PromotedSummary | null;
+};
+export type AdminAdRow = Database["public"]["Functions"]["admin_list_ads"]["Returns"][number];
+export type BusinessAdStats = Database["public"]["Functions"]["business_ad_stats"]["Returns"][number];
+export type BusinessDailyStats = Database["public"]["Functions"]["business_daily_stats"]["Returns"][number];
+export type BusinessAnalyticsOverview = Database["public"]["Functions"]["business_analytics_overview"]["Returns"][number];
+export type BusinessAuditRow = Database["public"]["Functions"]["business_audit"]["Returns"][number];
+export type BusinessReportRow = Database["public"]["Functions"]["admin_list_business_reports"]["Returns"][number];
+export type SavedAd = Database["public"]["Functions"]["my_saved_ads"]["Returns"][number];
+export type BusinessReportReason = "spam" | "misleading" | "offensive" | "scam" | "discrimination" | "prohibited" | "other";
+export type BusinessEventKind = "impression" | "click" | "save" | "profile_visit" | "inquiry";
+export type BusinessEventPlacement = AdPlacement | "profile" | "deals" | "other";
 export type PostLike = Tables<"post_likes">;
 export type PostComment = Tables<"post_comments">;
 export type MediaStatus = "uploading" | "processing" | "ready" | "failed";
@@ -67,7 +109,8 @@ export type ListingVideo = {
   duration_seconds: number | null;
 };
 export type Notification = Tables<"notifications">;
-export type NotificationType = "message" | "listing_saved" | "nearby_listing" | "system" | "like" | "comment" | "follow" | "snap" | "snap_activity" | "call";
+/** `business` and `ad` (migrations 49 and 50) go to a business's team: reviews, roles and campaign changes; their links are portal paths. */
+export type NotificationType = "message" | "listing_saved" | "nearby_listing" | "system" | "like" | "comment" | "follow" | "snap" | "snap_activity" | "call" | "business" | "ad";
 export type NotificationWithActor = Notification & { actor: ProfileSummary | null };
 /** Something a person has muted: a person's messages anywhere, one chat, or every group chat; `until` null is until unmuted. */
 export type NotificationMute = Tables<"notification_mutes">;
@@ -213,9 +256,12 @@ export type ProfileTile = {
 /** What a shared post, reel or listing looks like inside a chat message: a snapshot taken when it was sent, so the card
  * renders without another query and still reads sensibly if the original is deleted. `path` is the website path, which the
  * app maps onto its own screens. */
-export type SharedPostKind = "post" | "reel" | "listing";
+/** A story card (migration 62) is "story" when shared and "story_reply" when it answers the story in its author's chat. */
+export type SharedPostKind = "post" | "reel" | "listing" | "story" | "story_reply";
+/** What a card in a chat can point to: a post, a listing, or a story (which has no page on the website). */
+export type SharedTargetType = PostTargetType | "story";
 export type SharedPost = {
-  target_type: PostTargetType;
+  target_type: SharedTargetType;
   target_id: string;
   kind: SharedPostKind;
   path: string;
@@ -292,8 +338,249 @@ export type Paginated<T> = {
 // ---------------------------------------------------------------------------
 // Two-factor sign-in for staff (Supabase Auth TOTP; the same shapes as CampConnect Admin's)
 // ---------------------------------------------------------------------------
+// CampConnect Admin (apps/admin): its staff (owner > admin > moderator), invitations and audit log
+
+/** The signed-in user's place on the team (from admin_me). lastOwner: the only owner, who cannot step back until there is another. */
+export type StaffAccess = { userId: string; role: AdminStaffRole; mfaVerified: boolean; mfaEnrolled: boolean; lastOwner: boolean };
+/** mfaEnrolled is null when the caller may not know: moderators see it on their own row only. */
+export type StaffMember = { userId: string; email: string | null; fullName: string; avatarUrl: string | null; role: AdminStaffRole; grantedBy: string | null; grantedByName: string | null; createdAt: string; mfaEnrolled: boolean | null };
+/** A role promised to an email address that has not confirmed an account yet. */
+export type StaffInvite = {
+  email: string;
+  role: AdminStaffRole;
+  invitedBy: string | null;
+  invitedByName: string | null;
+  createdAt: string;
+  /** Null for the first-owner bootstrap invitation, which does not expire. */
+  expiresAt: string | null;
+  expired: boolean;
+  /** Whether the invitation email went out: not_sent (never tried or this app cannot send), sent, failed. */
+  emailStatus: InviteEmailStatus;
+  emailSentAt: string | null;
+  emailAttempts: number;
+  emailError: string | null;
+  /** The email created the invitee's account (waiting for them to open the link). */
+  accountCreated: boolean;
+};
+export type InviteEmailStatus = "not_sent" | "sent" | "failed";
+export type AuditEntry = { id: number; actorId: string | null; actorEmail: string | null; actorName: string | null; action: string; targetType: string | null; targetId: string | null; details: Record<string, unknown>; createdAt: string };
 export type MfaFactorSummary = { id: string; friendlyName: string | null; status: "verified" | "unverified"; createdAt: string };
 /** enrolled = a verified authenticator exists; verified = this session passed it (aal2) and it still exists, the rule staff_mfa_verified() applies in SQL. */
 export type MfaStatus = { currentLevel: "aal1" | "aal2"; nextLevel: "aal1" | "aal2"; verified: boolean; enrolled: boolean; factors: MfaFactorSummary[] };
 /** What to show while the user adds the authenticator: QR code (SVG data URL), the secret to type by hand and the otpauth URI. */
 export type TotpEnrollment = { factorId: string; qrCode: string; secret: string; uri: string };
+
+// ---------------------------------------------------------------------------
+// Admin section: moderation (suspensions, hidden content, reports, media jobs)
+// ---------------------------------------------------------------------------
+/** The eight kinds of content staff can hide, restore and delete. The names reports.target_type uses, minus 'profile'. */
+export type ModerationTargetType = (typeof MODERATION_TARGET_TYPES)[number]["value"];
+/** What staff decided when they closed a report. */
+export type ReportDecision = (typeof REPORT_DECISIONS)[number]["value"];
+/** "actioned" is Trust & Safety's word (production's console and the auto-hide backstop) for a report staff acted on. */
+export type ReportStatus = "open" | "reviewed" | "actioned" | "dismissed";
+export type MediaJobKind = (typeof MEDIA_JOB_KINDS)[number]["value"];
+
+/** One suspension as the staff list shows it (admin_restrictions_list). `reason` is shown to the person; `internalNote` only to staff. */
+export type AccountRestriction = {
+  id: string;
+  userId: string;
+  fullName: string;
+  email: string | null;
+  kind: string;
+  reason: string;
+  internalNote: string | null;
+  /** Null: until lifted. */
+  expiresAt: string | null;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  liftedAt: string | null;
+  liftedByName: string | null;
+  liftNote: string | null;
+  /** Neither lifted nor expired. */
+  active: boolean;
+};
+/** The signed-in user's own active suspension (my_restriction), behind the "Your account is suspended" notice. */
+export type MyRestriction = { kind: string; reason: string; expiresAt: string | null; createdAt: string };
+/** One hit of the staff people search (admin_user_search). */
+export type UserSearchResult = {
+  userId: string;
+  fullName: string;
+  email: string | null;
+  avatarUrl: string | null;
+  universityName: string | null;
+  createdAt: string;
+  suspended: boolean;
+  staffRole: AdminStaffRole | null;
+};
+/** One entry of a person's suspension history (admin_user_get.restrictions). */
+export type UserRestriction = {
+  id: string;
+  kind: string;
+  reason: string;
+  internalNote: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  createdBy: string | null;
+  createdByName: string | null;
+  liftedAt: string | null;
+  liftedBy: string | null;
+  liftedByName: string | null;
+  liftNote: string | null;
+  active: boolean;
+};
+/** Everything on one person's admin page (admin_user_get). Reports against Buzz content are not counted: Buzz authorship only ever shows through getContentSnapshot. */
+export type UserDetail = {
+  userId: string;
+  fullName: string;
+  email: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  program: string | null;
+  university: string | null;
+  createdAt: string;
+  lastSeenAt: string | null;
+  staffRole: AdminStaffRole | null;
+  /** From auth.users: Supabase refuses sign-in while this is in the future. Set by every suspension, cleared when it is lifted. */
+  bannedUntil: string | null;
+  counts: { apartments: number; items: number; roommatePosts: number; posts: number; comments: number; reportsFiled: number; reportsAgainst: number };
+  activeRestriction: Omit<UserRestriction, "liftedAt" | "liftedBy" | "liftedByName" | "liftNote" | "active"> | null;
+  /** Newest first. */
+  restrictions: UserRestriction[];
+};
+/** One shape for every kind of content on the review screen (admin_content_get). For Buzz the author is revealed on purpose, and the look is logged. */
+export type ContentSnapshot = {
+  targetType: ModerationTargetType;
+  targetId: string;
+  authorId: string | null;
+  authorName: string | null;
+  authorEmail: string | null;
+  createdAt: string;
+  hiddenAt: string | null;
+  hiddenReason: string | null;
+  /** Listings and Buzz threads have one; posts, comments and messages do not. */
+  title: string | null;
+  body: string;
+  images: string[];
+  /** The row's `videos` jsonb as stored (ListingVideo-shaped for listings, posts and Buzz). */
+  videos: unknown[];
+  /** Type-specific fields: price, status, category, conversation_id, alias, score... */
+  extra: Record<string, unknown>;
+};
+/** One row of the report queue (admin_reports_list). targetAuthorId is null for Buzz targets: the list never reveals Buzz authors. */
+export type ReportRow = {
+  id: string;
+  reporterId: string;
+  reporterName: string | null;
+  reporterEmail: string | null;
+  targetType: ModerationTargetType | "profile";
+  targetId: string;
+  reason: string;
+  details: string | null;
+  status: ReportStatus;
+  decision: ReportDecision | null;
+  notes: string | null;
+  reviewedBy: string | null;
+  reviewerName: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  /** The title, or the first 140 characters of the content (the name, for a profile); empty once it is gone. */
+  targetPreview: string;
+  /** Hidden content, or a suspended profile. */
+  targetHidden: boolean;
+  targetExists: boolean;
+  targetAuthorId: string | null;
+};
+/** One job of the media clean-up queue (media_jobs). */
+export type MediaJob = {
+  id: number;
+  kind: MediaJobKind;
+  /** Storage path, folder prefix or Mux asset id, depending on the kind. */
+  ref: string;
+  targetType: string | null;
+  targetId: string | null;
+  attempts: number;
+  lastError: string | null;
+  nextAttemptAt: string;
+  /** When a worker last claimed it; a retry is refused while a claim is fresh and unreported. */
+  claimedAt: string | null;
+  createdAt: string;
+  doneAt: string | null;
+};
+/** failing: still pending after three or more attempts. */
+export type MediaJobStats = { pending: number; failing: number; done: number };
+
+// ---------------------------------------------------------------------------
+// Admin app: dashboard queries (migration 16)
+// ---------------------------------------------------------------------------
+/** Counts for the overview page (admin_overview_stats). */
+export type OverviewStats = {
+  usersTotal: number;
+  usersNew7d: number;
+  usersActive24h: number;
+  suspendedActive: number;
+  reportsOpen: number;
+  reportsClosed7d: number;
+  hiddenContent: number;
+  listingsTotal: number;
+  postsTotal: number;
+  buzzTotal: number;
+  mediaPending: number;
+  mediaFailing: number;
+  staffTotal: number;
+};
+/** One row when browsing people (admin_users_list), newest sign-up first. */
+export type AdminUserRow = {
+  userId: string;
+  fullName: string;
+  email: string | null;
+  avatarUrl: string | null;
+  universityName: string | null;
+  createdAt: string;
+  lastSeenAt: string | null;
+  suspended: boolean;
+  staffRole: AdminStaffRole | null;
+};
+export type AutoHideStatus = (typeof AUTO_HIDE_STATUSES)[number]["value"];
+/**
+ * Content hidden automatically by reports (admin_auto_hidden_list, migration 20261116000000_report_auto_hide.sql).
+ * source "report_threshold": 10 different eligible people reported it; "trust_safety": Trust & Safety's own Buzz threshold.
+ * Buzz rows never carry an author.
+ */
+export type AutoHiddenRow = {
+  id: string;
+  targetType: ModerationTargetType;
+  targetId: string;
+  source: "report_threshold" | "trust_safety";
+  reporterCount: number;
+  /** How many of those reporters gave each reason. */
+  reasons: Record<string, number>;
+  hiddenAt: string;
+  createdAt: string;
+  status: AutoHideStatus;
+  reviewedBy: string | null;
+  reviewerName: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  targetExists: boolean;
+  targetHidden: boolean;
+  title: string | null;
+  preview: string;
+  authorId: string | null;
+  authorName: string | null;
+};
+export type AutoHiddenCounts = Record<AutoHideStatus, number>;
+
+/** One hidden row (admin_hidden_content_list). Buzz rows carry no author and show the published time. */
+export type HiddenContentRow = {
+  targetType: ModerationTargetType;
+  targetId: string;
+  hiddenAt: string;
+  hiddenReason: string | null;
+  title: string | null;
+  preview: string;
+  authorId: string | null;
+  authorName: string | null;
+  createdAt: string;
+};

@@ -7,13 +7,18 @@ device builds and store releases.
 ## Layout
 
 ```
-src/app/(tabs)/   index (Home: Orbit, Buzz, Reels), discover, messages, housing (Explore), profile
+src/app/(tabs)/   index (Home: the story tray, then Orbit, Buzz, Reels), housing (Explore), messages,
+                  events (For you | All events), profile
+src/app/search.tsx  the search screen (people, topics, posts, what is popular): the magnifier beside the bell
 src/app/compose/  the create flow behind every "+": camera → edit → publish; listing, listing-form,
                   listing-preview for roommate posts and Marketplace items
 src/app/create/   per-kind entry points: post, reel, buzz, apartment, roommate, item
 src/app/…         buzz, messages, posts, reels, apartments, roommates, marketplace, profile, follows,
-                  call, snap, topics, settings, notifications, saved, find-people
-src/lib/          app-only helpers: calls.ts, home-scope.ts, supabase.ts, dev-overrides.ts, …
+                  call, snap, stories, topics, settings, notifications, saved, find-people, events
+                  (an event, saved, interests, new, edit), organizations (page, new, edit, members),
+                  (auth)/forgot-password, reset-password (a recovery link that opens the app; Change password)
+src/lib/          app-only helpers: calls.ts, home-scope.ts, stories-store.ts, event-saves-store.ts,
+                  organization-follows-store.ts, campus-time-zone.ts, supabase.ts, dev-overrides.ts, …
 e2e/              Maestro flows (flows/*.yaml, run.sh), seed and lifecycle scripts
 ```
 
@@ -31,6 +36,9 @@ npx eas-cli@latest update --channel preview --environment preview   # publish JS
   docs/branches/business-portal-prelaunch.md).
 - `eas update` publishes JavaScript only. A change to native configuration (`app.json` plugins,
   permissions, SDK) needs a new native build; `npx eas-cli@latest build:list` shows which exist.
+  The runtime version is the native fingerprint, so an update reaches only builds with the same
+  native code: before publishing, `npx eas-cli@latest fingerprint:compare --build-id <id>` against
+  the testers' build should say the fingerprints match.
 - Publishing an update reaches real testers, so it is a production write.
 
 ## Configuration
@@ -43,7 +51,11 @@ npx eas-cli@latest update --channel preview --environment preview   # publish JS
 
 Why each exists: [docs/decisions.md](../../docs/decisions.md).
 
-- `CALLS_PAUSED` (`src/lib/calls.ts`): calls are off unless `EXPO_PUBLIC_CALLS_ENABLED=1`.
+- `CALLS_PAUSED` (`src/lib/calls.ts`): calls are off and hidden (no call button, ring, banner or call
+  screen; past calls are history rows) unless `EXPO_PUBLIC_CALLS_ENABLED=1`. Check it in any new
+  call entry point, and never bundle that variable into a build without the owner's decision.
+  Since migration 66 went live (2026-11-05) the database refuses new calls too: turning calls on also takes its
+  rollback.
 - `SCOPE_TOGGLE_SHOWN = false` (`src/lib/home-scope.ts`): the Campus | Global toggle is hidden.
 - `HIDDEN_HOME_SECTIONS = ["posts"]` (`packages/shared/src/constants.ts`, read by the website's
   Home too): Posts has no Home tab.

@@ -131,6 +131,12 @@ export const PUSH_PLATFORMS = ["ios", "android", "web"] as const;
 /** Video */
 export const MAX_VIDEOS_PER_LISTING = 3;
 export const MAX_VIDEO_SIZE_BYTES = 2 * 1024 * 1024 * 1024;
+/** The longest video anyone uploads (10 minutes): the server refuses a longer one and deletes it at the provider (migration 55). */
+export const MAX_VIDEO_DURATION_SECONDS = 600;
+/** New videos a day per person, as the database counts them (migration 55). */
+export const MAX_VIDEO_UPLOADS_PER_DAY = 30;
+/** How old a signed webhook from the video provider may be, in seconds, before it is refused as a replay. */
+export const MUX_WEBHOOK_TOLERANCE_SECONDS = 300;
 export const MUX_STREAM_BASE = "https://stream.mux.com";
 export const MUX_IMAGE_BASE = "https://image.mux.com";
 
@@ -229,6 +235,52 @@ export const FOR_YOU_PAGE = { posts: 6, reels: 2 } as const;
  * page keeps its own address (/apartments, /roommates, /marketplace), so listing links, filters and saved searches are
  * unchanged.
  */
+/**
+ * The kinds of event the Events tab sorts by (events.category, migration 61), in the order the category pills show
+ * them. The sync guesses one from a calendar's own words (categoryFromText); members pick one when they publish.
+ */
+export const EVENT_CATEGORIES = [
+  { value: "academic", label: "Academic" },
+  { value: "career", label: "Career" },
+  { value: "social", label: "Social" },
+  { value: "sports", label: "Sports" },
+  { value: "music", label: "Music" },
+  { value: "arts", label: "Arts" },
+  { value: "tech", label: "Tech" },
+  { value: "wellness", label: "Wellness" },
+  { value: "cultural", label: "Cultural" },
+  { value: "service", label: "Service" },
+  { value: "faith", label: "Faith" },
+  { value: "other", label: "Other" },
+] as const;
+export type EventCategory = (typeof EVENT_CATEGORIES)[number]["value"];
+export const EVENT_CATEGORY_VALUES = EVENT_CATEGORIES.map((c) => c.value) as [EventCategory, ...EventCategory[]];
+/** Who may publish events: a student club, a student organization, or a university department (organizations.kind). */
+export const ORGANIZATION_KINDS = [
+  { value: "club", label: "Student club" },
+  { value: "organization", label: "Student organization" },
+  { value: "department", label: "University department" },
+] as const;
+export type OrganizationKind = (typeof ORGANIZATION_KINDS)[number]["value"];
+export const ORGANIZATION_KIND_VALUES = ORGANIZATION_KINDS.map((k) => k.value) as [OrganizationKind, ...OrganizationKind[]];
+/** The Events tab's two pages: the ranked page, then everything in time order. */
+export const EVENT_SECTIONS = [
+  { value: "foryou", label: "For you" },
+  { value: "all", label: "All events" },
+] as const;
+export type EventSection = (typeof EVENT_SECTIONS)[number]["value"];
+export const EVENT_TITLE_MAX = 160;
+export const EVENT_DESCRIPTION_MAX = 5000;
+export const EVENT_LOCATION_MAX = 200;
+export const ORGANIZATION_NAME_MAX = 80;
+export const ORGANIZATION_DESCRIPTION_MAX = 1000;
+/** Events per page of the All list; For you ranks this many upcoming events at once. */
+export const EVENTS_PAGE_SIZE = 40;
+export const FOR_YOU_EVENTS_POOL = 200;
+/** How far ahead a feed sync takes events, and how far back it still updates them (an event that ran yesterday may be marked cancelled today). */
+export const EVENT_SYNC_DAYS_AHEAD = 120;
+export const EVENT_SYNC_DAYS_BACK = 1;
+
 export const HOUSING_SECTIONS = [
   { value: "apartments", label: "Housing" },
   { value: "roommates", label: "Roommate" },
@@ -258,14 +310,16 @@ export const MUTE_DURATIONS = [
 
 /** The business portal (UniBuzz Business, at /business): businesses post listings and deals, and answer students' inquiries. */
 export const BUSINESS_PORTAL_NAME = "UniBuzz Business";
-export const BUSINESS_PORTAL_TAGLINE = "Reach students where they already look for housing, food and deals around campus.";
+export const BUSINESS_PORTAL_TAGLINE = "Reach verified university students with posts and ads they actually want to see.";
+/** Any legitimate business. 'food' is restaurants and cafés, 'housing' apartments and property ('startup' since migration 50). */
 export const BUSINESS_CATEGORIES = [
-  { value: "housing", label: "Housing & property" },
-  { value: "food", label: "Food & drink" },
+  { value: "food", label: "Restaurants & cafés" },
+  { value: "housing", label: "Apartments & housing" },
   { value: "retail", label: "Retail" },
-  { value: "services", label: "Services" },
+  { value: "startup", label: "Startup" },
+  { value: "services", label: "Service provider" },
   { value: "fitness", label: "Fitness & wellness" },
-  { value: "entertainment", label: "Entertainment" },
+  { value: "entertainment", label: "Entertainment & events" },
   { value: "education", label: "Education & tutoring" },
   { value: "other", label: "Other" },
 ] as const;
@@ -287,3 +341,169 @@ export const DEAL_STATUSES = [
 ] as const;
 export type DealStatusValue = (typeof DEAL_STATUSES)[number]["value"];
 export const DEAL_STATUS_VALUES = DEAL_STATUSES.map((s) => s.value) as [DealStatusValue, ...DealStatusValue[]];
+
+// --- UniBuzz Business v2 (migrations 49 and 50) ----------------------------------------------------------------------
+/** The team's roles and what each may do (the database's business_can() decides; this is what the portal says). */
+export const BUSINESS_TEAM_ROLES = [
+  { value: "owner", label: "Owner", description: "Everything, and the only one who makes admins." },
+  { value: "admin", label: "Admin", description: "The profile, the team, posts, ads and their budgets, the inbox and analytics." },
+  { value: "editor", label: "Editor", description: "Posts, listings, ad drafts and the inbox. Cannot submit ads or manage the team." },
+  { value: "analyst", label: "Analyst", description: "Analytics only. Never sees students' messages." },
+] as const;
+export type BusinessTeamRoleValue = (typeof BUSINESS_TEAM_ROLES)[number]["value"];
+export const BUSINESS_INVITE_ROLE_VALUES = ["admin", "editor", "analyst"] as const;
+export function teamRoleLabel(value: string | null | undefined): string {
+  return BUSINESS_TEAM_ROLES.find((r) => r.value === value)?.label ?? "Editor";
+}
+
+/** What a business post is. Every v1 deal is a "deal". */
+export const POST_KINDS = [
+  { value: "update", label: "Update" },
+  { value: "product", label: "Product" },
+  { value: "service", label: "Service" },
+  { value: "deal", label: "Deal" },
+  { value: "event", label: "Event" },
+  { value: "promotion", label: "Promotion" },
+] as const;
+export type PostKindValue = (typeof POST_KINDS)[number]["value"];
+export const POST_KIND_VALUES = POST_KINDS.map((k) => k.value) as [PostKindValue, ...PostKindValue[]];
+export function postKindLabel(value: string | null | undefined): string {
+  return POST_KINDS.find((k) => k.value === value)?.label ?? "Post";
+}
+/** Photos per post or ad, and the post rate limit the database enforces. */
+export const BUSINESS_MEDIA_MAX = 10;
+export const BUSINESS_POSTS_PER_DAY = 30;
+
+export const AD_OBJECTIVES = [
+  { value: "awareness", label: "Reach", description: "Be seen by as many students on your campuses as possible." },
+  { value: "traffic", label: "Website visits", description: "Send students to your site, menu or booking page." },
+  { value: "engagement", label: "Profile visits", description: "Bring students to your UniBuzz profile and posts." },
+  { value: "messages", label: "Messages", description: "Start conversations: students message you, you reply." },
+] as const;
+export type AdObjectiveValue = (typeof AD_OBJECTIVES)[number]["value"];
+export const AD_OBJECTIVE_VALUES = AD_OBJECTIVES.map((o) => o.value) as [AdObjectiveValue, ...AdObjectiveValue[]];
+
+/** Where an ad runs: For You and Reels for every ad but housing, Housing for housing ads only (the database enforces it). */
+export const AD_PLACEMENTS = [
+  { value: "for_you", label: "For You", description: "Between posts in the Home feed." },
+  { value: "reels", label: "Reels", description: "Full screen between reels. Needs one vertical video." },
+  { value: "housing", label: "Housing", description: "Between listings in Explore › Housing. Housing ads only." },
+] as const;
+export type AdPlacementValue = (typeof AD_PLACEMENTS)[number]["value"];
+
+/** The button under an ad. The link ones need an address; "View listing" and "Get offer" can open what the ad promotes. */
+export const AD_CTAS = [
+  { value: "learn_more", label: "Learn more", needsUrl: true },
+  { value: "shop_now", label: "Shop now", needsUrl: true },
+  { value: "order_now", label: "Order now", needsUrl: true },
+  { value: "book_now", label: "Book now", needsUrl: true },
+  { value: "sign_up", label: "Sign up", needsUrl: true },
+  { value: "get_offer", label: "Get offer", needsUrl: false },
+  { value: "view_listing", label: "View listing", needsUrl: false },
+  { value: "message", label: "Send message", needsUrl: false },
+  { value: "visit_profile", label: "Visit profile", needsUrl: false },
+] as const;
+export type AdCtaValue = (typeof AD_CTAS)[number]["value"];
+export const AD_CTA_VALUES = AD_CTAS.map((c) => c.value) as [AdCtaValue, ...AdCtaValue[]];
+export function adCtaLabel(value: string | null | undefined): string {
+  return AD_CTAS.find((c) => c.value === value)?.label ?? "Learn more";
+}
+
+export const AD_STATUSES = [
+  { value: "draft", label: "Draft" },
+  { value: "pending_review", label: "In review" },
+  { value: "scheduled", label: "Scheduled" },
+  { value: "active", label: "Active" },
+  { value: "paused", label: "Paused" },
+  { value: "completed", label: "Completed" },
+  { value: "rejected", label: "Rejected" },
+] as const;
+export type AdStatusValue = (typeof AD_STATUSES)[number]["value"];
+export function adStatusLabel(value: string | null | undefined): string {
+  return AD_STATUSES.find((st) => st.value === value)?.label ?? "Draft";
+}
+
+/** The limits the database checks when an ad is submitted (ad_problems()), so the Ads Manager can say them first. */
+export const AD_MIN_BUDGET_CENTS = 1000;
+export const AD_MAX_DAYS = 90;
+export const AD_REELS_MAX_SECONDS = 60;
+export const AD_VIDEO_MAX_SECONDS = 120;
+export const AD_CAPTION_MAX = 2200;
+export const AD_HEADLINE_MAX = 80;
+/** One ad at most for every this many organic posts, reels or listings: "about one per 8 to 10". */
+export const ADS_EVERY = 9;
+/**
+ * The organic row a feed's first ad follows; ADS_EVERY rows apart after it. Each feed's first page has 8 to 12 rows
+ * (FOR_YOU_PAGE, REELS_PAGE_SIZE, DEFAULT_PAGE_SIZE), so a first ad only after the 9th row meant no ad on any first
+ * page, and none at all on a campus with fewer than 9 posts.
+ */
+export const ADS_FIRST_AFTER = 3;
+
+export const BUSINESS_REPORT_REASONS = [
+  { value: "misleading", label: "Misleading or false" },
+  { value: "scam", label: "Scam or fraud" },
+  { value: "discrimination", label: "Discriminatory (for example housing)" },
+  { value: "offensive", label: "Offensive" },
+  { value: "prohibited", label: "Prohibited product or service" },
+  { value: "spam", label: "Spam" },
+  { value: "other", label: "Something else" },
+] as const;
+/**
+ * Staff roles for CampConnect Admin (apps/admin: owner > admin > moderator). The database enforces them; these drive its
+ * UI. The website's staff console has its own two (trust-safety's StaffRole: moderator, admin; owners count as admins).
+ */
+export const STAFF_ROLES = [
+  { value: "owner", label: "Owner", description: "Everything, including adding and removing owners and admins." },
+  { value: "admin", label: "Admin", description: "Runs the admin section day to day and manages moderators." },
+  { value: "moderator", label: "Moderator", description: "Reviews reports and content. Cannot change the team." },
+] as const;
+export type AdminStaffRole = (typeof STAFF_ROLES)[number]["value"];
+export const STAFF_ROLE_VALUES = STAFF_ROLES.map((r) => r.value) as [AdminStaffRole, ...AdminStaffRole[]];
+export const STAFF_ROLE_RANK: Record<AdminStaffRole, number> = { owner: 3, admin: 2, moderator: 1 };
+
+/** The eight kinds of content staff can hide, restore and delete: the names reports.target_type uses ('profile' is handled by suspension instead). */
+export const MODERATION_TARGET_TYPES = [
+  { value: "apartment", label: "Apartment listing" },
+  { value: "item", label: "Marketplace item" },
+  { value: "roommate", label: "Roommate post" },
+  { value: "post", label: "Post or reel" },
+  { value: "comment", label: "Comment" },
+  { value: "message", label: "Message" },
+  { value: "buzz", label: "Buzz thread" },
+  { value: "buzz_comment", label: "Buzz reply" },
+] as const;
+export const MODERATION_TARGET_TYPE_VALUES = MODERATION_TARGET_TYPES.map((t) => t.value) as [(typeof MODERATION_TARGET_TYPES)[number]["value"], ...(typeof MODERATION_TARGET_TYPES)[number]["value"][]];
+
+/** What staff record when they close a report (reports.decision). "Dismissed" sets the report's status to dismissed; every other decision sets it to reviewed. */
+export const REPORT_DECISIONS = [
+  { value: "dismissed", label: "Dismissed" },
+  { value: "content_hidden", label: "Content hidden" },
+  { value: "content_deleted", label: "Content deleted" },
+  { value: "user_suspended", label: "User suspended" },
+  { value: "warning", label: "Warning given" },
+  { value: "no_action", label: "No action needed" },
+] as const;
+export const REPORT_DECISION_VALUES = REPORT_DECISIONS.map((d) => d.value) as [(typeof REPORT_DECISIONS)[number]["value"], ...(typeof REPORT_DECISIONS)[number]["value"][]];
+
+/** Different eligible people whose reports hide content automatically (report_auto_hide_threshold() in SQL). */
+export const AUTO_HIDE_THRESHOLD = 10;
+
+/** Where an automatically hidden item stands (report_auto_hides.status). */
+export const AUTO_HIDE_STATUSES = [
+  { value: "pending", label: "Waiting for review" },
+  { value: "upheld", label: "Kept hidden" },
+  { value: "restored", label: "Restored" },
+  { value: "deleted", label: "Deleted" },
+] as const;
+
+/** The media clean-up queue (media_jobs.kind): work on storage and Mux that SQL cannot do itself, performed by the app-side worker with the service role. */
+export const MEDIA_JOB_KINDS = [
+  { value: "quarantine", label: "Move a hidden photo out of the public bucket" },
+  { value: "release", label: "Move a restored photo back to the public bucket" },
+  { value: "delete_object", label: "Remove a deleted photo from storage" },
+  { value: "delete_prefix", label: "Remove everything a deleted account uploaded to one folder" },
+  { value: "mux_disable", label: "Turn off playback of a hidden video" },
+  { value: "mux_enable", label: "Turn playback of a restored video back on" },
+  { value: "mux_delete", label: "Delete a removed video from Mux" },
+] as const;
+export const MEDIA_JOB_KIND_VALUES = MEDIA_JOB_KINDS.map((k) => k.value) as [(typeof MEDIA_JOB_KINDS)[number]["value"], ...(typeof MEDIA_JOB_KINDS)[number]["value"][]];

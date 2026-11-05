@@ -1,7 +1,9 @@
 import { useMemo, useRef, useState } from "react";
 import { RefreshControl, Text, View, type FlatList, type NativeScrollEvent, type NativeSyntheticEvent, type ListViewToken } from "react-native";
-import { KM_PER_MILE, listApartments, videosFor, type ApartmentWithOwner } from "@apartment-book/shared";
-import type { RoomFilters } from "@/components/housing/filter-sheet";
+import { ADS_EVERY, interleaveAds, KM_PER_MILE, listApartments, videosFor, type ApartmentWithOwner } from "@apartment-book/shared";
+import { SponsoredCard } from "@/components/ads/sponsored-card";
+import { feedAdSpacing, isAdRow, useAdImpressions, useFeedAds, type AdRow } from "@/lib/use-feed-ads";
+import type { RoomFilterChoice } from "@apartment-book/shared";
 import { HousingCard } from "@/components/housing/housing-card";
 import { FEED_HEADER_PADDING } from "@/components/post-card";
 import { EmptyState, ErrorBanner, Loading, useAppearingCells } from "@/components/ui";
@@ -25,7 +27,7 @@ function CardGap() {
  * reporting its scroll through `onScroll`. The search (`q`) and the campus come from the Housing screen's own bar, which
  * also owns the "+" button.
  */
-export function ApartmentsSection({ topInset, onScroll, q, campus, filters, filtered, active = true }: { topInset: number; onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void; q: string; campus: "mine" | "all"; filters: RoomFilters; filtered: boolean; active?: boolean }) {
+export function ApartmentsSection({ topInset, onScroll, q, campus, filters, filtered, active = true }: { topInset: number; onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void; q: string; campus: "mine" | "all"; filters: RoomFilterChoice; filtered: boolean; active?: boolean }) {
   const colors = useColors();
   const { user, profile } = useSession();
   const universityId = campus === "all" ? undefined : (profile?.university_id ?? undefined);
@@ -38,7 +40,14 @@ export function ApartmentsSection({ topInset, onScroll, q, campus, filters, filt
   const { savedIds, engagement } = useEngagement("apartment", feed.items, user?.id ?? null);
   const inset = useMemo(() => listInset(topInset), [topInset]);
   // Tapping Explore again while Housing is on screen: back to the top.
-  const listRef = useRef<FlatList<ApartmentWithOwner>>(null);
+  const listRef = useRef<FlatList<ApartmentWithOwner | AdRow>>(null);
+  // Housing ads (only housing ads run here) between the listings: the first after ADS_FIRST_AFTER, then at most one per
+  // ADS_EVERY.
+  const ended = !feed.loading && !feed.hasMore;
+  const ads = useFeedAds("housing", feed.items.length, Boolean(user), ended, feed.round);
+  const rows = useMemo<(ApartmentWithOwner | AdRow)[]>(() => interleaveAds(feed.items, ads, ADS_EVERY, feedAdSpacing(ended)).map((r) => (r.kind === "ad" ? { id: `ad-${r.ad.id}`, ad: r.ad } : r.item)), [feed.items, ads, ended]);
+  const countAds = useAdImpressions("housing");
+  const countAdsRef = useRef(countAds);
   // Rows fade in once as they first arrive (not when scrolled back into view).
   const appearCells = useAppearingCells();
   useTabReselect(() => listRef.current?.scrollToOffset({ offset: inset.topOffset, animated: true }), active);
@@ -46,8 +55,9 @@ export function ApartmentsSection({ topInset, onScroll, q, campus, filters, filt
   // half of Explore is the one shown: sound is one switch for every video, so two playing at once would both be heard.
   const [playingId, setPlayingId] = useState<string | null>(null);
   const onViewable = useRef(({ viewableItems }: { viewableItems: ListViewToken[] }) => {
-    const first = viewableItems.find((v) => v.isViewable && videosFor((v.item as ApartmentWithOwner).videos).length > 0);
+    const first = viewableItems.find((v) => v.isViewable && !isAdRow(v.item) && videosFor((v.item as ApartmentWithOwner).videos).length > 0);
     setPlayingId(first ? String(first.key) : null);
+    countAdsRef.current(viewableItems);
   }).current;
   const viewability = useRef({ itemVisiblePercentThreshold: 60 }).current;
   const tabBar = useTabBarInset();
@@ -56,14 +66,14 @@ export function ApartmentsSection({ topInset, onScroll, q, campus, filters, filt
     <View style={{ flex: 1 }}>
       <AnimatedFlatList
         ref={listRef}
-        data={feed.items}
+        data={rows}
         keyExtractor={(a) => a.id}
         {...inset.list}
         onScroll={onScroll}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: 90 + tabBar, paddingTop: inset.paddingTop }}
         CellRendererComponent={appearCells}
-        renderItem={({ item: a }) => <HousingCard apartment={a} saved={savedIds.has(a.id)} engagement={engagement[a.id]} playing={active && playingId === a.id} />}
+        renderItem={({ item: a }) => (isAdRow(a) ? <SponsoredCard ad={a.ad} placement="housing" /> : <HousingCard apartment={a} saved={savedIds.has(a.id)} engagement={engagement[a.id]} playing={active && playingId === a.id} />)}
         ItemSeparatorComponent={CardGap}
         onViewableItemsChanged={onViewable}
         viewabilityConfig={viewability}

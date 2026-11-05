@@ -40,6 +40,8 @@ export function safeNextPath(next: string | null | undefined, fallback = "/"): s
     return fallback;
   }
   if (url.origin !== "http://local") return fallback;
+  // The resolved path must not start with "//" either: a browser reads that as another site too.
+  if (url.pathname.startsWith("//")) return fallback;
   return url.pathname + url.search + url.hash;
 }
 
@@ -53,4 +55,12 @@ export function numberParam(value: string | string[] | undefined): number | unde
   if (raw === undefined || raw === "") return undefined;
   const n = Number(raw);
   return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * The time a server-rendered page is built for, read once per request. A page runs once per request, so this is as
+ * pure as it needs to be; it is a function because the purity rule flags Date.now() written inside a component.
+ */
+export function requestNow(): number {
+  return Date.now();
 }

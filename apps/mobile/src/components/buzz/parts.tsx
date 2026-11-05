@@ -3,8 +3,11 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Reanimated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import {
+  BUZZ_CATEGORY_COPY,
   BUZZ_FEED_COPY,
+  BUZZ_PROMPT_COPY,
   BUZZ_STATUS_CHIPS,
+  buzzCategory,
   buzzPlaceholder,
   buzzPollCaption,
   buzzReplyCountLabel,
@@ -31,7 +34,7 @@ type Item = Buzz | BuzzReply;
 
 /* ───────────────────────────── alias ───────────────────────────── */
 
-const AVATAR = { sm: 28, md: 36 } as const;
+const AVATAR = { xs: 24, sm: 28, md: 36 } as const;
 
 /**
  * An alias's mark: its emoji in a dashed ring of its colour over a 16% tint of it. Never an image and never pressable,
@@ -52,10 +55,13 @@ export const AliasAvatar = memo(function AliasAvatar({ alias, size = "sm" }: { a
   );
 });
 
-/** "You · Anon Key", OP, "· Sep 28", then the row's trailing pieces (a campus badge, the status chip, the "…"). */
-export function AliasLine({ alias, isMine, isOp, createdAt, trailing, size = "sm" }: { alias: BuzzAlias; isMine: boolean; isOp?: boolean; createdAt: number; trailing?: ReactNode; size?: "sm" | "md" }) {
+/**
+ * "You · Anon Key", OP, "· Sep 28", a lime dot when it is `fresh` (new since you last opened the thread), then the
+ * row's trailing pieces (a campus badge, the status chip, the "…").
+ */
+export function AliasLine({ alias, isMine, isOp, createdAt, trailing, size = "sm", fresh }: { alias: BuzzAlias; isMine: boolean; isOp?: boolean; createdAt: number; trailing?: ReactNode; size?: keyof typeof AVATAR; fresh?: boolean }) {
   const when = buzzTime(createdAt);
-  const label = `${isMine ? "You, " : ""}${alias.label}${isOp ? ", original poster" : ""}, ${when}`;
+  const label = `${isMine ? "You, " : ""}${alias.label}${isOp ? ", original poster" : ""}, ${when}${fresh ? ", new" : ""}`;
   return (
     <View style={styles.aliasRow}>
       <AliasAvatar alias={alias} size={size} />
@@ -70,8 +76,94 @@ export function AliasLine({ alias, isMine, isOp, createdAt, trailing, size = "sm
         <Text style={[T.caption, { color: P.ink3 }]} numberOfLines={1}>
           {when}
         </Text>
+        {fresh ? <View style={styles.fresh} /> : null}
       </View>
       {trailing}
+    </View>
+  );
+}
+
+/**
+ * The header of a day's prompt thread, which no one wrote: "✦ Daily prompt · Oct 27", then the row's trailing pieces.
+ * Where an alias line would be, so the prompt reads as the prompt, not as one more anon.
+ */
+export function PromptLine({ createdAt, trailing, size = "sm" }: { createdAt: number; trailing?: ReactNode; size?: "sm" | "md" }) {
+  const when = buzzTime(createdAt);
+  const px = AVATAR[size];
+  return (
+    <View style={styles.aliasRow}>
+      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.promptMark, { width: px, height: px, borderRadius: px / 2 }]}>
+        <Icon name="sparkles" size={Math.round(px * 0.5)} color={P.accentInk} />
+      </View>
+      <View style={styles.aliasText} accessible accessibilityLabel={`${BUZZ_PROMPT_COPY.label}, ${when}`}>
+        <Text style={[T.labelSm, { color: P.accentInk }, size === "md" && styles.aliasMd]} numberOfLines={1}>
+          {BUZZ_PROMPT_COPY.label}
+        </Text>
+        <Text style={{ color: P.ink4 }}>·</Text>
+        <Text style={[T.caption, { color: P.ink3 }]} numberOfLines={1}>
+          {when}
+        </Text>
+      </View>
+      {trailing}
+    </View>
+  );
+}
+
+/** On an answer posted as its own buzz: "✦ Daily prompt · See all answers", opening that day's prompt thread once it has one. */
+export function PromptChip({ threadId, onOpen }: { threadId: string | null | undefined; onOpen: (threadId: string) => void }) {
+  const content = (
+    <>
+      <Icon name="sparkles" size={13} color={P.accentInk} />
+      <Text style={[T.labelSm, { color: P.accentInk }]}>{BUZZ_PROMPT_COPY.label}</Text>
+      {threadId ? (
+        <>
+          <Text style={{ color: P.ink4 }}>·</Text>
+          <Text style={[T.labelSm, { color: P.ink2 }]}>{BUZZ_PROMPT_COPY.seeAll}</Text>
+          <Icon name="chevron-forward" size={13} color={P.ink3} />
+        </>
+      ) : null}
+    </>
+  );
+  if (!threadId) {
+    return (
+      <View style={styles.promptChip} accessible accessibilityLabel={`An answer to the ${BUZZ_PROMPT_COPY.label.toLowerCase()}`}>
+        {content}
+      </View>
+    );
+  }
+  return (
+    <Pressable onPress={() => onOpen(threadId)} hitSlop={6} accessibilityRole="link" accessibilityLabel={`${BUZZ_PROMPT_COPY.label}: ${BUZZ_PROMPT_COPY.seeAll}`} style={({ pressed }) => [styles.promptChip, pressed && { opacity: 0.75 }]}>
+      {content}
+    </Pressable>
+  );
+}
+
+/** "📚 Classes": the category its author picked. Not pressable yet: there is no page per category. */
+export function CategoryTag({ category }: { category: NonNullable<ReturnType<typeof buzzCategory>> }) {
+  return (
+    <View style={styles.categoryTag} accessible accessibilityLabel={`${BUZZ_CATEGORY_COPY.label}: ${category.label}`}>
+      <Text style={styles.categoryEmoji} allowFontScaling={false}>
+        {category.emoji}
+      </Text>
+      <Text style={[T.labelSm, { color: P.ink2 }]} numberOfLines={1}>
+        {category.label}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * The row under a buzz's alias line: its category, and on an answer posted as its own buzz the "Daily prompt" chip.
+ * Nothing when it has neither (a buzz from before categories, or one posted without).
+ */
+export function BuzzTags({ buzz, onOpenPrompt }: { buzz: Buzz; onOpenPrompt: (threadId: string) => void }) {
+  const category = buzzCategory(buzz.category);
+  const prompt = buzz.promptId !== null && !buzz.isPromptThread;
+  if (!category && !prompt) return null;
+  return (
+    <View style={styles.tags}>
+      {category ? <CategoryTag category={category} /> : null}
+      {prompt ? <PromptChip threadId={buzz.promptThreadId} onOpen={onOpenPrompt} /> : null}
     </View>
   );
 }
@@ -155,19 +247,19 @@ export function CollapsedFold({ id, reason, children }: { id: string; reason: "c
  * the lit arrow again to take the vote back. Your own items and items under review are not voted on: the arrows dim.
  * Up is lime, down coral.
  */
-export function VoteCluster({ item, size = "sm" }: { item: Item; size?: "sm" | "md" }) {
+export function VoteCluster({ item, size = "sm", plain = false }: { item: Item; size?: "sm" | "md"; plain?: boolean }) {
   const up = item.myVote === 1;
   const down = item.myVote === -1;
   const disabled = item.isMine || item.status !== "active";
   const upBounce = useBounceOn(up);
   const downBounce = useBounceOn(down);
-  const height = size === "sm" ? 36 : 44;
+  const height = plain ? 32 : size === "sm" ? 36 : 44;
   const upColor = up ? P.accentInk : P.ink3;
   const downColor = down ? P.down : P.ink3;
   // Screen readers hear what is voted on: "Upvote" on a buzz, "Upvote reply" on a reply.
   const noun = item.kind === "reply" ? " reply" : "";
   return (
-    <View style={[styles.votes, { height }]} accessibilityRole="toolbar" accessibilityLabel="Votes">
+    <View style={[styles.votes, plain && styles.votesPlain, { height }]} accessibilityRole="toolbar" accessibilityLabel="Votes">
       <Pressable
         onPress={() => voteOnBuzz(item.id, 1)}
         disabled={disabled}
@@ -287,12 +379,13 @@ export function StatusChip({ status }: { status: BuzzItemStatus }) {
   return <Badge label={label} tone={STATUS_TONE[status] ?? "neutral"} />;
 }
 
-/** "5 replies" in the card's footer: opens the thread. */
-export function ReplyCountButton({ count, onPress }: { count: number; onPress: () => void }) {
+/** "5 replies" in the card's footer ("5 answers" under a prompt): opens the thread. */
+export function ReplyCountButton({ count, onPress, answers = false }: { count: number; onPress: () => void; answers?: boolean }) {
+  const noun = answers ? (count === 1 ? "answer" : "answers") : buzzReplyCountLabel(count);
   return (
-    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="button" accessibilityLabel={`${count} ${buzzReplyCountLabel(count)}`} accessibilityHint="Opens the thread" style={({ pressed }) => [styles.replies, pressed && { backgroundColor: P.surface2 }]}>
+    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="button" accessibilityLabel={`${count} ${noun}`} accessibilityHint="Opens the thread" style={({ pressed }) => [styles.replies, pressed && { backgroundColor: P.surface2 }]}>
       <Text style={[T.labelSm, { color: P.ink2 }]}>{compactCount(count)}</Text>
-      <Text style={[T.footnote, { color: P.ink3 }]}>{buzzReplyCountLabel(count)}</Text>
+      <Text style={[T.footnote, { color: P.ink3 }]}>{noun}</Text>
     </Pressable>
   );
 }
@@ -314,12 +407,20 @@ const styles = StyleSheet.create({
   aliasRow: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
   aliasText: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6 },
   aliasMd: { fontSize: 15 },
+  fresh: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: P.accent },
+  promptMark: { alignItems: "center", justifyContent: "center", backgroundColor: P.accentSoft, borderWidth: 1, borderColor: P.accentLine },
+  promptChip: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, minHeight: 28, paddingHorizontal: 10, borderRadius: R.pill, backgroundColor: P.accentSoft },
+  tags: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
+  categoryTag: { flexDirection: "row", alignItems: "center", gap: 5, minHeight: 28, paddingHorizontal: 10, borderRadius: R.pill, backgroundColor: P.surface3 },
+  categoryEmoji: { fontSize: 13, lineHeight: 17 },
   placeholder: { color: P.ink4, fontStyle: "italic" },
   measure: { position: "absolute", top: 0, left: 0, right: 0, opacity: 0 },
   more: { alignSelf: "flex-start", marginTop: 4, paddingVertical: 2 },
   content: { gap: 6 },
   fold: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, borderRadius: R.md, borderCurve: "continuous", backgroundColor: P.surface2 },
   votes: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", borderRadius: R.pill, backgroundColor: P.surface2 },
+  // A reply's votes in a thread: the arrows and the score on nothing, as quiet as the other actions beside them.
+  votesPlain: { backgroundColor: "transparent", alignSelf: "auto" },
   arrow: { height: "100%", minWidth: 44, alignItems: "center", justifyContent: "center" },
   arrowLeft: { paddingLeft: 4 },
   arrowRight: { paddingRight: 4 },

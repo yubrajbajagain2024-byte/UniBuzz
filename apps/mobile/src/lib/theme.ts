@@ -40,6 +40,17 @@ export function auroraGradient(stops: readonly string[], angle = 110): string {
   return `linear-gradient(${angle}deg, ${stops.map((c, i) => `${c} ${AURORA_AT[i] ?? 100}%`).join(", ")})`;
 }
 
+/**
+ * The faint tint behind the status bar while a feed scrolls under it, Reddit's: `hex` (the bar's own colour, #rrggbb) at
+ * a fifth of its strength at the very top, behind the clock and the battery, gone by the status bar's bottom edge. Just
+ * enough to lift the icons off a picture of their own colour; the feed shows through, clearly, everywhere else.
+ */
+export function statusShade(hex: string): string {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  const rgb = m ? `${parseInt(m[1]!, 16)},${parseInt(m[2]!, 16)},${parseInt(m[3]!, 16)}` : "0,0,0";
+  return `linear-gradient(to bottom, rgba(${rgb},0.2) 0%, rgba(${rgb},0.1) 55%, rgba(${rgb},0) 100%)`;
+}
+
 /** An iOS 26 sheet at a partial height: it floats inset from the screen's sides and bottom, its corners concentric with the phone's. */
 export const sheetShape = { marginHorizontal: 8, marginBottom: 8, borderRadius: 34, borderCurve: "continuous", overflow: "hidden" } as const;
 

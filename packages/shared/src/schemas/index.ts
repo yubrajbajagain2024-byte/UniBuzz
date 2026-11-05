@@ -1,7 +1,14 @@
 import { z } from "zod";
 import {
+  AD_CAPTION_MAX,
+  AD_CTA_VALUES,
+  AD_HEADLINE_MAX,
+  AD_OBJECTIVE_VALUES,
   AMENITY_VALUES,
   BUSINESS_CATEGORY_VALUES,
+  BUSINESS_INVITE_ROLE_VALUES,
+  BUSINESS_MEDIA_MAX,
+  BUSINESS_REPORT_REASONS,
   CLEANLINESS_LEVELS,
   CURRENCIES,
   DEAL_STATUS_VALUES,
@@ -11,9 +18,14 @@ import {
   LISTING_AUDIENCE_VALUES,
   MAX_POST_VIEWERS,
   POST_AUDIENCE_VALUES,
+  POST_KIND_VALUES,
   POST_TITLE_MAX,
+  REPORT_DECISION_VALUES,
   SLEEP_SCHEDULES,
+  STAFF_ROLE_VALUES,
 } from "../constants";
+import { PASSWORD_MAX, PASSWORD_MIN } from "../auth";
+import { CLOSE_CLOCK, HOURS_TIMEZONE_VALUES, isHoursDate, MAX_HOURS_RANGES, MAX_SPECIAL_HOURS, OPEN_CLOCK } from "../business-hours";
 import {
   formBoolean,
   imageMeta,
@@ -27,6 +39,7 @@ import {
 } from "./common";
 
 export * from "./common";
+export * from "./events";
 
 // ---------------------------------------------------------------------------
 // Auth
@@ -43,16 +56,30 @@ export function createSignUpSchema(allowedDomains: string[]) {
       : `Use your university email address (${domains.map((d) => `@${d}`).join(", ")})`;
   return z.object({
     fullName: z.string().trim().min(2, "Enter your name").max(80),
+    // Tidied before it is checked: a space after the address (iOS adds one when it completes an email) is not a mistake.
     email: z
-      .email({ error: "Enter a valid email address" })
+      .string()
       .trim()
       .toLowerCase()
+      .pipe(z.email({ error: "Enter a valid email address" }))
       .refine((email) => domains.length === 0 || domains.includes(email.split("@")[1] ?? ""), { error: hint }),
     password: z.string().min(8, "Password must be at least 8 characters").max(72),
   });
 }
 export const signUpSchema = createSignUpSchema([]);
 export type SignUpInput = z.infer<typeof signUpSchema>;
+
+/** "Forgot password?": an email, tidied as the sign-in form tidies it. */
+export const resetRequestSchema = z.object({ email: z.string().trim().toLowerCase().pipe(z.email({ error: "Enter a valid email address" })) });
+
+/** "Choose a new password": the sign-up rule (8 to 72 characters), typed twice the same. */
+export const newPasswordSchema = z
+  .object({
+    password: z.string().min(PASSWORD_MIN, `Use at least ${PASSWORD_MIN} characters`).max(PASSWORD_MAX, `Use at most ${PASSWORD_MAX} characters`),
+    confirm: z.string(),
+  })
+  .refine((v) => v.password === v.confirm, { error: "The passwords don't match", path: ["confirm"] });
+export type NewPasswordInput = z.infer<typeof newPasswordSchema>;
 
 /** Optional map pin: both coordinates or neither. */
 const coordinateFields = {
@@ -64,7 +91,7 @@ const bothOrNeither = (v: { latitude?: number; longitude?: number }) =>
 const coordinateError = { error: "Pin the location on the map or clear the pin", path: ["latitude"] };
 
 export const signInSchema = z.object({
-  email: z.email({ error: "Enter a valid email address" }).trim().toLowerCase(),
+  email: z.string().trim().toLowerCase().pipe(z.email({ error: "Enter a valid email address" })),
   password: z.string().min(1, "Enter your password"),
 });
 export type SignInInput = z.infer<typeof signInSchema>;
@@ -303,6 +330,54 @@ const uuidList = z.preprocess(
   z.array(z.uuid()).max(50),
 );
 
+const hoursRange = z
+  .strictObject({
+    open: z.string().regex(OPEN_CLOCK, "Use a time like 09:00"),
+    close: z.string().regex(CLOSE_CLOCK, "Use a time like 17:00"),
+  })
+  .refine((r) => r.open !== r.close, "Opening and closing can't be the same time");
+const hoursRanges = z.array(hoursRange).max(MAX_HOURS_RANGES, `Up to ${MAX_HOURS_RANGES} sets of hours a day`);
+
+/**
+ * A business's opening hours (businesses.hours, migration 57): a time zone from the list, each weekday's ranges (none
+ * is closed) and special hours by date, each date once, closed or with its own hours. The database checks the same.
+ */
+export const businessHoursSchema = z.strictObject({
+  timezone: z.enum(HOURS_TIMEZONE_VALUES, { error: "Choose a time zone" }),
+  week: z.strictObject({ mon: hoursRanges, tue: hoursRanges, wed: hoursRanges, thu: hoursRanges, fri: hoursRanges, sat: hoursRanges, sun: hoursRanges }),
+  special: z
+    .array(
+      z
+        .strictObject({
+          date: z.string().refine(isHoursDate, "Choose a date"),
+          label: z
+            .string()
+            .trim()
+            .max(40, "Keep the name to 40 characters")
+            .nullish()
+            .transform((v) => v || null),
+          closed: z.boolean(),
+          hours: hoursRanges,
+        })
+        .refine((d) => (d.closed ? d.hours.length === 0 : d.hours.length > 0), "Add the hours, or mark the day closed"),
+    )
+    .max(MAX_SPECIAL_HOURS, `Up to ${MAX_SPECIAL_HOURS} special dates`)
+    .refine((list) => new Set(list.map((d) => d.date)).size === list.length, "Each date can have one set of special hours"),
+});
+export type BusinessHoursInput = z.infer<typeof businessHoursSchema>;
+
+/** The form sends the hours as JSON: "" or nothing leaves them as they are, "null" takes them off the profile. */
+const hoursField = z.preprocess((v) => {
+  if (v === undefined || v === "") return undefined;
+  if (v === "null") return null;
+  if (typeof v !== "string") return v;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return v;
+  }
+}, businessHoursSchema.nullable().optional());
+
 /** The business profile the owner edits. */
 export const businessProfileSchema = z.object({
   name: z.string().trim().min(2, "Enter the business's name").max(120),
@@ -315,26 +390,158 @@ export const businessProfileSchema = z.object({
   city: optionalText(120),
   logoUrl: optionalUrl,
   universityIds: uuidList,
+  /** Undefined leaves the hours as they are (and a database without migration 57 has none to change). */
+  hours: hoursField,
 });
 export type BusinessProfileInput = z.infer<typeof businessProfileSchema>;
 
-/** A deal. Empty universityIds = every campus. */
+const emptyToNothing = (value: unknown) => (typeof value === "string" && value.trim() === "" ? undefined : value);
+
+/**
+ * A post's or an ad's media from the uploaders (migration 50): a JSON list of photos ({type: "image", url}) and at most
+ * one video ({type: "video", media_id}); the database checks the rest (who uploaded it, its size and orientation).
+ */
+export const businessMediaSchema = z.preprocess(
+  (value) => {
+    if (value === undefined || value === null || value === "") return [];
+    if (typeof value !== "string") return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  },
+  z
+    .array(
+      z.union([
+        z.object({ type: z.literal("image"), url: z.url({ protocol: /^https$/, error: "Photos need an https address" }).max(2000), width: z.number().int().positive().nullish(), height: z.number().int().positive().nullish() }),
+        z.object({ type: z.literal("video"), media_id: z.uuid() }),
+      ]),
+      { error: "Add photos or a video" },
+    )
+    .max(BUSINESS_MEDIA_MAX, `Add ${BUSINESS_MEDIA_MAX} photos at most`)
+    .refine((m) => m.filter((x) => x.type === "video").length <= 1, "Add one video at most")
+    .refine((m) => !m.some((x) => x.type === "video") || m.every((x) => x.type === "video"), "Use either photos or one video, not both"),
+);
+export type BusinessMediaInput = z.infer<typeof businessMediaSchema>;
+
+/** Money typed in a form ("4.50", "$1,200") as cents; empty is none. */
+export const optionalCents = z.preprocess((value) => {
+  if (value === undefined || value === null) return undefined;
+  const text = String(value).replace(/[$,\s]/g, "");
+  if (text === "") return undefined;
+  const n = Number(text);
+  return Number.isFinite(n) ? Math.round(n * 100) : value;
+}, z.number({ error: "Enter an amount like 4.50" }).int().min(0, "The amount cannot be negative").max(100_000_000).optional());
+
+/** A moment from the browser as an ISO timestamp with its offset (the form turns local time into one); empty is none. */
+export const optionalIsoTime = z.preprocess(emptyToNothing, z.iso.datetime({ offset: true, error: "Choose a date and time" }).optional());
+
+/**
+ * A post (v1's deal; every kind since migration 50). Empty universityIds = every campus. `imageUrl` is v1's single
+ * picture; `media` replaces it when given.
+ */
 export const dealSchema = z
   .object({
-    title: z.string().trim().min(2, "Give the deal a title").max(120),
+    title: z.string().trim().min(2, "Give the post a title").max(120),
     description: z.string().trim().max(2000).optional().default(""),
+    kind: z.enum(POST_KIND_VALUES).default("deal"),
     discountLabel: optionalText(60),
     code: optionalText(60),
     linkUrl: optionalUrl,
     imageUrl: optionalUrl,
+    media: businessMediaSchema.optional(),
+    price: optionalCents,
+    eventAt: optionalIsoTime,
     universityIds: uuidList,
     startsAt: optionalDate,
     endsAt: optionalDate,
     status: z.enum(DEAL_STATUS_VALUES).default("active"),
   })
-  .refine((v) => !v.startsAt || !v.endsAt || v.endsAt > v.startsAt, { error: "The end date must be after the start date", path: ["endsAt"] });
+  .refine((v) => !v.startsAt || !v.endsAt || v.endsAt > v.startsAt, { error: "The end date must be after the start date", path: ["endsAt"] })
+  .refine((v) => v.kind !== "event" || Boolean(v.eventAt), { error: "Say when the event is", path: ["eventAt"] });
 export type DealInput = z.infer<typeof dealSchema>;
 
 export const businessInviteSchema = z.object({
   email: z.email({ error: "Enter a valid email address" }).trim().toLowerCase(),
+  /** Migration 49: what the invite joins as. */
+  role: z.enum(BUSINESS_INVITE_ROLE_VALUES, { error: "Choose a role" }).default("editor"),
 });
+
+// ---------------------------------------------------------------------------
+// Ads (migration 50)
+// ---------------------------------------------------------------------------
+const placementList = z.preprocess(
+  (v) => (Array.isArray(v) ? v : v ? [v] : []),
+  z.array(z.enum(["for_you", "reels", "housing"])).max(3),
+);
+
+/**
+ * An ad draft from the Ads Manager. A draft may be unfinished: what still stops it from being submitted is the
+ * database's ad_problems(), which the editor shows. `promoted` is "deal:<id>" or "apartment:<id>".
+ */
+export const adDraftSchema = z
+  .object({
+    name: z.string().trim().min(2, "Name the ad (only your team sees it)").max(80),
+    objective: z.enum(AD_OBJECTIVE_VALUES).default("awareness"),
+    placements: placementList,
+    universityIds: uuidList,
+    headline: optionalText(AD_HEADLINE_MAX),
+    caption: z.string().trim().max(AD_CAPTION_MAX).optional().default(""),
+    media: businessMediaSchema,
+    cta: z.enum(AD_CTA_VALUES).default("learn_more"),
+    ctaUrl: z.preprocess(emptyToNothing, z.url({ protocol: /^https$/, error: "Use a link starting with https://" }).max(2000).optional()),
+    promoted: z.preprocess(emptyToNothing, z.string().regex(/^(deal|apartment):[0-9a-f-]{36}$/i, "Choose a post or a listing").optional()),
+    budget: optionalCents,
+    startsAt: optionalIsoTime,
+    endsAt: optionalIsoTime,
+  })
+  .refine((v) => !v.startsAt || !v.endsAt || v.endsAt > v.startsAt, { error: "The end must be after the start", path: ["endsAt"] });
+export type AdDraftInput = z.infer<typeof adDraftSchema>;
+
+/** The UniBuzz team approves an ad by recording its payment (no payment provider yet). */
+export const adApprovalSchema = z.object({
+  amount: z.preprocess((v) => (v === undefined || v === null ? undefined : v), optionalCents.refine((c) => c !== undefined && c > 0, "Enter the amount received")),
+  currency: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim().toUpperCase() : "USD"), z.string().regex(/^[A-Z]{3}$/, "Use a three-letter currency code")),
+  paymentReference: z.string().trim().min(3, "Enter the invoice or receipt number").max(200),
+  note: optionalText(1000),
+  fairHousingChecked: formBoolean,
+});
+export type AdApprovalInput = z.infer<typeof adApprovalSchema>;
+
+/** A rejection or a pause by the UniBuzz team: the business reads the reason. */
+export const adReasonSchema = z.object({ reason: z.string().trim().min(5, "Say why (the business reads it)").max(1000) });
+
+const REPORT_REASON_VALUES = BUSINESS_REPORT_REASONS.map((r) => r.value) as [string, ...string[]];
+/** A student's report of an ad, a post or a business. */
+export const businessReportSchema = z.object({
+  reason: z.enum(REPORT_REASON_VALUES, { error: "Choose a reason" }),
+  details: optionalText(1000),
+});
+// Admin section: staff and two-factor authentication
+// ---------------------------------------------------------------------------
+export const staffAddSchema = z.object({ email: z.email({ error: "Enter a valid email address" }).trim().toLowerCase().max(320), role: z.enum(STAFF_ROLE_VALUES, { error: "Choose a role" }) });
+export type StaffAddInput = z.infer<typeof staffAddSchema>;
+/** 6 digits; spaces the user typed are ignored. */
+export const totpCodeSchema = z.object({ code: z.preprocess((v) => (typeof v === "string" ? v.replace(/\s+/g, "") : v), z.string().regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app")) });
+export type TotpCodeInput = z.infer<typeof totpCodeSchema>;
+
+// ---------------------------------------------------------------------------
+// Admin section: moderation
+// ---------------------------------------------------------------------------
+const emptyStringToUndefined = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
+/** The reason the person sees, 3 to 500 characters: the same rule the database applies. */
+const moderationReason = z.string().trim().min(3, "Give a reason of at least 3 characters").max(500, "Keep the reason under 500 characters");
+/** Suspend an account. expiresAt is an ISO date-time (a datetime-local input's value is accepted too); leave it empty for "until lifted". */
+export const suspendUserSchema = z.object({
+  reason: moderationReason,
+  expiresAt: z.preprocess(emptyStringToUndefined, z.iso.datetime({ offset: true, local: true, error: "Enter a valid end date and time" }).optional()),
+  note: optionalText(2000),
+});
+export type SuspendUserInput = z.infer<typeof suspendUserSchema>;
+export const hideContentSchema = z.object({ reason: moderationReason });
+export type HideContentInput = z.infer<typeof hideContentSchema>;
+export const deleteContentSchema = z.object({ reason: moderationReason });
+export type DeleteContentInput = z.infer<typeof deleteContentSchema>;
+export const resolveReportSchema = z.object({ decision: z.enum(REPORT_DECISION_VALUES, { error: "Choose a decision" }), notes: optionalText(2000) });
+export type ResolveReportInput = z.infer<typeof resolveReportSchema>;

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View, type ListViewToken } from "react-native";
 import { useRouter } from "expo-router";
-import { listReels, REELS_PAGE_SIZE, type Reel } from "@apartment-book/shared";
+import { ADS_EVERY, interleaveAds, listReels, REELS_PAGE_SIZE, type Reel } from "@apartment-book/shared";
+import { SponsoredReel } from "@/components/ads/sponsored-reel";
 import { openCompose } from "@/lib/compose-nav";
 import { errorText } from "@/lib/hooks";
 import { emitPostRemoved } from "@/lib/posts-events";
@@ -9,6 +10,7 @@ import { useHomeScope } from "@/lib/home-scope";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useTabBarInset } from "@/lib/tab-bar";
+import { feedAdSpacing, isAdRow, useAdImpressions, useFeedAds, type AdRow } from "@/lib/use-feed-ads";
 import { auroraGradient, textStyle } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { ReelCommentsSheet } from "./reel-comments-sheet";
@@ -56,12 +58,14 @@ export function ReelsSection({ active, preload = false, topInset, height }: { ac
   const [loadingMore, setLoadingMore] = useState(false);
   const [visible, setVisible] = useState(0);
   const [commentsKey, setCommentsKey] = useState<string | null>(null);
-  const listRef = useRef<FlatList<Reel>>(null);
+  const listRef = useRef<FlatList<Reel | AdRow>>(null);
   // Tapping Home again while Reels is on screen: back to the first reel.
   useTabReselect(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }), active);
   const seq = useRef(0);
   const offset = useRef(0);
   const done = useRef(false);
+  /** `done` for rendering: a feed shorter than the first ad's place ends with the ad once there are no more reels. */
+  const [ended, setEnded] = useState(false);
   const busyMore = useRef(false);
   const started = useRef(false);
   /** Who the rows on screen were fetched for: hearts and "Saved" belong to one person. */
@@ -71,6 +75,17 @@ export function ReelsSection({ active, preload = false, topInset, height }: { ac
   useEffect(() => {
     count.current = reels?.length ?? 0;
   }, [reels]);
+  // Sponsored reels between the reels (the first after ADS_FIRST_AFTER, then at most one per ADS_EVERY), each a page of
+  // its own. An ad promoting a listing whose tour is already in the feed gives its place to the next ad.
+  /** Goes up each time a first page lands (the first load, a pull-to-refresh): the ads are asked for again then. */
+  const [adsRound, setAdsRound] = useState(0);
+  const ads = useFeedAds("reels", reels?.length ?? 0, Boolean(userId), ended, adsRound);
+  const rows = useMemo<(Reel | AdRow)[]>(
+    () => interleaveAds((reels ?? []).map((reel) => ({ id: reel.sourceId, reel })), ads, ADS_EVERY, feedAdSpacing(ended)).map((r) => (r.kind === "ad" ? { id: `ad-${r.ad.id}`, ad: r.ad } : r.item.reel)),
+    [reels, ads, ended],
+  );
+  const countAds = useAdImpressions("reels");
+  const countAdsRef = useRef(countAds);
 
   const loadFirst = useCallback(async (mode: "initial" | "refresh") => {
     const id = ++seq.current;
@@ -82,7 +97,9 @@ export function ReelsSection({ active, preload = false, topInset, height }: { ac
       if (id !== seq.current) return;
       offset.current = REELS_PAGE_SIZE;
       done.current = page.length < REELS_PAGE_SIZE;
+      setEnded(done.current);
       setReels(mergeUnique([], page));
+      setAdsRound((n) => n + 1);
       setVisible(0);
       listRef.current?.scrollToOffset({ offset: 0, animated: false });
     } catch (e) {
@@ -103,7 +120,10 @@ export function ReelsSection({ active, preload = false, topInset, height }: { ac
       const page = await listReels(supabase, { universityId: universityRef.current, limit: REELS_PAGE_SIZE, offset: offset.current });
       if (id !== seq.current) return;
       offset.current += REELS_PAGE_SIZE;
-      if (page.length < REELS_PAGE_SIZE) done.current = true;
+      if (page.length < REELS_PAGE_SIZE) {
+        done.current = true;
+        setEnded(true);
+      }
       setReels((prev) => mergeUnique(prev ?? [], page));
     } catch {
       // Quietly give up: reaching the end again retries.
@@ -193,6 +213,7 @@ export function ReelsSection({ active, preload = false, topInset, height }: { ac
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ListViewToken[] }) => {
     const first = viewableItems.find((v) => v.isViewable && v.index != null);
     if (first && first.index != null) setVisible(first.index);
+    countAdsRef.current(viewableItems);
   }).current;
 
   const create = () => (user ? openCompose(router, "reel") : router.push("/(auth)/login"));
@@ -237,12 +258,17 @@ export function ReelsSection({ active, preload = false, topInset, height }: { ac
     body = (
       <FlatList
         ref={listRef}
-        data={reels}
+        data={rows}
         style={{ width, height }}
-        keyExtractor={reelKey}
-        renderItem={({ item, index }) => (
-          <ReelItem reel={item} width={width} height={height} topInset={topInset} bottomInset={tabBar} near={index === visible || (active && Math.abs(index - visible) <= 1)} playing={active && index === visible} onPatch={onPatch} onOpenComments={onOpenComments} onRemoved={onRemoved} />
-        )}
+        keyExtractor={(row) => (isAdRow(row) ? row.id : reelKey(row))}
+        renderItem={({ item, index }) => {
+          const near = index === visible || (active && Math.abs(index - visible) <= 1);
+          return isAdRow(item) ? (
+            <SponsoredReel ad={item.ad} width={width} height={height} topInset={topInset} bottomInset={tabBar} near={near} playing={active && index === visible} />
+          ) : (
+            <ReelItem reel={item} width={width} height={height} topInset={topInset} bottomInset={tabBar} near={near} playing={active && index === visible} onPatch={onPatch} onOpenComments={onOpenComments} onRemoved={onRemoved} />
+          );
+        }}
         extraData={`${visible}:${active}:${height}:${width}`}
         pagingEnabled
         decelerationRate="fast"
@@ -267,7 +293,7 @@ export function ReelsSection({ active, preload = false, topInset, height }: { ac
     <View style={{ height, backgroundColor: colors.mediaBg }}>
       {body}
       {/* Posting a reel starts from the "+" in the Home top bar, so there is no second "+" here. */}
-      {loadingMore && reels && visible >= reels.length - 1 ? (
+      {loadingMore && reels && visible >= rows.length - 1 ? (
         <View style={[styles.more, { bottom: 6 + tabBar }]} pointerEvents="none">
           <ActivityIndicator color={colors.onMedia} />
         </View>

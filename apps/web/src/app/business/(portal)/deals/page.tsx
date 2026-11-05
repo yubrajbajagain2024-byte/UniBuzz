@@ -1,14 +1,33 @@
 import type { Metadata } from "next";
-import { Plus, Tag } from "lucide-react";
-import { getBusinessDealStats, listBusinessDeals, listUniversities } from "@apartment-book/shared";
+import { Plus, Store } from "lucide-react";
+import { getBusinessDealStats, listBusinessDeals, listUniversities, teamRoleAllows, type Deal } from "@apartment-book/shared";
 import { requireBusiness } from "@/lib/business/portal";
 import { createClient } from "@/lib/supabase/server";
-import { EmptyState } from "@/components/ui/empty-state";
 import { DealTable } from "@/components/business/deal-table";
-import { PortalLink } from "@/components/business/portal-base";
+import { FilterTabs } from "@/components/business/filter-tabs";
+import { ProductsTabs } from "@/components/business/section-tabs";
+import { BizLink, EmptyPanel, PageHeader } from "@/components/business/ui";
 
-export const metadata: Metadata = { title: "Deals" };
+export const metadata: Metadata = { title: "Products & Services" };
 
+/** What the type filter offers: offers are v1's deals and promotions; v1's deals at /deals are every kind since migration 50. */
+const KINDS = [
+  { value: "all", label: "All", kinds: null },
+  { value: "products", label: "Products", kinds: ["product"] },
+  { value: "services", label: "Services", kinds: ["service"] },
+  { value: "offers", label: "Special offers", kinds: ["deal", "promotion"] },
+  { value: "events", label: "Events", kinds: ["event"] },
+  { value: "updates", label: "Updates", kinds: ["update"] },
+] as const;
+
+const matches = (f: (typeof KINDS)[number], d: Deal) => !f.kinds || (f.kinds as readonly string[]).includes(d.kind);
+/** Each filter's kinds, for the grid to pick from in the browser (null: every kind). */
+const KINDS_BY_FILTER = Object.fromEntries(KINDS.map((k) => [k.value, k.kinds])) as Record<string, readonly string[] | null>;
+
+/**
+ * Products & Services: the business's posts (products, services, special offers, events, updates) and its listings.
+ * Every post is on the page; the type filter (?kind=) picks from them in the browser, so switching costs no request.
+ */
 export default async function DealsPage() {
   const { membership } = await requireBusiness("/deals");
   const business = membership.business;
@@ -19,26 +38,31 @@ export default async function DealsPage() {
     listUniversities(supabase).catch(() => []),
   ]);
   const names = new Map(universities.map((u) => [u.id, u.name]));
-  const newDeal = (
-    <PortalLink href="/deals/new" className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-600 bg-aurora px-4 text-sm font-semibold text-white hover:brightness-95">
-      <Plus className="h-5 w-5" /> Add a deal
-    </PortalLink>
-  );
+  const canPublish = teamRoleAllows(membership.role, "publish");
+  const newPost = canPublish ? (
+    <BizLink href="/deals/new">
+      <Plus className="h-4 w-4" /> New post
+    </BizLink>
+  ) : null;
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Deals</h1>
-          <p className="text-sm text-gray-600">
-            Offers for students at the campuses you choose.{business.status === "approved" ? " Live deals show on UniBuzz's Deals page." : " They go in front of students once the business is approved."}
-          </p>
-        </div>
-        {newDeal}
-      </div>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        title="Products & Services"
+        subtitle={
+          business.status === "approved"
+            ? "Your products, services, special offers, events and updates: what students see on your public profile; offers also appear in Deals. Promote any of them with an ad."
+            : "Draft them now: students see them once the UniBuzz team approves your business."
+        }
+        actions={newPost}
+      />
+      <ProductsTabs active="posts" listings={business.category === "housing"} />
       {deals.length === 0 ? (
-        <EmptyState icon={Tag} title="No deals yet" description="A discount, a free add-on, a student night: say what it is, where it applies and until when." action={newDeal} />
+        <EmptyPanel icon={Store} title="Nothing here yet" description="A new product, a service, a student discount, an event: photos or a video, a price, a code, a link." action={newPost} />
       ) : (
-        <DealTable deals={deals} stats={stats} universityNames={names} />
+        <>
+          <FilterTabs label="Filter by type" param="kind" path="/deals" fallback="all" options={KINDS.map((k) => ({ value: k.value, label: k.label, count: deals.filter((d) => matches(k, d)).length }))} />
+          <DealTable deals={deals} stats={stats} universityNames={names} canPublish={canPublish} filter={{ param: "kind", fallback: "all", kinds: KINDS_BY_FILTER }} />
+        </>
       )}
     </div>
   );

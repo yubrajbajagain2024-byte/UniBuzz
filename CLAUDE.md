@@ -3,13 +3,14 @@
 Shared instructions for every AI session (and person) working in this repository: what the project
 is, how to work in it, and the rules that do not change week to week. **This file is the single
 source of truth on `main`**: branches inherit it unchanged, and nothing branch-specific or
-status-like belongs in it. Keep it under 200 lines. Status, history and branch notes live in
-[docs/](docs/README.md).
+status-like belongs in it. Never add a per-branch copy or another instruction file on a branch;
+change these files through a PR into `main`. Keep it under 200 lines. Status, history and branch
+notes live in [docs/](docs/README.md).
 
 More specific instructions load when you work in these folders:
 [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md), [supabase/CLAUDE.md](supabase/CLAUDE.md), and
-`apps/web/CLAUDE.md`, an import of `apps/web/AGENTS.md`: the Next.js 16 rules that `next dev`
-writes itself. Leave those two alone.
+`apps/web/CLAUDE.md` and `apps/admin/CLAUDE.md`, imports of their `AGENTS.md`: the Next.js 16 rules
+that `next dev` writes itself. Leave those alone.
 
 ## The project
 
@@ -17,13 +18,17 @@ writes itself. Leave those two alone.
 State University. Sign-up is limited to the email domains on the `universities` table
 (`txstate.edu` today), checked by the form and by a `before insert` trigger on `auth.users`.
 
-- **Social network first.** Lead with people, posts, Orbit, Buzz, Reels and messages. Housing,
-  roommates and the Marketplace are supporting tools on the Explore tab; they must not set the
-  app's identity, navigation or wording outside Explore.
+- **Social network first.** Lead with people, posts, Stories, Orbit, Buzz, Reels and messages. The
+  bar is Home, Explore, Messages, Events, Profile (search is the magnifier beside the bell). Events
+  is the campus's calendar: the university's feeds and verified organizations. Housing, roommates
+  and the Marketplace are supporting tools on the Explore tab; they must not set the app's
+  identity, navigation or wording outside Explore.
+- **Calls stay hidden for the launch:** keep their code and records; only the owner turns them on.
 - **Three surfaces, one Supabase project:** UniBuzz for students (Next.js website and Expo app);
   UniBuzz Business at `/business` (its own host once `NEXT_PUBLIC_BUSINESS_SITE_URL` is set), where
-  businesses never start conversations; CampConnect Admin for staff (the website's `/admin`
-  console, and a separate staff app whose state is in docs/branches/README.md).
+  businesses never start conversations; CampConnect Admin for staff: the separate staff app
+  (`apps/admin`, where the advertising business is run) and, until the two are reconciled, the
+  website's `/admin` Trust & Safety console.
 - **Legacy names stay.** The product was *CampConnect* until 2026-10-26; the staff app keeps the
   name *CampConnect Admin*. *Apartment Book*, the first name, survives only in identifiers:
   `@apartment-book/shared`, `@apartment-book/moderation`, the root package `apartment-book`, the
@@ -40,22 +45,29 @@ State University. Sign-up is limited to the email domains on the `universities` 
 ```
 apps/web/src/
   app/(app)/       the site: /, apartments, roommates, marketplace, posts, reels, buzz, messages,
-                   profile, notifications, saved, search, settings, deals, two-factor, and admin/
-                   (staff console: queue, rules, users, appeals, audit, metrics)
+                   events, organizations, profile, notifications, saved, search, settings, deals,
+                   two-factor, and admin/ (staff console: queue, rules, users, appeals, audit,
+                   metrics, events)
   app/(auth)/      login, signup     app/auth/  auth callbacks     app/business/  the portal
-  app/api/         buzz (moderated writes), video (Mux uploads + webhooks), geocode
+  app/api/         buzz (moderated writes), video (Mux uploads + webhooks), geocode, events/sync
+                   (the feed sync, run by Vercel Cron and the console)
   app/             also privacy, terms, guidelines, design, sitemap, robots, manifest
   components/      UI by area (home, feed, posts, buzz, messages, profile, housing, business, staff, …)
-  lib/             actions/ (server actions), supabase/ (clients), buzz-server/ (server-only),
-                   staff/, business/, mux.ts, env.ts      proxy.ts: auth guard + the portal's host
-apps/web/e2e/      home-feed.mjs (Playwright, desktop + phone)
+  lib/             actions/ (server actions), supabase/ (clients), buzz-server/ and events-server/
+                   (server-only), staff/, business/, mux.ts, env.ts   proxy.ts: auth guard + the portal's host
+apps/web/e2e/      Playwright: home-feed.mjs, release-smoke.mjs (every page of each role), business-sidebar.mjs,
+                   password-recovery.mjs (sign-up, confirmation, login, Forgot password, the reset page; staging only)
+apps/admin/src/    CampConnect Admin, the staff app (port 3001; its own Vercel project): overview, reports,
+                   flagged, content, users, media, staff, audit, security, analytics, business (lib/console/)
 apps/mobile/       Expo app (expo-router): apps/mobile/CLAUDE.md
 packages/shared/   everything that is not UI: types/ (incl. database.ts), schemas/ (zod), queries/
-                   (every read and write), buzz/, trust-safety/, constants.ts, for-you.ts, discover.ts,
-                   profile.ts, snaps.ts, calls.ts, share.ts, format.ts, …
+                   (every read and write), buzz/, trust-safety/, events/ (calendar parsers, the sync
+                   plan, wall-clock time), constants.ts, for-you.ts, events.ts, discover.ts, profile.ts,
+                   snaps.ts, stories.ts, calls.ts, share.ts, format.ts, …
 packages/moderation/  the Buzz moderation engine (rule packs, PII detector, policy); server-only
 supabase/          migrations/, rollbacks/, tests/, applied-outside-repo/, functions/, seed.sql
-scripts/           supabase-setup.mjs (db:setup), e2e-check.mjs (db:check), e2e-home-feed.mjs
+scripts/           supabase-setup.mjs (db:setup), e2e-check.mjs (db:check), e2e-home-feed.mjs,
+                   backup.mjs (read-only backup of a project), e2e-target.mjs (staging or production)
 docs/              status, migrations, tests, decisions, history, environment, branches
 ```
 
@@ -66,11 +78,12 @@ How each feature works: [README.md](README.md) and [docs/technical-reference.md]
 ```bash
 npm install                 # once, at the repo root
 npm run dev                 # every app; npm run dev -w web for the website (-- -p 3060 for a port)
+npm run dev:admin           # CampConnect Admin alone, on port 3001
 npm run check               # typecheck + lint + build: run before you call work done
 npm run typecheck           # or lint, or build: the same steps one at a time
 npm run test:shared         # packages/shared unit tests, offline
 npm run test:moderation     # packages/moderation unit tests, offline
-npm run db:test             # every supabase/tests suite in PGlite, offline, ~5 min
+npm run db:test             # every supabase/tests suite in PGlite, offline, ~7 min
 ```
 
 Commands against a real Supabase project, and their traps: [supabase/CLAUDE.md](supabase/CLAUDE.md).
@@ -88,19 +101,30 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
 - Website: server-only modules start with `import "server-only"`; writes go through server actions
   in `apps/web/src/lib/actions/`; call `redirect()` and `notFound()` outside `try` blocks; read
   `node_modules/next/dist/docs/` before using a Next.js API you have not checked.
-- Paused features stay behind their flags instead of being deleted (apps/mobile/CLAUDE.md lists
-  them).
+- Paused features stay behind their flags instead of being deleted (apps/mobile/CLAUDE.md lists them).
 - Database changes: follow [supabase/CLAUDE.md](supabase/CLAUDE.md).
 - Settled product and technical choices, with their reasons, are in
   [docs/decisions.md](docs/decisions.md). Do not re-open one without a reason.
 
 ## Workflow
 
-- Branch from `main` and land work through a **reviewed pull request**. Never push to `main`.
-- **Every push to `main` deploys the website to production** (Vercel is connected to Git). Merging
-  is deploying, so a migration the code needs must already be live.
-- Before opening a PR: `npm run check`, the tests your change touches (`npm run db:test` for any
-  SQL), and the documentation updates below.
+- Branch from `main` and land work through a **pull request**. Never push to `main`.
+- **Every push to `main` deploys the website and CampConnect Admin to production** (both Vercel
+  projects are Git-connected since 2026-11-02; each builds on every push). Merging is deploying: a
+  migration the code needs must already be live.
+- **Sunil and Ankur (`ProXteller`) each merge their own pull requests** into `main` once the checks
+  below pass, without waiting for the other's approval: the author's merge is that deploy's
+  approval. The other production writes below still need the owner's approval.
+- **Ankur works on his own, end to end** (Sunil's decision, 2026-11-01). A session working for him
+  writes, refactors and deletes code; builds features; fixes bugs and security issues; changes the
+  UI, the APIs and the schema (as migrations); runs tests; commits, pushes his branches, opens PRs
+  and merges his own once the checks pass; and deploys to development and staging (preview builds,
+  the staging project), all without asking first. Only the production writes below wait, each on
+  Sunil's explicit approval, one at a time, then run with a backup, tests and a rollback ready. It
+  ends with a short summary: the work done, the commits and PRs, and what was deployed where.
+- Before opening a PR, check what it would bring (`git log origin/main..<branch>`); a branch already
+  merged needs none, whatever GitHub's banner suggests. Then run `npm run check`, the tests your
+  change touches (`npm run db:test` for any SQL), and the documentation updates below.
 - Commit messages: a plain-English subject saying what changed; a body with why, the migrations
   (and whether they are on production) and the tests run. AI-written commits end with a
   `Co-Authored-By:` trailer.
@@ -108,8 +132,8 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
   their approval (owners: [docs/branches/README.md](docs/branches/README.md)). Never rewrite
   commits that are already pushed.
 - **Every production write needs the owner's explicit approval**: a migration, a role grant, an EAS
-  publish, a script that writes to the live project, and a manual deploy
-  (`vercel deploy --prod --yes --archive=tgz` from the repo root ships the local tree).
+  publish, a script that writes to the live project, a manual deploy of either app (`npm run deploy:admin`;
+  `vercel deploy --prod --yes --archive=tgz` from the repo root ships the local tree).
 - Never chain `cd` with `;` in front of a command that writes files; use `&&` or absolute paths
   (a failed `cd` once let EAS write a stray `app.json` at the repo root).
 
@@ -160,18 +184,16 @@ environment variable. Typos, formatting and read-only exploration are not.
    never status. Refer to other entries by title, not by number.
 2. **Avoid merge conflicts by design.** While a branch is in progress, record its progress only in
    its own `docs/branches/<branch name>.md` (a slash in the name is a folder:
-   `docs/branches/ankur/dev.md`). Its changes to shared files (status, migrations, testing,
-   history, branches/README) go in late, in its PR, after merging `main` into it. Something that
-   happens on no branch (a migration applied to production, a test run on `main`) gets a short
-   docs-only PR.
+   `docs/branches/ankur/dev.md`). Its changes to shared files (status, migrations, testing, history,
+   branches/README) go in late, in its PR, after merging `main` into it. Something that happens on
+   no branch (a migration applied to production, a test run on `main`) gets a short docs-only PR.
 3. A branch that outlives one session or PR gets its own file; once the branch is merged and
    deleted, move a short summary to docs/history.md and delete the file.
 4. **State, not prose: write what is true, the ugly parts included**, and date what can go stale
    ("as of 2026-10-27"). Say where a claim comes from when you have not checked it yourself.
 5. **Verify before you rely on it.** Check that a named file, function, flag or status still holds.
-6. No changelog sections: git history is the record. The old per-branch `CLAUDE.md` copies of
-   2026-10-27 lose to `main`'s in a merge (docs/branches/README.md); resolve any other conflict on
-   its merits.
+6. No changelog sections: git history is the record. Old per-branch `CLAUDE.md` copies (2026-10-27)
+   lose to `main`'s in a merge (docs/branches/README.md); resolve any other conflict on its merits.
 
 On the owner's Mac a local Claude Code `Stop` hook, not in git (`.claude/settings.local.json` →
 `.claude/hooks/claude-md-reminder.sh`), reminds a session when files changed but no documentation

@@ -1,12 +1,12 @@
-// Migration 48 (who is an admin for the business portal's staff actions) against PGlite. On production's schema
+// Migration 67 (first written as 48: who is an admin for the business portal's staff actions) against PGlite. On production's schema
 // (boot({ live: true }): CampConnect Admin's staff list and suspensions applied where they ran) an admin is a staff
 // owner or admin, not suspended, whose session passed two-factor sign-in with a verified factor; the admin role on
 // profiles no longer counts on its own. On a database built from this repo alone the admin role still decides. The
 // rollback restores migration 39's rule and the migration applies again. Usage: node supabase/tests/admin-authority.test.mjs
 import { boot, read, expectOk, expectError, done } from "./harness.mjs";
 
-const MIGRATION = "migrations/20261106000000_admin_authority.sql";
-const ROLLBACK = "rollbacks/20261106000000_admin_authority.down.sql";
+const MIGRATION = "migrations/20261119000000_admin_authority.sql";
+const ROLLBACK = "rollbacks/20261119000000_admin_authority.down.sql";
 const MFA = { aal: "aal2" };
 const check = (cond, message) => { if (!cond) throw new Error(message); };
 const val = async (p) => { const row = (await p).rows[0]; return row ? row[Object.keys(row)[0]] : undefined; };
@@ -115,6 +115,22 @@ async function pendingBusiness(db, email) {
   });
   await expectError("admin_standing() is not callable signed out", () => asAnon(() => db.query("select public.admin_standing()")), "permission denied");
   await expectError("require_admin() is still not callable through the API", () => as(ADMIN, () => db.query("select public.require_admin()"), MFA), "permission denied");
+
+  // Business v2 (49 to 57, live since 2026-11-03) guards its team's tools with the same check: ads under review,
+  // payments, business reports, pausing an ad.
+  for (const [what, sql, args] of [
+    ["the ads waiting for review", "select count(*) from public.admin_list_ads('pending_review')", []],
+    ["a business's payments", "select count(*) from public.admin_list_promotions($1)", [business]],
+    ["the open business reports", "select count(*) from public.admin_list_business_reports('open')", []],
+  ]) {
+    await expectOk(`Business v2: a staff admin who passed two-factor sign-in lists ${what}`, () => as(ADMIN, () => db.query(sql, args), MFA));
+    await expectError(`Business v2: the admin role alone cannot list ${what}`, () => as(ROLE_ONLY, () => db.query(sql, args), MFA), "Only CampConnect admins");
+  }
+  await expectError("Business v2: a staff admin without two-factor sign-in is told to confirm it before pausing an ad", () => as(ADMIN, () => db.query("select public.admin_pause_ad(gen_random_uuid(), 'Checking it')"), {}), "authenticator app");
+  await expectError("Business v2: a suspended staff admin cannot pause an ad", async () => {
+    await db.query("insert into public.account_restrictions (user_id, reason) values ($1, 'Checking suspended staff')", [ADMIN]);
+    try { await as(ADMIN, () => db.query("select public.admin_pause_ad(gen_random_uuid(), 'Checking it')"), MFA); } finally { await db.query("update public.account_restrictions set lifted_at = now() where user_id = $1", [ADMIN]); }
+  }, "Only CampConnect admins");
 
   await expectOk("the rollback restores migration 39's rule: the admin role decides again", async () => {
     await db.exec(read(ROLLBACK));

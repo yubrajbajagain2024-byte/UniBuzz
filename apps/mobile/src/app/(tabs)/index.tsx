@@ -11,6 +11,8 @@ import { PostsSection } from "@/components/home/posts-section";
 import { ReelsSection } from "@/components/home/reels-section";
 import { useCollapsingHeader } from "@/lib/collapsing-header";
 import { tabBarInset } from "@/lib/tab-bar";
+import { useCollapseOnScroll } from "@/lib/tab-bar-collapse";
+import { followOffset, handOverTarget, SectionPagerContext, type SectionPager } from "@/lib/section-pager";
 import { OpeningBandContext } from "@/lib/viewer-chrome";
 import { onHomeSectionRequest, takeHomeSection } from "@/lib/home-section";
 import { useAppTheme } from "@/lib/theme-provider";
@@ -90,6 +92,8 @@ export default function HomeScreen() {
   const tappedAt = useRef(0);
   /** The finger is on the pager. */
   const dragging = useRef(false);
+  /** A photo carousel's swipe the pager follows (see sectionPagers): the page it started on, or null. */
+  const handOver = useRef<number | null>(null);
   /** The finger is on the pager or the page is still gliding (a swipe's momentum, a label tap's scroll): nothing is mounted now. */
   const moving = useRef(false);
   /** The pager's offset in the last scroll event. */
@@ -111,13 +115,20 @@ export default function HomeScreen() {
   /** Whether the page under the finger is Posts, flipped halfway like overVideo: the bar's "Following" title reads it. */
   const [onPosts] = useState(() => createOverVideoStore(START === POSTS));
   const [barHeight, setBarHeight] = useState(insets.top + HOME_TOP_BAR_HEIGHT);
-  /** The bar slides away as the page on screen scrolls down and back as soon as it scrolls up (Instagram): For you, Buzz and Posts each feed it their scroll; Reels (full-screen video) never moves it. */
-  const { translateY: barShift, select: followPage, reveal: revealBar, onScroll: onPageScroll, hidden: barHidden } = useCollapsingHeader(ORDER.length, barHeight, START === REELS ? -1 : START);
   /**
-   * Between the top bar (as far as it has slid away) and the floating tab bar: what a tapped picture zooms open from. Never
-   * above the status bar's strip, which stays drawn over the feed when the bar has slid away.
+   * The bottom bar collapses to its Home button on a flick down For you, Buzz or Posts and comes back as it scrolls back,
+   * like Reddit's (lib/tab-bar-collapse.ts); Reels keeps the whole bar. Another section, or leaving Home, brings the whole
+   * bar back.
    */
-  const openingBand = useCallback(() => ({ top: Math.max(insets.top, barHeight - barHidden()), bottom: windowHeight - tabBarInset(insets) }), [barHeight, barHidden, windowHeight, insets]);
+  const feedOn = focused && (ORDER[index] === "foryou" || ORDER[index] === "buzz" || ORDER[index] === "posts");
+  const trackTabBar = useCollapseOnScroll(feedOn);
+  /** The bar slides away as the page on screen scrolls down and back as soon as it scrolls up (Instagram): For you, Buzz and Posts each feed it their scroll; Reels (full-screen video) never moves it. */
+  const { translateY: barShift, select: followPage, reveal: revealBar, onScroll: onPageScroll, scrollValue, hidden: barHidden } = useCollapsingHeader(ORDER.length, barHeight, START === REELS ? -1 : START, trackTabBar);
+  /**
+   * Between the top bar (as far as it has slid away) and the floating tab bar: what a tapped picture zooms open from. Up
+   * to the screen's top edge once the bar has gone: nothing but a soft shade is drawn over the feed under the status bar.
+   */
+  const openingBand = useCallback(() => ({ top: Math.max(0, barHeight - barHidden()), bottom: windowHeight - tabBarInset(insets) }), [barHeight, barHidden, windowHeight, insets]);
   const [pageHeight, setPageHeight] = useState(0);
 
   const section: HomeSection = ORDER[index] ?? DEFAULT_HOME_SECTION;
@@ -195,7 +206,7 @@ export default function HomeScreen() {
     stopSettleTimer();
     settleTimer.current = setTimeout(() => {
       settleTimer.current = null;
-      if (dragging.current || width <= 0) return;
+      if (dragging.current || handOver.current !== null || width <= 0) return;
       const pos = lastX.current / width;
       // Still between pages: the next scroll event arms the timer again.
       if (Math.abs(pos - Math.round(pos)) > ON_PAGE) return;
@@ -258,6 +269,54 @@ export default function HomeScreen() {
   );
   const onBarLayout = useCallback((e: LayoutChangeEvent) => setBarHeight(Math.round(e.nativeEvent.layout.height)), []);
 
+  /**
+   * A swipe a photo carousel on page `from` took past its last photo (or first): the pager follows the finger, as if the
+   * swipe had started on it, never further than the page beside (lib/section-pager.ts). A swipe the pager has itself
+   * is left alone.
+   */
+  const followCarousel = (from: number, dx: number) => {
+    if (dragging.current || width <= 0) return;
+    if (handOver.current === null) {
+      // What a drag's start does (onBeginDrag), for a drag the pager itself never saw begin.
+      handOver.current = from;
+      moving.current = true;
+      target.current = null;
+      under.current = from;
+      stopSettleTimer();
+      stopPrefetch();
+      revealBar();
+    }
+    const x = followOffset(handOver.current, dx, width, LAST);
+    lastX.current = x;
+    pager.current?.scrollTo({ x, animated: false });
+  };
+  /** That swipe let go: the pager glides on to the section beside, or back, as after a label tap, and settles there. */
+  const releaseCarousel = (dx: number, vx: number) => {
+    const from = handOver.current;
+    handOver.current = null;
+    if (from === null || width <= 0) return;
+    const to = handOverTarget(from, dx, vx, width, LAST);
+    target.current = to;
+    tappedAt.current = Date.now();
+    moving.current = true;
+    pager.current?.scrollTo({ x: to * width, animated: true });
+    armSettleTimer();
+  };
+  const carouselRef = useRef({ follow: followCarousel, release: releaseCarousel });
+  carouselRef.current = { follow: followCarousel, release: releaseCarousel };
+  /**
+   * What each page's photo carousels see of the pager: one value per page, the same for good, so no page re-renders for
+   * it. Never past For you or Reels, so a swipe never reaches another tab.
+   */
+  const sectionPagers = useMemo<SectionPager[]>(
+    () =>
+      ORDER.map((_, i) => ({
+        follow: (dx: number) => carouselRef.current.follow(i, dx),
+        release: (dx: number, vx: number) => carouselRef.current.release(dx, vx),
+      })),
+    [],
+  );
+
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (width <= 0 || placedWidth.current !== width) return;
@@ -306,7 +365,7 @@ export default function HomeScreen() {
   // Ends a swipe's glide, a label tap's scroll (iOS) and a jump; never acted on while a finger holds the pager.
   const onMomentumEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (dragging.current || width <= 0) return;
+      if (dragging.current || handOver.current !== null || width <= 0) return;
       const x = e.nativeEvent.contentOffset.x;
       // A tap's scroll cut short by a second tap: the timer waits for the one that reaches its page.
       if (tapUnderway(x / width)) armSettleTimer();
@@ -325,7 +384,8 @@ export default function HomeScreen() {
   // Each page keeps its element while its own props stay the same, so a settle re-renders the section that was left and
   // the one that was reached, not all four lists.
   const forYou = useMemo(() => <ForYouSection active={forYouOn} topInset={barHeight} onScroll={onPageScroll(FOR_YOU)} />, [forYouOn, barHeight, onPageScroll]);
-  const buzz = useMemo(() => <BuzzSection active={buzzOn} topInset={barHeight} onScroll={onPageScroll(BUZZ)} />, [buzzOn, barHeight, onPageScroll]);
+  const buzzScroll = useMemo(() => ({ onScroll: onPageScroll(BUZZ), scrollY: scrollValue(BUZZ), barShift }), [onPageScroll, scrollValue, barShift]);
+  const buzz = useMemo(() => <BuzzSection active={buzzOn} topInset={barHeight} scroll={buzzScroll} />, [buzzOn, barHeight, buzzScroll]);
   const posts = useMemo(() => (POSTS >= 0 ? <PostsSection active={postsOn} topInset={barHeight} onScroll={onPageScroll(POSTS)} /> : null), [postsOn, barHeight, onPageScroll]);
   const reels = useMemo(() => (REELS >= 0 && pageHeight > 0 ? <ReelsSection active={reelsOn} preload={reelsPreload} topInset={barHeight} height={pageHeight} /> : null), [reelsOn, reelsPreload, barHeight, pageHeight]);
   const content: Record<HomeSection, ReactNode> = { foryou: forYou, buzz, posts, reels };
@@ -355,7 +415,7 @@ export default function HomeScreen() {
           {ORDER.map((s, i) => (
             // A page not mounted yet is just its background, so one uncovered early (a very fast double swipe) is never a hole.
             <View key={s} style={[page, { backgroundColor: s === "reels" ? colors.mediaBg : colors.bg }]}>
-              {mounted.has(i) ? content[s] : null}
+              {mounted.has(i) ? <SectionPagerContext.Provider value={sectionPagers[i]!}>{content[s]}</SectionPagerContext.Provider> : null}
             </View>
           ))}
         </Animated.ScrollView>

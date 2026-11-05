@@ -1,0 +1,322 @@
+// Unit tests for UniBuzz Business v2 (src/business.ts, src/schemas, src/queries/business.ts): team roles as the
+// database decides them, an ad's status over time, where ads go in a feed (after row 3, then one per 9 at most), where
+// an ad's button leads, placements, media, money, and the forms' schemas. Run: npm run test:shared
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { register } from "node:module";
+
+// The sources import their siblings without an extension, as the bundlers resolve them; this hook adds it (as in media.test.mjs).
+register(
+  `data:text/javascript,${encodeURIComponent(`
+    export async function resolve(specifier, context, next) {
+      const relative = specifier.startsWith("./") || specifier.startsWith("../");
+      const bare = !/\\\\.[cm]?[jt]sx?$/.test(specifier);
+      if (relative && bare && context.parentURL?.includes("/packages/shared/src/")) {
+        try { return await next(specifier + ".ts", context); } catch { return next(specifier + "/index.ts", context); }
+      }
+      return next(specifier, context);
+    }
+  `)}`,
+  import.meta.url,
+);
+
+const biz = await import("../src/business.ts");
+const { ADS_EVERY } = await import("../src/constants.ts");
+
+test("teamRoleAllows: the same table as business_role_allows() in migration 49", () => {
+  const caps = ["view", "analytics", "publish", "reply", "manage_team", "edit_profile", "manage_ads"];
+  const table = { owner: "1111111", admin: "1111111", editor: "1111000", analyst: "1100000" };
+  for (const [role, want] of Object.entries(table)) {
+    assert.equal(caps.map((c) => (biz.teamRoleAllows(role, c) ? "1" : "0")).join(""), want, role);
+  }
+  assert.equal(biz.teamRoleOf("staff"), "editor", "v1's staff read as editors");
+  assert.equal(biz.teamRoleOf(undefined), "editor");
+});
+
+test("assignableRoles and canManageMember: only the owner touches admins; nobody touches the owner", () => {
+  assert.deepEqual(biz.assignableRoles("owner"), ["admin", "editor", "analyst"]);
+  assert.deepEqual(biz.assignableRoles("admin"), ["editor", "analyst"]);
+  assert.deepEqual(biz.assignableRoles("editor"), []);
+  assert.equal(biz.canManageMember("owner", "admin"), true);
+  assert.equal(biz.canManageMember("admin", "admin"), false);
+  assert.equal(biz.canManageMember("admin", "analyst"), true);
+  assert.equal(biz.canManageMember("owner", "owner"), false);
+  assert.equal(biz.canManageMember("editor", "analyst"), false);
+});
+
+test("adDisplayStatus: scheduled becomes active at its start; everything running ends at its end date, sweep or not", () => {
+  const now = Date.parse("2026-11-10T12:00:00Z");
+  const at = (h) => new Date(now + h * 3600_000).toISOString();
+  assert.equal(biz.adDisplayStatus({ status: "scheduled", starts_at: at(1), ends_at: at(48) }, now), "scheduled");
+  assert.equal(biz.adDisplayStatus({ status: "scheduled", starts_at: at(-1), ends_at: at(48) }, now), "active");
+  assert.equal(biz.adDisplayStatus({ status: "active", starts_at: at(-48), ends_at: at(-1) }, now), "completed");
+  assert.equal(biz.adDisplayStatus({ status: "paused", starts_at: at(-48), ends_at: at(-1) }, now), "completed");
+  assert.equal(biz.adDisplayStatus({ status: "pending_review", starts_at: at(-48), ends_at: at(-1) }, now), "pending_review");
+  assert.equal(biz.adDisplayStatus({ status: "draft", starts_at: null, ends_at: null }, now), "draft");
+  assert.equal(biz.adIsEditable({ status: "rejected" }), true);
+  assert.equal(biz.adIsEditable({ status: "active" }), false);
+});
+
+test("adSlotsAfter: after every 9th organic row, counted over the whole feed so pages agree", () => {
+  assert.equal(ADS_EVERY, 9);
+  assert.deepEqual(biz.adSlotsAfter(0, 8, 9), []);
+  assert.deepEqual(biz.adSlotsAfter(0, 9, 9), [8]);
+  assert.deepEqual(biz.adSlotsAfter(8, 8, 9), [8]);
+  assert.deepEqual(biz.adSlotsAfter(16, 8, 9), [17]);
+  assert.deepEqual(biz.adSlotsAfter(0, 30, 9), [8, 17, 26]);
+  assert.equal(biz.adSlotCount(30, 9), 3);
+  assert.equal(biz.adSlotCount(8, 9), 0);
+});
+
+const ad = (id, promoted = null) => ({ id, business_id: "b", cta: "learn_more", cta_url: "https://x.example", promoted });
+const posts = (count) => Array.from({ length: count }, (_, i) => ({ id: `p${i}` }));
+
+test("interleaveAds: at most one ad per 9 organic rows, never first, never two in a row, never twice", () => {
+  const rows = biz.interleaveAds(posts(30), [ad("a1"), ad("a2"), ad("a1"), ad("a3"), ad("a4")], 9);
+  const kinds = rows.map((r) => (r.kind === "ad" ? r.ad.id : "·")).join("");
+  // 9 posts, ad, 9 posts, ad, 9 posts, ad, 3 posts: the repeated a1 is skipped.
+  assert.equal(kinds, "·········a1·········a2·········a3···");
+  for (let i = 1; i < rows.length; i++) assert.ok(!(rows[i].kind === "ad" && rows[i - 1].kind === "ad"));
+  const organic = rows.filter((r) => r.kind === "item").length;
+  const ads = rows.filter((r) => r.kind === "ad").length;
+  assert.ok(ads <= Math.floor(organic / 9));
+});
+
+test("the apps' spacing: every feed's first page (8 to 12 rows) has room for an ad; the old rule gave none", async () => {
+  const { ADS_FIRST_AFTER, FOR_YOU_PAGE, REELS_PAGE_SIZE, DEFAULT_PAGE_SIZE } = await import("../src/constants.ts");
+  const apps = { first: ADS_FIRST_AFTER };
+  const firstPages = [FOR_YOU_PAGE.posts + FOR_YOU_PAGE.reels, REELS_PAGE_SIZE, DEFAULT_PAGE_SIZE];
+  // Why ads did not show: the first page of For You and of Reels is 8 rows, under the 9 the old rule waited for.
+  assert.deepEqual(firstPages.map((n) => biz.adSlotCount(n, ADS_EVERY)), [0, 0, 1]);
+  assert.deepEqual(firstPages.map((n) => biz.adSlotCount(n, ADS_EVERY, apps)), [1, 1, 2]);
+  // After row 3, then 9 apart: rows 3, 12, 21, 30.
+  assert.deepEqual(biz.adSlotsAfter(0, 31, ADS_EVERY, apps), [2, 11, 20, 29]);
+  assert.deepEqual(biz.adSlotsAfter(8, 8, ADS_EVERY, apps), [11]);
+  assert.equal(biz.adSlotCount(31, ADS_EVERY, apps), 4);
+  assert.equal(biz.adSlotCount(2, ADS_EVERY, apps), 0, "a short feed still loading waits");
+  assert.equal(biz.adSlotCount(0, ADS_EVERY, { ...apps, ended: true }), 0, "an empty feed shows no ad");
+});
+
+test("interleaveAds with the apps' spacing: the first ad after row 3, then 9 apart; never first, never two in a row", () => {
+  const spacing = { first: 3 };
+  const kinds = (rows) => rows.map((r) => (r.kind === "ad" ? r.ad.id : "·")).join("");
+  assert.equal(kinds(biz.interleaveAds(posts(14), [ad("a1"), ad("a2"), ad("a3")], 9, spacing)), "···a1·········a2··");
+  assert.equal(kinds(biz.interleaveAds(posts(8), [ad("a1"), ad("a2")], 9, spacing)), "···a1·····");
+  assert.equal(kinds(biz.interleaveAds(posts(3), [ad("a1")], 9, spacing)), "···a1");
+  // A feed shorter than that: no ad while more may come, one at its end once it has ended, none when it is empty.
+  assert.equal(kinds(biz.interleaveAds(posts(2), [ad("a1")], 9, spacing)), "··");
+  assert.equal(kinds(biz.interleaveAds(posts(2), [ad("a1"), ad("a2")], 9, { ...spacing, ended: true })), "··a1");
+  assert.equal(kinds(biz.interleaveAds(posts(1), [ad("a1")], 9, { ...spacing, ended: true })), "·a1");
+  assert.equal(biz.interleaveAds([], [ad("a1")], 9, { ...spacing, ended: true }).length, 0);
+  // Ended or not, a feed long enough keeps the same places: ending adds nothing past the first slot.
+  assert.equal(kinds(biz.interleaveAds(posts(5), [ad("a1"), ad("a2")], 9, { ...spacing, ended: true })), "···a1··");
+  // The slots the feed asks for are the slots it fills.
+  for (let n = 0; n <= 40; n++) {
+    for (const ended of [false, true]) {
+      const s = { ...spacing, ended };
+      const placed = biz.interleaveAds(posts(n), Array.from({ length: 10 }, (_, i) => ad(`a${i}`)), 9, s).filter((r) => r.kind === "ad").length;
+      assert.equal(placed, biz.adSlotCount(n, 9, s), `${n} rows, ended ${ended}`);
+    }
+  }
+});
+
+test("interleaveAds: an ad promoting a listing already in the feed runs, and the listing's own row leaves the feed", () => {
+  const ids = (rows) => rows.map((r) => (r.kind === "ad" ? `ad:${r.ad.id}` : r.item.id));
+  const rows = biz.interleaveAds(posts(18), [ad("a1", { type: "apartment", id: "p3" }), ad("a2")], 9);
+  assert.deepEqual(rows.filter((r) => r.kind === "ad").map((r) => r.ad.id), ["a1", "a2"]);
+  assert.ok(!ids(rows).includes("p3"), "the promoted listing shows once, as the ad");
+  assert.equal(rows.filter((r) => r.kind === "item").length, 17);
+  // The case staging found: a campus whose whole Housing feed is 5 listings, the promoted one among them.
+  const small = biz.interleaveAds(posts(5), [ad("h1", { type: "apartment", id: "p0" })], 9, { first: 3, ended: true });
+  assert.deepEqual(ids(small), ["p1", "p2", "ad:h1", "p3", "p4"]);
+  // At the slot itself, the ad stands where the listing was.
+  assert.deepEqual(ids(biz.interleaveAds(posts(5), [ad("h1", { type: "apartment", id: "p2" })], 9, { first: 3, ended: true })), ["p0", "p1", "ad:h1", "p3", "p4"]);
+  // A promoted listing further down, or an ad not placed, takes nothing out.
+  assert.deepEqual(ids(biz.interleaveAds(posts(5), [ad("h1"), ad("h2", { type: "apartment", id: "p4" })], 9, { first: 3, ended: true })), ["p0", "p1", "p2", "ad:h1", "p3", "p4"]);
+  assert.equal(biz.interleaveAds(posts(18), [], 9).length, 18);
+  assert.equal(biz.interleaveAds(posts(5), [ad("a1")], 9).filter((r) => r.kind === "ad").length, 0);
+  assert.equal(biz.interleaveAds(posts(2), [ad("a1", { type: "apartment", id: "p0" })], 9, { first: 3 }).length, 2, "no slot yet: nothing taken out");
+});
+
+// A stand-in for ads_for_feed(): the live ads in the campus's rotation, `limit` of them from `offset`.
+const server = (live) => (request) => live().slice(request.offset, request.offset + request.limit);
+/** Asks and answers until the feed has what it needs for `slots`, as useFeedAds does; returns the ads on screen. */
+function settle(state, round, slots, answer) {
+  for (let request = biz.nextAdsRequest(state, round, slots); request; request = biz.nextAdsRequest(state, round, slots)) {
+    state = biz.receiveAds(state, request, answer(request));
+  }
+  return state;
+}
+const idsOf = (state) => state.ads.map((a) => a.id);
+
+test("feed ads: a first round fills the slots, more come as the feed grows, and none are asked for once the database has no more", () => {
+  let live = [ad("a1"), ad("a2"), ad("a3")];
+  const answer = server(() => live);
+  let s = settle(biz.emptyFeedAds(), 1, 1, answer);
+  assert.deepEqual(idsOf(s), ["a1"]);
+  assert.deepEqual(biz.nextAdsRequest(s, 1, 1), null, "a full feed asks for nothing");
+  assert.deepEqual(biz.nextAdsRequest(s, 1, 3), { round: 1, offset: 1, limit: 2 }, "a grown feed asks only for its new slots");
+  s = settle(s, 1, 5, answer);
+  assert.deepEqual(idsOf(s), ["a1", "a2", "a3"]);
+  assert.equal(s.done, true, "the database had fewer than asked for");
+  live = [...live, ad("a4")];
+  assert.deepEqual(biz.nextAdsRequest(s, 1, 6), null, "within a round, a database that ran out is not asked again");
+});
+
+test("feed ads: a pull-to-refresh is a new round: a paused or ended ad leaves, a resumed or newly approved one comes in", () => {
+  let live = [ad("latte"), ad("reel"), ad("lease")];
+  const answer = server(() => live);
+  let s = settle(biz.emptyFeedAds(), 1, 2, answer);
+  assert.deepEqual(idsOf(s), ["latte", "reel"]);
+  // The business pauses "latte" (or its end passes): the next round asks again from the first ad.
+  live = [ad("reel"), ad("lease")];
+  assert.deepEqual(biz.nextAdsRequest(s, 2, 2), { round: 2, offset: 0, limit: 2 });
+  s = settle(s, 2, 2, answer);
+  assert.deepEqual(idsOf(s), ["reel", "lease"], "the paused ad stayed after the refresh");
+  // It resumes and the team approves a new one: both come in on the next refresh.
+  live = [ad("latte"), ad("pumpkin"), ad("reel"), ad("lease")];
+  s = settle(s, 3, 3, answer);
+  assert.deepEqual(idsOf(s), ["latte", "pumpkin", "reel"]);
+  // A round started even with a full feed and a database that had run out (done): refreshing always asks again.
+  s = settle({ ...s, done: true }, 4, 3, answer);
+  assert.equal(s.round, 4);
+});
+
+test("feed ads: the old ads stay on screen until the new round's arrive, and an answer from a round already over is dropped", () => {
+  const s1 = settle(biz.emptyFeedAds(), 1, 2, server(() => [ad("a1"), ad("a2")]));
+  // A refresh is out (round 2); until it is answered the feed keeps showing round 1's ads: no gap opens in the list.
+  const refresh = biz.nextAdsRequest(s1, 2, 2);
+  assert.deepEqual(idsOf(s1), ["a1", "a2"]);
+  // A "load more" asked for in round 1 lands late, after the refresh was sent: dropped once round 2 has answered.
+  const late = { round: 1, offset: 2, limit: 2 };
+  const s2 = biz.receiveAds(s1, refresh, [ad("a2")]);
+  assert.deepEqual(idsOf(biz.receiveAds(s2, late, [ad("a1"), ad("old")])), ["a2"], "a stale answer changed the feed");
+  assert.equal(biz.receiveAds(s2, late, [ad("old")]), s2, "a stale answer must leave the state as it was");
+});
+
+test("feed ads: an unchanged refresh keeps the same objects, an answer's repeats count once, and an empty first page drops the ads", () => {
+  const live = [ad("a1"), ad("a2")];
+  const s1 = settle(biz.emptyFeedAds(), 1, 2, server(() => live));
+  const s2 = settle(s1, 2, 2, server(() => live.map((a) => ({ ...a }))));
+  assert.equal(s2.ads, s1.ads, "the same ads after a refresh must be the same array, so the list does not re-render");
+  assert.notEqual(settle(s1, 3, 2, server(() => [ad("a1"), { ...ad("a2"), cta: "shop_now" }])).ads, s1.ads, "a changed ad must replace the old one");
+  const twice = biz.receiveAds(biz.emptyFeedAds(), { round: 1, offset: 0, limit: 3 }, [ad("a1"), ad("a1"), ad("a2")]);
+  assert.deepEqual(idsOf(twice), ["a1", "a2"]);
+  assert.deepEqual(idsOf(biz.receiveAds(twice, { round: 1, offset: 2, limit: 2 }, [ad("a2"), ad("a3")])), ["a1", "a2", "a3"], "a later page repeated an ad");
+  // A refreshed feed with no rows has no slots: its round answers nothing, and the old ads go.
+  const empty = settle(s1, 4, 0, server(() => live));
+  assert.deepEqual(idsOf(empty), []);
+  assert.equal(biz.nextAdsRequest(empty, 4, 0), null);
+});
+
+test("adsToCount: an ad on screen counts once per screen, a pull-to-refresh and its return included", () => {
+  const seen = new Set();
+  assert.deepEqual(biz.adsToCount(seen, ["a1", "a2"]), ["a1", "a2"]);
+  assert.deepEqual(biz.adsToCount(seen, ["a1", "a2"]), [], "still on screen: counted again");
+  // Refreshed away and back (paused, then resumed), or scrolled past and back: still once.
+  assert.deepEqual(biz.adsToCount(seen, ["a3", "a1"]), ["a3"]);
+  assert.deepEqual(biz.adsToCount(seen, ["a4", "a4"]), ["a4"], "twice in one report");
+});
+
+test("adDestination: links, listings, posts, a chat the student starts, or the profile", () => {
+  const listing = { type: "apartment", id: "apt" };
+  const post = { type: "deal", id: "deal" };
+  assert.deepEqual(biz.adDestination({ id: "a", business_id: "b", cta: "order_now", cta_url: "https://x.example/order", promoted: null }), { kind: "url", url: "https://x.example/order" });
+  assert.deepEqual(biz.adDestination({ id: "a", business_id: "b", cta: "view_listing", cta_url: null, promoted: listing }), { kind: "listing", id: "apt" });
+  assert.deepEqual(biz.adDestination({ id: "a", business_id: "b", cta: "get_offer", cta_url: null, promoted: post }), { kind: "post", id: "deal", businessId: "b" });
+  assert.deepEqual(biz.adDestination({ id: "a", business_id: "b", cta: "message", cta_url: "https://x.example", promoted: null }), { kind: "message", adId: "a" });
+  assert.deepEqual(biz.adDestination({ id: "a", business_id: "b", cta: "visit_profile", cta_url: "https://x.example", promoted: null }), { kind: "profile", businessId: "b" });
+  assert.deepEqual(biz.adDestination({ id: "a", business_id: "b", cta: "learn_more", cta_url: null, promoted: null }), { kind: "profile", businessId: "b" });
+});
+
+test("placements: housing ads only in Housing, every other ad in For You and Reels", () => {
+  assert.equal(biz.isHousingAd("housing", false), true);
+  assert.equal(biz.isHousingAd("food", true), true);
+  assert.equal(biz.isHousingAd("food", false), false);
+  assert.deepEqual(biz.placementsFor(true), ["housing"]);
+  assert.deepEqual(biz.placementsFor(false), ["for_you", "reels"]);
+});
+
+test("media: unknown items dropped; the cover is the first photo or the video's poster; vertical means taller than wide", () => {
+  const items = biz.mediaItems([{ type: "image", url: "https://a/1.jpg" }, { type: "gif" }, null, { type: "video", media_id: "m", poster_url: "https://p.jpg", width: 1080, height: 1920 }]);
+  assert.equal(items.length, 2);
+  assert.equal(biz.mediaCover(items), "https://a/1.jpg");
+  assert.equal(biz.mediaCover([items[1]]), "https://p.jpg");
+  assert.equal(biz.mediaItems("nope").length, 0);
+  assert.equal(biz.isVerticalVideo({ width: 1080, height: 1920 }), true);
+  assert.equal(biz.isVerticalVideo({ width: 1920, height: 1080 }), false);
+  assert.equal(biz.isVerticalVideo({ width: null, height: 1920 }), false);
+});
+
+test("money and rates", () => {
+  assert.equal(biz.formatCents(5000), "$50");
+  assert.equal(biz.formatCents(1250), "$12.50");
+  assert.equal(biz.clickRate(0, 0), "–");
+  assert.equal(biz.clickRate(3, 125), "2.4%");
+  assert.equal(biz.clickRate(30, 100), "30%");
+});
+
+test("adDraftSchema: a draft may be unfinished; money, placements and the promoted item are read from the form", async () => {
+  const { adDraftSchema } = await import("../src/schemas/index.ts");
+  const parsed = adDraftSchema.parse({
+    name: "Latte week",
+    placements: "reels",
+    universityIds: "11111111-1111-4111-8111-111111111111",
+    media: JSON.stringify([{ type: "video", media_id: "22222222-2222-4222-8222-222222222222" }]),
+    budget: "$1,250.50",
+    promoted: "deal:33333333-3333-4333-8333-333333333333",
+    startsAt: "2026-11-10T15:00:00.000Z",
+    endsAt: "",
+  });
+  assert.deepEqual(parsed.placements, ["reels"]);
+  assert.equal(parsed.budget, 125050);
+  assert.equal(parsed.endsAt, undefined);
+  assert.equal(parsed.objective, "awareness");
+  assert.equal(adDraftSchema.safeParse({ name: "x" }).success, false, "a name of two characters at least");
+  assert.equal(adDraftSchema.safeParse({ name: "Ok", startsAt: "2026-11-10T15:00:00Z", endsAt: "2026-11-09T15:00:00Z" }).success, false, "the end after the start");
+  assert.equal(adDraftSchema.safeParse({ name: "Ok", ctaUrl: "http://plain.example" }).success, false, "links are https");
+});
+
+test("businessMediaSchema: photos or one video, never both; ten at most", async () => {
+  const { businessMediaSchema } = await import("../src/schemas/index.ts");
+  const v = (i) => ({ type: "video", media_id: `2222222${i}-2222-4222-8222-222222222222` });
+  const p = (i) => ({ type: "image", url: `https://x.example/${i}.jpg` });
+  assert.equal(businessMediaSchema.safeParse(JSON.stringify([p(1), p(2)])).success, true);
+  assert.equal(businessMediaSchema.safeParse([v(1), v(2)]).success, false);
+  assert.equal(businessMediaSchema.safeParse([v(1), p(1)]).success, false);
+  assert.equal(businessMediaSchema.safeParse(Array.from({ length: 11 }, (_, i) => p(i))).success, false);
+  assert.deepEqual(businessMediaSchema.parse(""), []);
+});
+
+test("dealSchema: v1's deal still parses; an event needs its date; prices are cents", async () => {
+  const { dealSchema } = await import("../src/schemas/index.ts");
+  const v1 = dealSchema.parse({ title: "Taco Tuesday", universityIds: [] });
+  assert.equal(v1.kind, "deal");
+  assert.equal(dealSchema.safeParse({ title: "Open mic", kind: "event", universityIds: [] }).success, false);
+  const event = dealSchema.parse({ title: "Open mic", kind: "event", eventAt: "2026-11-14T01:00:00.000Z", price: "5", universityIds: [] });
+  assert.equal(event.price, 500);
+});
+
+test("adApprovalSchema and businessInviteSchema", async () => {
+  const { adApprovalSchema, businessInviteSchema } = await import("../src/schemas/index.ts");
+  const ok = adApprovalSchema.parse({ amount: "50", paymentReference: "INV-1", fairHousingChecked: "on" });
+  assert.equal(ok.amount, 5000);
+  assert.equal(ok.currency, "USD");
+  assert.equal(ok.fairHousingChecked, true);
+  assert.equal(adApprovalSchema.safeParse({ amount: "0", paymentReference: "INV-1" }).success, false);
+  assert.equal(adApprovalSchema.safeParse({ amount: "10", paymentReference: "" }).success, false);
+  assert.equal(businessInviteSchema.parse({ email: "A@B.example" }).role, "editor");
+  assert.equal(businessInviteSchema.safeParse({ email: "a@b.example", role: "owner" }).success, false);
+});
+
+test("listFeedAds: rows read into shapes; an error (no migration 50, signed out) is no ads, not a broken feed", async () => {
+  const { listFeedAds } = await import("../src/queries/business.ts");
+  const row = { id: "a", business_id: "b", cta: "learn_more", media: [{ type: "image", url: "https://u/1.jpg" }, { bogus: true }], promoted: { type: "deal", id: "d", media: [{ type: "image", url: "https://u/2.jpg" }] } };
+  const ok = { rpc: async (fn, args) => ({ data: fn === "ads_for_feed" && args.p_limit === 2 ? [row] : [], error: null }) };
+  const [ad] = await listFeedAds(ok, "for_you", 2);
+  assert.equal(ad.media.length, 1);
+  assert.equal(ad.promoted.media[0].url, "https://u/2.jpg");
+  const broken = { rpc: async () => ({ data: null, error: { code: "PGRST202", message: "missing" } }) };
+  assert.deepEqual(await listFeedAds(broken, "reels", 3), []);
+  assert.deepEqual(await listFeedAds(ok, "reels", 0), []);
+});

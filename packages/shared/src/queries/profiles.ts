@@ -1,5 +1,6 @@
 import { isBusinessRole } from "../business";
 import { isMissingInDatabase, isMissingRelation, LISTINGS_VISIBILITY_NOT_READY } from "./profile-page";
+import { profileSettingsColumns, type ProfileSettingsPatch } from "../settings";
 import type { Client, PosterSummary, Profile, ProfileSummary, ProfileVisibility, ProfileWithUniversity } from "../types/models";
 
 export const PROFILE_SUMMARY_COLUMNS = "id, full_name, avatar_url";
@@ -78,6 +79,14 @@ export async function updateProfile(
     .single();
   if (error) throw input.listingsVisibility !== undefined && isMissingInDatabase(error) ? new Error(LISTINGS_VISIBILITY_NOT_READY) : error;
   return data;
+}
+
+/** Saves a patch of my profile's settings (see ProfileSettingsPatch); nothing is sent for an empty one. */
+export async function updateProfileSettings(supabase: Client, id: string, patch: ProfileSettingsPatch): Promise<void> {
+  const columns = profileSettingsColumns(patch);
+  if (Object.keys(columns).length === 0) return;
+  const { error } = await supabase.from("profiles").update(columns as never).eq("id", id);
+  if (error) throw patch.listingsVisibility !== undefined && isMissingInDatabase(error) ? new Error(LISTINGS_VISIBILITY_NOT_READY) : error;
 }
 
 /**

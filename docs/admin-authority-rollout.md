@@ -1,10 +1,12 @@
-# Admin authority fix (migration 48): rollout plan
+# Admin authority fix (migration 67): rollout plan
 
-**Status, 2026-10-27:** prepared and tested offline on branch `fix/security-2026-10-27`. **Nothing is
-applied to production and the branch is not pushed** (the repository is public). Every production
-step below needs the owner's approval.
+**Status, 2026-11-05:** brought up to `main` (Business v2, migrations up to 66, all live), its migration renumbered
+67 (`20261119000000_admin_authority.sql`, first written as 48, `20261106000000_…`), every suite passing, and rehearsed
+on staging through the real Auth and REST API with its rollback (`supabase/tests/staging/admin-authority.mjs`, 14/14;
+67 stays applied there). **Nothing is applied to production and the branch is not pushed** (the repository is public).
+Every production step below needs the owner's approval.
 
-## The problem (live since 2026-10-25)
+## The problem (live since 2026-10-25; still open on production, read-only check 2026-11-05)
 
 Migration 39's `is_admin()` checks only `profiles.role = 'admin'`. `require_admin()` and several
 row-level security policies rely on it. On production, where CampConnect Admin's staff list
@@ -13,7 +15,9 @@ governs every other staff power, that means:
 - the business portal's admin actions work with a **password alone, without two-factor sign-in**:
   approving, rejecting or suspending a business, "Verified Partner", recording or cancelling a paid
   promotion ("Sponsored"), listing businesses and promotions, and admin read access to pending
-  businesses, their teams and inquiries;
+  businesses, their teams and inquiries; since Business v2 (2026-11-03) also reviewing, approving,
+  rejecting and pausing ads, recording and cancelling ad payments, business reports and the audit log
+  (about 20 functions in migrations 49, 50, 56 and 63 call `is_admin()` / `require_admin()`);
 - a **suspended** staff admin keeps them;
 - someone **removed from the staff list** keeps them, because migration 39 copied staff owners and
   admins into `profiles.role` once (2026-10-25) and nothing removes the role.
@@ -23,7 +27,7 @@ role. The realistic risks are a stolen admin password and a former or suspended 
 
 ## The fix
 
-**Database:** `supabase/migrations/20261106000000_admin_authority.sql`
+**Database:** `supabase/migrations/20261119000000_admin_authority.sql`
 
 - `admin_standing()` (new; signed-in callers learn their own standing only). Where `public.staff`
   exists, it returns `'admin'` for a staff owner or admin who is not suspended and whose session is
@@ -39,15 +43,24 @@ role. The realistic risks are a stolen admin password and a former or suspended 
 
 - `requireAdmin()` (the portal's admin page and its four server actions) asks `admin_standing()`.
   `'mfa_required'` goes to the portal's new `/two-factor` page; anything but `'admin'` is "not
-  found". On a database without migration 48 it falls back to the role rule, so **the website is
+  found". On a database without migration 67 it falls back to the role rule, so **the website is
   safe to deploy before the migration** (and after a rollback).
 - New page `apps/web/src/app/business/(portal)/two-factor/page.tsx`, reusing `StaffTwoFactor` (now
   with `doneHref` and `subject` props).
 
-**Tests:** `supabase/tests/admin-authority.test.mjs`, 26 checks on production's schema order and on
-the repo-only schema, including rollback and re-apply; added to `npm run db:test`.
+**Tests:** `supabase/tests/admin-authority.test.mjs`, 34 checks on production's schema order and on
+the repo-only schema, including rollback and re-apply, and Business v2's ad-review, payment, report and
+pause tools; added to `npm run db:test`. Other suites follow: `ad-delivery.test.mjs`'s team admin is a
+staff owner with a second factor, as production requires; the rollout suites leave 67 out (`AHEAD`)
+until it is live; `permissions-audit.test.mjs` lets `admin_standing()` answer a student, as `admin_me()`
+does, and checks it tells them nothing. On staging: `supabase/tests/staging/admin-authority.mjs`.
 
 ## Before you approve: read-only checks on production
+
+Run on 2026-11-05 (counts only): production has 1 account with the admin role, and it is its 1 staff
+admin, with a verified authenticator; no one with the role alone; `is_admin()` is migration 39's role
+rule; `admin_standing()` absent; no `_migrations` row for the fix. So nobody loses the admin screens
+unexpectedly, and nobody is left without a factor. Rerun them just before the migration.
 
 Run in the SQL editor (or `psql "$SUPABASE_DB_URL"`). Nothing here writes.
 
@@ -75,13 +88,13 @@ Run in the SQL editor (or `psql "$SUPABASE_DB_URL"`). Nothing here writes.
    ```sql
    select to_regclass('public.staff') as staff, to_regprocedure('public.is_suspended(uuid)') as is_suspended,
           to_regclass('auth.mfa_factors') as mfa_factors,
-          exists (select 1 from public._migrations where name = '20261106000000_admin_authority.sql') as already_applied;
+          exists (select 1 from public._migrations where name = '20261119000000_admin_authority.sql') as already_applied;
    ```
 
    Expect three non-null values and `false`.
 
 3. Take the usual read-only backup first, as for migrations 43–45
-   (`~/CampConnect-backups/<date>-before-migration-48/`).
+   (`scripts/backup.mjs before-migration-67 --full`, as for 58 to 66).
 
 ## Rollout
 
@@ -92,28 +105,27 @@ the admin screens stop working.
 **Option A, through the pull request (simplest; minutes between the public fix and the patched
 database):**
 
-1. Push `fix/security-2026-10-27` and open its PR into `main`. It sits on top of the documentation
-   PR (`docs/claude-structure`): merge that one first, or both together. Keep the PR text generic
-   ("tighten admin authority for the business portal") until step 3 is done.
+1. Push `fix/security-2026-10-27` and open its PR into `main` (it has `main` merged in, 2026-11-05). Keep
+   the PR text generic ("tighten admin authority for the business portal") until step 3 is done, and
+   keep this file and the branch's notes out of the pushed branch until then: they say how the gap works.
 2. Merge and wait for Vercel. Check that the portal's admin screens still open for you as before
    (the role fallback).
-3. Apply migration 48 **on its own**, in one transaction, with its tracking row:
+3. Apply migration 67 **on its own**, in one transaction, with its tracking row:
 
    ```sql
    begin;
-   -- paste supabase/migrations/20261106000000_admin_authority.sql here
-   insert into public._migrations (name) values ('20261106000000_admin_authority.sql') on conflict do nothing;
+   -- paste supabase/migrations/20261119000000_admin_authority.sql here
+   insert into public._migrations (name) values ('20261119000000_admin_authority.sql') on conflict do nothing;
    commit;
    notify pgrst, 'reload schema';
    ```
 
-   **Do not use `npm run db:setup` for this.** It applies every pending migration, so it would also
-   run 44, 46 and 47.
+   **Do not use `npm run db:setup` for this.** Apply the one file, as 58 to 66 were applied.
 4. Verify (below).
 
 **Option B, patched before anything is public:** deploy the website from this branch with
 `vercel deploy --prod --yes --archive=tgz` (production then runs this branch's build), apply
-migration 48 as in step 3, verify, then push and merge the PR (main's automatic deploy rebuilds
+migration 67 as in step 3, verify, then push and merge the PR (main's automatic deploy rebuilds
 the same code).
 
 ## Verify on production
@@ -130,8 +142,8 @@ the same code).
 
 ```sql
 begin;
--- paste supabase/rollbacks/20261106000000_admin_authority.down.sql here
-delete from public._migrations where name = '20261106000000_admin_authority.sql';
+-- paste supabase/rollbacks/20261119000000_admin_authority.down.sql here
+delete from public._migrations where name = '20261119000000_admin_authority.sql';
 commit;
 notify pgrst, 'reload schema';
 ```
@@ -152,5 +164,5 @@ The website needs no change to roll back: without `admin_standing()` it uses the
   `step-admin`'s migration 18 (`20261103100200_staff_invite_email.sql`), which production has but
   which is in neither `supabase/migrations/` nor `supabase/applied-outside-repo/`. Per its commit
   message, 18 changes staff invitations only, not the staff list, suspensions or two-factor.
-- No other migration redefines `is_admin()` or `require_admin()` (only 39 does), so 44, 46 and 47
-  can follow at any time after 48.
+- No migration since 39 redefines `is_admin()` or `require_admin()` (checked against `main`, 2026-11-05),
+  so 67 replaces exactly migration 39's definitions, and its rollback restores them (rehearsed on staging).

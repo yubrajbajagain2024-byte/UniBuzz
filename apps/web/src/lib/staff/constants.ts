@@ -105,6 +105,7 @@ export const SURFACE_LABEL: Record<string, string> = {
   roommate: "Roommate post",
   profile: "Profile",
   message: "Message",
+  story: "Story",
 };
 export function surfaceLabel(s: string): string {
   return SURFACE_LABEL[s] ?? s;
@@ -154,7 +155,7 @@ export const AUDIT_ACTIONS: readonly string[] = [
   "strike_add", "strike_revoke", "appeal_create", "appeal_decide", "role_grant", "role_revoke", "rule_pack_toggle", "reporter_viewed", "dm_context_viewed",
 ];
 export const AUDIT_TARGETS: readonly string[] = [
-  "buzz", "buzz_reply", "post", "comment", "apartment", "item", "roommate", "profile", "message", "user", "appeal", "rule_pack", "queue",
+  "buzz", "buzz_reply", "post", "comment", "apartment", "item", "roommate", "profile", "message", "story", "user", "appeal", "rule_pack", "queue",
 ];
 
 export type LimitationId = "G1" | "G2" | "G3" | "G4" | "G5" | "A1" | "U1" | "U2";
@@ -193,8 +194,8 @@ export const LIMITATIONS: readonly { id: LimitationId; title: string; body: stri
   },
   {
     id: "U1",
-    title: "Public content cannot be hidden, only removed",
-    body: "Posts, comments, listings, profiles and messages have no hidden state. When reports reach the auto-hide threshold the item jumps to P1 instead; removing it deletes it (a profile loses its bio and photo), so it cannot be restored.",
+    title: "Public content hides only at 10 reports",
+    body: "Posts, reels, comments and listings are hidden automatically once 10 different eligible people report them (CampConnect Admin's hidden state); Approve or Restore here brings them back. Below that, reaching the auto-hide threshold only raises the item to P1. Profiles and messages are never hidden, and removing anything deletes it (a profile loses its bio and photo), so it cannot be restored.",
   },
   {
     id: "U2",

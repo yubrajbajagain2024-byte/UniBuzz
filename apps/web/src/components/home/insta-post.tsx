@@ -299,7 +299,7 @@ export function InstaPost({ post, saved, signedIn, currentUserId, currentUser, e
       ) : null}
 
       {/* Send the post to friends (a chat message with the post as a card) or copy its link. */}
-      {shareable ? <ShareDialog sharedPost={sharedPostFromFeedPost(post, media)} url={shareDialog.url} open={shareDialog.open} onClose={shareDialog.hide} currentUser={currentUser ?? (currentUserId ? { id: currentUserId } : null)} restricted={audience !== "global"} /> : null}
+      {shareable ? <ShareDialog sharedPost={sharedPostFromFeedPost(post, media)} url={shareDialog.url} open={shareDialog.open} onClose={shareDialog.hide} currentUser={currentUser ?? (currentUserId ? { id: currentUserId } : null)} /> : null}
     </article>
   );
 }
