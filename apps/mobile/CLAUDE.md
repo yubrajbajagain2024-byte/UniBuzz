@@ -54,6 +54,8 @@ Why each exists: [docs/decisions.md](../../docs/decisions.md).
 - `CALLS_PAUSED` (`src/lib/calls.ts`): calls are off and hidden (no call button, ring, banner or call
   screen; past calls are history rows) unless `EXPO_PUBLIC_CALLS_ENABLED=1`. Check it in any new
   call entry point, and never bundle that variable into a build without the owner's decision.
+  Once migration 66 is live the database refuses new calls too: turning calls on also takes its
+  rollback.
 - `SCOPE_TOGGLE_SHOWN = false` (`src/lib/home-scope.ts`): the Campus | Global toggle is hidden.
 - `HIDDEN_HOME_SECTIONS = ["posts"]` (`packages/shared/src/constants.ts`, read by the website's
   Home too): Posts has no Home tab.

@@ -56,7 +56,8 @@ Supabase's `auth` and `storage` schemas.
   refuse production): `business-portal.mjs`; `stories.mjs`, Stories through Auth, the REST API and
   Storage; `events.mjs`, Events through the same (it applies 61 on staging when missing);
   `story-actions.mjs`, a story's likes, replies and shares into direct and group chats through the
-  app's own code (it applies 62 on staging when missing); `auth-recovery.mjs`, sign-up, confirmation,
+  app's own code (it applies 62 on staging when missing); `calls-paused.mjs`, every new call
+  refused and open calls ended (it applies 66 on staging when missing); `auth-recovery.mjs`, sign-up, confirmation,
   login and password recovery through Supabase Auth and the apps' own code (links made with the
   admin API; staging's built-in mailer allows two emails an hour); and
   `ad-delivery.mjs`, an ad from a business's sign-up to students' first pages through the apps' own code, with

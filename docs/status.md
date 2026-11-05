@@ -104,7 +104,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   probe exercised). **Ankur's "Invalid login
   credentials"** on production was not looked up (that reads a student's account): with Google sign-in off there, it
   is a wrong password or no account for that email; Forgot password now covers the first, Create an account the second.
-- **Calls hidden for the launch** (`pause-calls`, 2026-11-02, PR #90 open, `main` merged in): calls were already paused behind
+- **Calls hidden for the launch** (`pause-calls`, merged as PR #90, 2026-11-02 23:59 UTC; migration 66 after it, first written as 64 and renamed on 2026-11-04): calls were already paused behind
   `CALLS_PAUSED`, but every chat's bar still showed Audio call and Video call, which only brought up a "Coming Soon"
   pill. The owner postponed calls for the launch to hold down operating costs (docs/decisions.md), so now nothing of
   them shows in the app: Info stands alone in a direct or group chat's bar, no ring is listened for (no incoming-call
@@ -114,10 +114,16 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   deleted; a build bundled with `EXPO_PUBLIC_CALLS_ENABLED=1` brings everything back. Checked on the Simulator against
   staging with throwaway calls from Ann (deleted afterwards, with their notifications): both bars show only Info, a
   tap on a missed call does nothing while a tap on a bubble beside it works, long press opens the message's menu, a
-  ring from Ann while Sim's chat was open showed no incoming screen, and a call link landed on Messages. The pause lives
-  in the app only: a signed-in request made outside the app can still start a call (it then shows in the chat as a
-  live "Ringing" row, and on the other person's phone as a push); closing that takes a migration, not written. App
-  only, no migration; testers get it with the next EAS update.
+  ring from Ann while Sim's chat was open showed no incoming screen, and a call link landed on Messages. Testers get it
+  with the next EAS update. The app alone left a gap: a signed-in request made outside the app could still start a
+  call (it then showed in the chat as a live "Ringing" row and rang the other phone through a push). **Migration 66**
+  (`20261118000000_calls_paused.sql`, written the same day as `20261116000000_calls_paused.sql`, 64, and pushed to
+  `pause-calls` after PR #90 was merged; renamed on 2026-11-04, `main` merged in, because `main`'s report auto-hide had
+  gone live as `20261116000000_report_auto_hide.sql`; PR to open) closes it: the database refuses every
+  new call, whoever asks, and ends any call still open when it runs, keeping every past call; `start_call()` and its
+  grants stay as they are. Rehearsed offline (`calls-paused.test.mjs`; the other rollout suites leave it out of production's state until it is
+  live) and on staging (12/12), where it stays applied;
+  **not on production**: it waits on the owner's approval (docs/migrations.md).
 - **The story viewer, redesigned** (PR #86, merged 2026-11-02 05:28 UTC, the website redeployed without a change of its own): on a tall phone the
   story is a rounded 9:16 card under the status bar and its actions sit on black below it (`storyFrame`), so they are
   always legible and a tap that misses one never moves the story on; on a short screen (iPhone SE) the story fills it
@@ -337,7 +343,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | `db:setup` token mode resets the production auth Site URL to localhost by default | [supabase/CLAUDE.md](../supabase/CLAUDE.md) |
 | A security fix for a live part of the database is pending | "Security fix pending" above |
 | Supabase CLI history empty on production; `supabase db push` would re-run everything | `supabase/applied-outside-repo/README.md` |
-| Calls are paused and hidden for the launch (operating costs, 2026-11-02); switching them on also needs an Apple Developer Program membership (USD 99/yr), and the native ring (CallKit/PushKit, Android full-screen intent) is not built. The pause is in the app only: the database still starts a call asked for outside it | README §"Calls"; "Calls hidden for the launch" above |
+| Calls are paused and hidden for the launch (operating costs, 2026-11-02); switching them on also needs an Apple Developer Program membership (USD 99/yr), and the native ring (CallKit/PushKit, Android full-screen intent) is not built. Until migration 66 is on production the pause is in the app only, and the database still starts a call asked for outside it | README §"Calls"; "Calls hidden for the launch" above |
 | `is_suspended(uuid)` callable while signed out (low severity) | applied-outside-repo README §"Security review" |
 | Buzz's `admin.spam` rule pack flags ordinary phrases (staff can turn it off under Rules) | README §"Buzz (anonymous)" |
 | A Buzz photo can be dated by Storage's `Last-Modified` despite the publication delay | same |
