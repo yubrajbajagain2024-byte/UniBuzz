@@ -45,6 +45,8 @@ export function useFeed<T extends { id: string }>(
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** How many first pages have landed (the first load, a pull-to-refresh, a new query): a feed's ads follow it. */
+  const [round, setRound] = useState(0);
   const seq = useRef(0);
 
   const fetchPage = useCallback(
@@ -54,6 +56,7 @@ export function useFeed<T extends { id: string }>(
         const result = await loadPage(p);
         if (id !== seq.current) return;
         setItems((prev) => (replace ? result.data : [...prev, ...result.data.filter((r) => !prev.some((x) => x.id === r.id))]));
+        if (replace) setRound((n) => n + 1);
         setTotalPages(result.totalPages);
         setPage(p);
         setError(null);
@@ -91,7 +94,7 @@ export function useFeed<T extends { id: string }>(
     void fetchPage(1, true);
   }, [fetchPage]);
 
-  return { items, setItems, loading, refreshing, error, loadMore, refresh, hasMore: page < totalPages };
+  return { items, setItems, loading, refreshing, error, loadMore, refresh, round, hasMore: page < totalPages };
 }
 
 export function errorText(e: unknown, fallback = "Something went wrong. Please try again."): string {

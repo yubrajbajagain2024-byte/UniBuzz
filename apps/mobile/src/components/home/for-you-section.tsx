@@ -113,6 +113,8 @@ export function ForYouSection({ active, topInset, onScroll }: { active: boolean;
   /** The page the list on screen ends with. A ref, so paging on does not re-create `load` and start over from page 1. */
   const page = useRef(1);
   const seq = useRef(0);
+  /** Goes up each time a first page lands (the first load, a pull-to-refresh): the ads are asked for again then. */
+  const [adsRound, setAdsRound] = useState(0);
 
   const load = useCallback(
     async (mode: "replace" | "more") => {
@@ -128,6 +130,7 @@ export function ForYouSection({ active, topInset, onScroll }: { active: boolean;
         });
         page.current = result.page;
         setHasMore(result.hasMore);
+        if (mode === "replace") setAdsRound((n) => n + 1);
         setError(null);
         setMoreError(false);
       } catch (e) {
@@ -187,7 +190,7 @@ export function ForYouSection({ active, topInset, onScroll }: { active: boolean;
   const [playingId, setPlayingId] = useState<string | null>(null);
   // Sponsored posts between the posts (the first after ADS_FIRST_AFTER, then at most one per ADS_EVERY), counted as seen
   // when the list says so.
-  const ads = useFeedAds("for_you", items.length, Boolean(userId), !loading && !hasMore);
+  const ads = useFeedAds("for_you", items.length, Boolean(userId), !loading && !hasMore, adsRound);
   const rows = useMemo<(ForYouItem | AdRow)[]>(() => interleaveAds(items, ads, ADS_EVERY, feedAdSpacing(!loading && !hasMore)).map((r) => (r.kind === "ad" ? { id: `ad-${r.ad.id}`, ad: r.ad } : r.item)), [items, ads, loading, hasMore]);
   const countAds = useAdImpressions("for_you");
   const countAdsRef = useRef(countAds);

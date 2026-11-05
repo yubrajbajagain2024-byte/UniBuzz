@@ -77,7 +77,9 @@ export function ReelsSection({ active, preload = false, topInset, height }: { ac
   }, [reels]);
   // Sponsored reels between the reels (the first after ADS_FIRST_AFTER, then at most one per ADS_EVERY), each a page of
   // its own. An ad promoting a listing whose tour is already in the feed gives its place to the next ad.
-  const ads = useFeedAds("reels", reels?.length ?? 0, Boolean(userId), ended);
+  /** Goes up each time a first page lands (the first load, a pull-to-refresh): the ads are asked for again then. */
+  const [adsRound, setAdsRound] = useState(0);
+  const ads = useFeedAds("reels", reels?.length ?? 0, Boolean(userId), ended, adsRound);
   const rows = useMemo<(Reel | AdRow)[]>(
     () => interleaveAds((reels ?? []).map((reel) => ({ id: reel.sourceId, reel })), ads, ADS_EVERY, feedAdSpacing(ended)).map((r) => (r.kind === "ad" ? { id: `ad-${r.ad.id}`, ad: r.ad } : r.item.reel)),
     [reels, ads, ended],
@@ -97,6 +99,7 @@ export function ReelsSection({ active, preload = false, topInset, height }: { ac
       done.current = page.length < REELS_PAGE_SIZE;
       setEnded(done.current);
       setReels(mergeUnique([], page));
+      setAdsRound((n) => n + 1);
       setVisible(0);
       listRef.current?.scrollToOffset({ offset: 0, animated: false });
     } catch (e) {

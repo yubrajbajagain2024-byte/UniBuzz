@@ -4,7 +4,8 @@
 // its payment. Then, as students over the REST API: each ad runs in its own placement (For You, Reels, Housing), on the
 // first page of each feed as the apps build it, for the campus it targets only; an impression and a click reach the
 // business as numbers (and one from another campus does not); a pause takes the ad out at once and a resume brings it
-// back; a hidden ad stays hidden for that student only. Every step goes through the apps' own code in packages/shared.
+// back; a pull-to-refresh, as the apps run it, drops a paused or ended ad and brings in a resumed or newly approved one;
+// a hidden ad stays hidden for that student only. Every step goes through the apps' own code in packages/shared.
 // Never run against production: it refuses the production ref and any project not named as staging.
 //
 //   SUPABASE_ACCESS_TOKEN=… STAGING_SUPABASE_REF=<staging ref> node supabase/tests/staging/ad-delivery.mjs
@@ -42,7 +43,7 @@ const q = await import("../../../packages/shared/src/queries/business.ts");
 const { listForYou } = await import("../../../packages/shared/src/queries/for-you.ts");
 const { listReels } = await import("../../../packages/shared/src/queries/feed.ts");
 const { listApartments } = await import("../../../packages/shared/src/queries/apartments.ts");
-const { adSlotCount, interleaveAds } = await import("../../../packages/shared/src/business.ts");
+const { adSlotCount, adsToCount, emptyFeedAds, interleaveAds, nextAdsRequest, receiveAds } = await import("../../../packages/shared/src/business.ts");
 const { ADS_EVERY, ADS_FIRST_AFTER, REELS_PAGE_SIZE } = await import("../../../packages/shared/src/constants.ts");
 const { adApprovalSchema, adDraftSchema } = await import("../../../packages/shared/src/schemas/index.ts");
 
@@ -356,6 +357,36 @@ try {
     expect(!(await served(ben, "for_you")).includes(forYouAd.id), "a paused ad was served");
     expect((await q.resumeAd(owner, forYouAd.id)).status === "active", "not resumed");
     expect((await served(ben, "for_you")).includes(forYouAd.id), "not back");
+  });
+  await check("a pull-to-refresh, as the apps run it, asks for the ads again: paused gone, resumed back, a newly approved one in, an ended one gone, each counted once", async () => {
+    // A long feed, so every live For You ad has a slot; each refresh is a new round of the apps' feed-ads state.
+    const owner = await session(cafe.owner);
+    const slots = adSlotCount(90, ADS_EVERY, { first: ADS_FIRST_AFTER, ended: true });
+    let state = emptyFeedAds(), round = 0;
+    const seen = new Set(), sent = [];
+    const refresh = async () => {
+      round += 1;
+      for (let r = nextAdsRequest(state, round, slots); r; r = nextAdsRequest(state, round, slots)) state = receiveAds(state, r, await q.listFeedAds(ben, "for_you", r.limit, r.offset));
+      const ids = state.ads.map((a) => a.id);
+      sent.push(...adsToCount(seen, ids));
+      return ids;
+    };
+    expect((await refresh()).includes(forYouAd.id), "not there at first");
+    await q.pauseAd(owner, forYouAd.id);
+    expect(!(await refresh()).includes(forYouAd.id), "a paused ad stayed after a refresh");
+    await q.resumeAd(owner, forYouAd.id);
+    expect((await refresh()).includes(forYouAd.id), "a resumed ad did not come back");
+    // The team approves a second ad mid-session: it comes in on the next refresh.
+    const flash = await buildAndSubmit(cafe.owner, cafe.id, { name: "Flash sale", placements: ["for_you"], headline: "Two for one", caption: "Today only. (UniBuzz staging test)", media: [await upload(cafe.owner, "flash", [242, 119, 24])], cta: "learn_more", ctaUrl: "https://example.com/unibuzz-staging-flash" });
+    expect(!(await refresh()).includes(flash.id), "served before its approval");
+    await q.adminApproveAd(team, flash.id, adApprovalSchema.parse({ amount: "20", currency: "USD", paymentReference: `STAGING-${run}-4`, fairHousingChecked: false }));
+    expect((await refresh()).includes(flash.id), "a newly approved ad did not come in on the next refresh");
+    // Its end passes. An ad must end at least an hour after it is submitted, so the clock is moved instead of waited for:
+    // its ends_at set into the past the way the database's own transitions write (app.ad_transition), on this test ad only.
+    await sql(`begin; select set_config('app.ad_transition', 'on', true); update public.ads set ends_at = now() - interval '1 second' where id = ${lit(flash.id)}; commit;`);
+    const after = await refresh();
+    expect(!after.includes(flash.id) && after.includes(forYouAd.id), `an ended ad stayed after a refresh: ${JSON.stringify(after)}`);
+    expect(sent.filter((id) => id === forYouAd.id).length === 1, "an ad on screen through five refreshes was counted more than once");
   });
   await check("a student who hides the ad stops getting it; the student beside them still does", async () => {
     await q.hideAd(cat, forYouAd.id);

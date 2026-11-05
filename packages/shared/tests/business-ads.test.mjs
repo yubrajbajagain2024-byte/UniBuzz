@@ -138,6 +138,86 @@ test("interleaveAds: an ad promoting a listing already in the feed runs, and the
   assert.equal(biz.interleaveAds(posts(2), [ad("a1", { type: "apartment", id: "p0" })], 9, { first: 3 }).length, 2, "no slot yet: nothing taken out");
 });
 
+// A stand-in for ads_for_feed(): the live ads in the campus's rotation, `limit` of them from `offset`.
+const server = (live) => (request) => live().slice(request.offset, request.offset + request.limit);
+/** Asks and answers until the feed has what it needs for `slots`, as useFeedAds does; returns the ads on screen. */
+function settle(state, round, slots, answer) {
+  for (let request = biz.nextAdsRequest(state, round, slots); request; request = biz.nextAdsRequest(state, round, slots)) {
+    state = biz.receiveAds(state, request, answer(request));
+  }
+  return state;
+}
+const idsOf = (state) => state.ads.map((a) => a.id);
+
+test("feed ads: a first round fills the slots, more come as the feed grows, and none are asked for once the database has no more", () => {
+  let live = [ad("a1"), ad("a2"), ad("a3")];
+  const answer = server(() => live);
+  let s = settle(biz.emptyFeedAds(), 1, 1, answer);
+  assert.deepEqual(idsOf(s), ["a1"]);
+  assert.deepEqual(biz.nextAdsRequest(s, 1, 1), null, "a full feed asks for nothing");
+  assert.deepEqual(biz.nextAdsRequest(s, 1, 3), { round: 1, offset: 1, limit: 2 }, "a grown feed asks only for its new slots");
+  s = settle(s, 1, 5, answer);
+  assert.deepEqual(idsOf(s), ["a1", "a2", "a3"]);
+  assert.equal(s.done, true, "the database had fewer than asked for");
+  live = [...live, ad("a4")];
+  assert.deepEqual(biz.nextAdsRequest(s, 1, 6), null, "within a round, a database that ran out is not asked again");
+});
+
+test("feed ads: a pull-to-refresh is a new round: a paused or ended ad leaves, a resumed or newly approved one comes in", () => {
+  let live = [ad("latte"), ad("reel"), ad("lease")];
+  const answer = server(() => live);
+  let s = settle(biz.emptyFeedAds(), 1, 2, answer);
+  assert.deepEqual(idsOf(s), ["latte", "reel"]);
+  // The business pauses "latte" (or its end passes): the next round asks again from the first ad.
+  live = [ad("reel"), ad("lease")];
+  assert.deepEqual(biz.nextAdsRequest(s, 2, 2), { round: 2, offset: 0, limit: 2 });
+  s = settle(s, 2, 2, answer);
+  assert.deepEqual(idsOf(s), ["reel", "lease"], "the paused ad stayed after the refresh");
+  // It resumes and the team approves a new one: both come in on the next refresh.
+  live = [ad("latte"), ad("pumpkin"), ad("reel"), ad("lease")];
+  s = settle(s, 3, 3, answer);
+  assert.deepEqual(idsOf(s), ["latte", "pumpkin", "reel"]);
+  // A round started even with a full feed and a database that had run out (done): refreshing always asks again.
+  s = settle({ ...s, done: true }, 4, 3, answer);
+  assert.equal(s.round, 4);
+});
+
+test("feed ads: the old ads stay on screen until the new round's arrive, and an answer from a round already over is dropped", () => {
+  const s1 = settle(biz.emptyFeedAds(), 1, 2, server(() => [ad("a1"), ad("a2")]));
+  // A refresh is out (round 2); until it is answered the feed keeps showing round 1's ads: no gap opens in the list.
+  const refresh = biz.nextAdsRequest(s1, 2, 2);
+  assert.deepEqual(idsOf(s1), ["a1", "a2"]);
+  // A "load more" asked for in round 1 lands late, after the refresh was sent: dropped once round 2 has answered.
+  const late = { round: 1, offset: 2, limit: 2 };
+  const s2 = biz.receiveAds(s1, refresh, [ad("a2")]);
+  assert.deepEqual(idsOf(biz.receiveAds(s2, late, [ad("a1"), ad("old")])), ["a2"], "a stale answer changed the feed");
+  assert.equal(biz.receiveAds(s2, late, [ad("old")]), s2, "a stale answer must leave the state as it was");
+});
+
+test("feed ads: an unchanged refresh keeps the same objects, an answer's repeats count once, and an empty first page drops the ads", () => {
+  const live = [ad("a1"), ad("a2")];
+  const s1 = settle(biz.emptyFeedAds(), 1, 2, server(() => live));
+  const s2 = settle(s1, 2, 2, server(() => live.map((a) => ({ ...a }))));
+  assert.equal(s2.ads, s1.ads, "the same ads after a refresh must be the same array, so the list does not re-render");
+  assert.notEqual(settle(s1, 3, 2, server(() => [ad("a1"), { ...ad("a2"), cta: "shop_now" }])).ads, s1.ads, "a changed ad must replace the old one");
+  const twice = biz.receiveAds(biz.emptyFeedAds(), { round: 1, offset: 0, limit: 3 }, [ad("a1"), ad("a1"), ad("a2")]);
+  assert.deepEqual(idsOf(twice), ["a1", "a2"]);
+  assert.deepEqual(idsOf(biz.receiveAds(twice, { round: 1, offset: 2, limit: 2 }, [ad("a2"), ad("a3")])), ["a1", "a2", "a3"], "a later page repeated an ad");
+  // A refreshed feed with no rows has no slots: its round answers nothing, and the old ads go.
+  const empty = settle(s1, 4, 0, server(() => live));
+  assert.deepEqual(idsOf(empty), []);
+  assert.equal(biz.nextAdsRequest(empty, 4, 0), null);
+});
+
+test("adsToCount: an ad on screen counts once per screen, a pull-to-refresh and its return included", () => {
+  const seen = new Set();
+  assert.deepEqual(biz.adsToCount(seen, ["a1", "a2"]), ["a1", "a2"]);
+  assert.deepEqual(biz.adsToCount(seen, ["a1", "a2"]), [], "still on screen: counted again");
+  // Refreshed away and back (paused, then resumed), or scrolled past and back: still once.
+  assert.deepEqual(biz.adsToCount(seen, ["a3", "a1"]), ["a3"]);
+  assert.deepEqual(biz.adsToCount(seen, ["a4", "a4"]), ["a4"], "twice in one report");
+});
+
 test("adDestination: links, listings, posts, a chat the student starts, or the profile", () => {
   const listing = { type: "apartment", id: "apt" };
   const post = { type: "deal", id: "deal" };

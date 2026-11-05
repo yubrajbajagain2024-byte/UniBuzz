@@ -44,7 +44,7 @@ export function ApartmentsSection({ topInset, onScroll, q, campus, filters, filt
   // Housing ads (only housing ads run here) between the listings: the first after ADS_FIRST_AFTER, then at most one per
   // ADS_EVERY.
   const ended = !feed.loading && !feed.hasMore;
-  const ads = useFeedAds("housing", feed.items.length, Boolean(user), ended);
+  const ads = useFeedAds("housing", feed.items.length, Boolean(user), ended, feed.round);
   const rows = useMemo<(ApartmentWithOwner | AdRow)[]>(() => interleaveAds(feed.items, ads, ADS_EVERY, feedAdSpacing(ended)).map((r) => (r.kind === "ad" ? { id: `ad-${r.ad.id}`, ad: r.ad } : r.item)), [feed.items, ads, ended]);
   const countAds = useAdImpressions("housing");
   const countAdsRef = useRef(countAds);
