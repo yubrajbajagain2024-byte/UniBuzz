@@ -196,20 +196,9 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   On staging, 2026-11-04 (staging first brought to production's schema, history.md): the API run 13/13 (three runs)
   and the browser 6/6, both as the run's student and as a fresh one whose impressions and clicks reached the
   businesses; the iPhone in Expo Go is in [testing.md](testing.md). Any EAS update waits on the owner's approval.
-- **UniBuzz Business v2 is on `main` without its migrations.** PR #49 was merged on 2026-10-28 at
-  04:07 UTC (and #51 at 07:06 UTC), so production's website runs Business v2 code while neither
-  migration 49 nor 50 is applied (production's `_migrations`, read-only, 2026-10-28). Until they are, the code
-  says these are broken on production:
-  - creating and editing posts in the portal;
-  - team invites;
-  - the Ads screens;
-  - "Message" on a business profile.
-
-  On staging in production's state, this code shows an error screen on the portal's Ads and
-  Analytics pages and the Business admin's Ads, Reports and Audit pages (2026-10-28). Student
-  feeds carry on without ads. The owner chooses (both write to production):
-  - the order of release below, now;
-  - or revert PR #49 on `main` first, until the migrations can be applied.
+- **UniBuzz Business v2's migrations are live** (since the release of 2026-11-03 00:19 UTC, migrations.md): the
+  portal's posts, invites and Ads screens work on production; a read-only schema diff on 2026-11-05 shows production
+  and `main` identical (607 functions).
 - **UniBuzz Business v2** (merged in PR #49 on 2026-10-28 at 04:07 UTC). It upgrades the v1 portal to the business spec:
   - team roles;
   - business posts;
@@ -358,8 +347,6 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 
 | Item | Where it is written up |
 | --- | --- |
-| Two migrations not on production (44, 46), while `main`, which deploys production, already uses them (47 was applied on 2026-10-27) | [migrations.md](migrations.md) |
-| Business v2's code is on `main` (PRs #49 and #51) while migrations 49 and 50 are not on production (read-only check, 2026-10-28): posts, invites and the Ads screens in the portal fail until they are applied | "UniBuzz Business v2 is on `main` without its migrations" above |
 | `db:setup` token mode resets the production auth Site URL to localhost by default | [supabase/CLAUDE.md](../supabase/CLAUDE.md) |
 | A security fix for a live part of the database is pending | "Security fix pending" above |
 | Supabase CLI history empty on production; `supabase db push` would re-run everything | `supabase/applied-outside-repo/README.md` |
@@ -370,8 +357,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | Supabase CDN may serve a just-deleted Snap to the same viewer for ~1 minute | README §"Snaps" |
 | Supabase free projects pause after a week idle (Pro, USD 25/mo, before real users); built-in auth email is rate-limited (custom SMTP needed) | README §"Production checklist" |
 | Vercel Hobby optimizes 5,000 source images a month | README §"Photos" |
-| An EAS update from `main` would reach a build that cannot run it (read-only check, 2026-11-03): the app's runtime policy is `sdkVersion`, so every SDK 58 build takes any SDK 58 update, and the only one, the Android preview build of 2026-10-26 07:12 UTC (`2e0e4458`), predates `expo-camera`, `expo-media-library`, `expo-video-thumbnails` and `react-native-view-shot` (added 20:28 UTC that day, used by the create flow). No update has been published since. **Addressed by `ads-delivery` (merged, PR #97):** the runtime version is now the native fingerprint (`828b9d3`), so an update reaches only builds with the same native code, and the old build gets none; a new Android preview build on it, `0493abcf` (EAS, 2026-11-03, commit `828b9d3`, runtime `048bb02e…`, artifact until 2026-11-17), matches the code's fingerprint by `eas fingerprint:compare`. Its code is `ads-delivery`'s as of `828b9d3`, merged since; on 2026-11-05 `eas fingerprint:compare` against `main` at `63335d4` still matches (no native change since), so an update from `main` on the `preview` channel reaches it, and only it: the old preview build `9dea92b5` (runtime `exposdk:58.0.0`) gets none. Sharing approved by the owner on 2026-11-05, after its APK was checked: the bundle names production's Supabase project, site address and anon key (no staging, no localhost), no EAS environment sets `EXPO_PUBLIC_CALLS_ENABLED` (calls stay hidden), package `com.apartmentbook.app` 1.0.0 (version code 2, as the old build: it installs over it); its install link needs no sign-in and works until 2026-11-17, so the owner forwards it to the testers. With the owner's approval the update went out on 2026-11-05 at 03:13 UTC: the `preview` channel, Android only (group `c83f7fb4-f3cf-44de-9028-099468d786bf`, update `01a1a9b2…`, from `main` at `d2bf09f`, after `fingerprint:compare` matched). Expo's update server gives it to runtime `048bb02e…` (build `0493abcf`) only: the old build's `exposdk:58.0.0` still gets its update of 2026-10-26, and an iOS runtime gets none; its bundle names production's project and site, not staging. No EAS build exists for an iPhone (the iOS build is an SDK 57 simulator build); iPhones run the app in Expo Go | "Ads reach students" above |
-| The README still says the Vercel project is not connected to Git, and that 41 and 42 are not live; both are out of date | this file, [migrations.md](migrations.md) |
+| Testers' app: EAS updates reach only builds with the same native fingerprint (since `828b9d3`); today that is Android build `0493abcf` alone (update of 2026-11-05 03:13 UTC), whose install link stops working on 2026-11-17 (installed apps keep working); the old Android build gets no more updates; there is no iPhone build (an Apple Developer Program membership, USD 99/yr, then an iOS build) and no store build (the last Play Store build is on SDK 57) | "Ads refresh with the feed" above |
+| Production has no listings and no For You or Reels campaigns (read-only, 2026-11-05): Housing is empty everywhere and no student sees an ad until listings and campaigns exist | "Production's one live campaign is not visible yet" above |
 
 ## Future plans
 
