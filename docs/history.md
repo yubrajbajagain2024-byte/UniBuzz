@@ -233,6 +233,11 @@ open work is in [status.md](status.md).
   zero-difference schema diff and a full backup (`before-migration-66`) first, the file and its
   `_migrations` row in one transaction; checked after, the schema matching the branch exactly
   (migrations.md). From then on no new call can start, whoever asks; no call was open to end.
+- 2026-11-05 01:50 UTC: PR #102 (`pause-calls`: migration 66 and its tests, `main` merged in) merged into
+  `main` by the owner; 66 was already live.
+- 2026-11-05 02:42 UTC: PR #103 (`ads-refresh`: a pull-to-refresh asks for the feed's ads again in the app's
+  Orbit, Reels and Housing) merged into `main` by the owner; the website and CampConnect Admin redeployed
+  (Vercel: both Ready, their production addresses on the new deployments); no EAS update yet.
 
 ## Retired branches
 
