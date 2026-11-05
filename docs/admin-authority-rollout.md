@@ -1,10 +1,8 @@
 # Admin authority fix (migration 67): rollout plan
 
-**Status, 2026-11-05:** brought up to `main` (Business v2, migrations up to 66, all live), its migration renumbered
-67 (`20261119000000_admin_authority.sql`, first written as 48, `20261106000000_…`), every suite passing, and rehearsed
-on staging through the real Auth and REST API with its rollback (`supabase/tests/staging/admin-authority.mjs`, 14/14;
-67 stays applied there). **Nothing is applied to production and the branch is not pushed** (the repository is public).
-Every production step below needs the owner's approval.
+**Status: done, 2026-11-05.** Option B was followed, each step with the owner's approval: a full backup, the website
+from the branch, migration 67 alone (04:15 UTC), then PR #106 (22:31 CST); see docs/migrations.md and docs/history.md.
+The plan is kept as the record of how it was checked and rolled out; its two product questions are still open.
 
 ## The problem (live since 2026-10-25; still open on production, read-only check 2026-11-05)
 
