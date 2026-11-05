@@ -166,7 +166,9 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   the first, the old ones kept on screen until the new arrive, an unchanged set left as it was so the list does not
   re-render, late answers from an earlier round dropped; a screen counts an impression once, refreshes included
   (`adsToCount`). The website has no in-place refresh: a reload or a navigation already asks again
-  (`apps/web/e2e/sponsored-ads-refresh.mjs`). Results in [testing.md](testing.md). The app's part reaches testers only
+  (`apps/web/e2e/sponsored-ads-refresh.mjs`). On an iPhone in Expo Go against staging, with the fix: a pause, then a
+  pull-to-refresh, took the card away at once; a resume and a refresh brought it back; one impression throughout. Results
+  in [testing.md](testing.md). The app's part reaches testers only
   with an EAS update, the owner's approval; it changes no native code.
 - **Ads reach students** (branch `ads-delivery`, merged by the owner as PRs #97, #98 and #99, 2026-11-03 21:25 UTC to
   2026-11-04 09:14 UTC; no migration; the website's part is live on production). Ads approved in UniBuzz
