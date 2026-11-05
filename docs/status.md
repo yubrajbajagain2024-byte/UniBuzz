@@ -157,7 +157,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   owner's approval, after a full verified backup and a zero-difference schema diff; the diff is zero again after it and
   rows, accounts and files are as in the backup ([migrations.md](migrations.md)). Still to do: the app's EAS update for
   the features that need these migrations (owner's approval).
-- **Ads refresh with the feed** (branch `ads-refresh`, 2026-11-04, not merged; no migration). On an iPhone, a
+- **Ads refresh with the feed** (branch `ads-refresh`, merged by the owner as PR #103, 2026-11-05 02:42 UTC; no migration;
+  the website and CampConnect Admin redeployed, both Ready on Vercel; the app's part waits on an EAS update). On an iPhone, a
   campaign paused in UniBuzz Business stayed in Orbit after a pull-to-refresh: the app fetched a feed's ads once per
   screen (`useFeedAds` kept them and asked again only as the feed grew), so a paused, ended or hidden ad stayed and a
   resumed or newly approved one did not appear until the screen was opened again. `ads_for_feed()` was right: it decides
@@ -170,6 +171,10 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   pull-to-refresh, took the card away at once; a resume and a refresh brought it back; one impression throughout. Results
   in [testing.md](testing.md). The app's part reaches testers only
   with an EAS update, the owner's approval; it changes no native code.
+- **Production's one live campaign is not visible yet** (read-only check, 2026-11-05): it is a Housing ad, and
+  `ads_for_feed()` serves it to students of its campus (checked as one, in a transaction rolled back), but production
+  has no listings at all, so no Housing feed has a row for it to follow (an empty feed shows no ad, decisions.md). It
+  shows by itself once a listing exists on its campus.
 - **Ads reach students** (branch `ads-delivery`, merged by the owner as PRs #97, #98 and #99, 2026-11-03 21:25 UTC to
   2026-11-04 09:14 UTC; no migration; the website's part is live on production). Ads approved in UniBuzz
   Business did not show in the student feeds. Not the connection: the portal is part of the website, and the website's
@@ -364,7 +369,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | Supabase CDN may serve a just-deleted Snap to the same viewer for ~1 minute | README §"Snaps" |
 | Supabase free projects pause after a week idle (Pro, USD 25/mo, before real users); built-in auth email is rate-limited (custom SMTP needed) | README §"Production checklist" |
 | Vercel Hobby optimizes 5,000 source images a month | README §"Photos" |
-| An EAS update from `main` would reach a build that cannot run it (read-only check, 2026-11-03): the app's runtime policy is `sdkVersion`, so every SDK 58 build takes any SDK 58 update, and the only one, the Android preview build of 2026-10-26 07:12 UTC (`2e0e4458`), predates `expo-camera`, `expo-media-library`, `expo-video-thumbnails` and `react-native-view-shot` (added 20:28 UTC that day, used by the create flow). No update has been published since. **Addressed by `ads-delivery` (merged, PR #97):** the runtime version is now the native fingerprint (`828b9d3`), so an update reaches only builds with the same native code, and the old build gets none; a new Android preview build on it, `0493abcf` (EAS, 2026-11-03, commit `828b9d3`, runtime `048bb02e…`, artifact until 2026-11-17), matches the code's fingerprint by `eas fingerprint:compare`. Its code is `ads-delivery`'s as of `828b9d3`, merged since; sharing it with testers and any update wait on the owner's approval; no update published (as of 2026-11-04). No EAS build exists for an iPhone (the iOS build is an SDK 57 simulator build); iPhones run the app in Expo Go | "Ads reach students" above |
+| An EAS update from `main` would reach a build that cannot run it (read-only check, 2026-11-03): the app's runtime policy is `sdkVersion`, so every SDK 58 build takes any SDK 58 update, and the only one, the Android preview build of 2026-10-26 07:12 UTC (`2e0e4458`), predates `expo-camera`, `expo-media-library`, `expo-video-thumbnails` and `react-native-view-shot` (added 20:28 UTC that day, used by the create flow). No update has been published since. **Addressed by `ads-delivery` (merged, PR #97):** the runtime version is now the native fingerprint (`828b9d3`), so an update reaches only builds with the same native code, and the old build gets none; a new Android preview build on it, `0493abcf` (EAS, 2026-11-03, commit `828b9d3`, runtime `048bb02e…`, artifact until 2026-11-17), matches the code's fingerprint by `eas fingerprint:compare`. Its code is `ads-delivery`'s as of `828b9d3`, merged since; on 2026-11-05 `eas fingerprint:compare` against `main` at `63335d4` still matches (no native change since), so an update from `main` on the `preview` channel reaches it, and only it: the old preview build `9dea92b5` (runtime `exposdk:58.0.0`) gets none. Sharing it with testers and any update wait on the owner's approval; no update published (as of 2026-11-05). No EAS build exists for an iPhone (the iOS build is an SDK 57 simulator build); iPhones run the app in Expo Go | "Ads reach students" above |
 | The README still says the Vercel project is not connected to Git, and that 41 and 42 are not live; both are out of date | this file, [migrations.md](migrations.md) |
 
 ## Future plans
