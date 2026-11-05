@@ -158,7 +158,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   rows, accounts and files are as in the backup ([migrations.md](migrations.md)). Still to do: the app's EAS update for
   the features that need these migrations (owner's approval).
 - **Ads refresh with the feed** (branch `ads-refresh`, merged by the owner as PR #103, 2026-11-05 02:42 UTC; no migration;
-  the website and CampConnect Admin redeployed, both Ready on Vercel; the app's part waits on an EAS update). On an iPhone, a
+  the website and CampConnect Admin redeployed, both Ready on Vercel; the app's part reached build `0493abcf` with the
+  EAS update of 2026-11-05 03:13 UTC). On an iPhone, a
   campaign paused in UniBuzz Business stayed in Orbit after a pull-to-refresh: the app fetched a feed's ads once per
   screen (`useFeedAds` kept them and asked again only as the feed grew), so a paused, ended or hidden ad stayed and a
   resumed or newly approved one did not appear until the screen was opened again. `ads_for_feed()` was right: it decides
@@ -195,20 +196,9 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   On staging, 2026-11-04 (staging first brought to production's schema, history.md): the API run 13/13 (three runs)
   and the browser 6/6, both as the run's student and as a fresh one whose impressions and clicks reached the
   businesses; the iPhone in Expo Go is in [testing.md](testing.md). Any EAS update waits on the owner's approval.
-- **UniBuzz Business v2 is on `main` without its migrations.** PR #49 was merged on 2026-10-28 at
-  04:07 UTC (and #51 at 07:06 UTC), so production's website runs Business v2 code while neither
-  migration 49 nor 50 is applied (production's `_migrations`, read-only, 2026-10-28). Until they are, the code
-  says these are broken on production:
-  - creating and editing posts in the portal;
-  - team invites;
-  - the Ads screens;
-  - "Message" on a business profile.
-
-  On staging in production's state, this code shows an error screen on the portal's Ads and
-  Analytics pages and the Business admin's Ads, Reports and Audit pages (2026-10-28). Student
-  feeds carry on without ads. The owner chooses (both write to production):
-  - the order of release below, now;
-  - or revert PR #49 on `main` first, until the migrations can be applied.
+- **UniBuzz Business v2's migrations are live** (since the release of 2026-11-03 00:19 UTC, migrations.md): the
+  portal's posts, invites and Ads screens work on production; a read-only schema diff on 2026-11-05 shows production
+  and `main` identical (607 functions).
 - **UniBuzz Business v2** (merged in PR #49 on 2026-10-28 at 04:07 UTC). It upgrades the v1 portal to the business spec:
   - team roles;
   - business posts;
@@ -336,8 +326,9 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   with a password alone. Now an admin is a staff owner or admin, not suspended, past a second factor; the portal
   sends a staff admin to `/business/two-factor` first. The website went live first (22:05 CST, from the branch), then
   67 alone (04:15 UTC), each with the owner's approval, after a full backup (docs/migrations.md). Still to do: the
-  owner's check in a browser, then the branch's PR (its merge, the owner's approval) so `main` carries the website
-  change before anything else is merged.
+  owner's check in a browser (passed, 2026-11-05), then the branch's PR (its merge, the owner's approval): the docs
+  merge of 22:14 CST redeployed `main`'s website over the branch's, so until the PR is merged the portal lacks its
+  two-factor routing (the database still enforces the rule).
 - **Decide and merge `step-admin`.** `admin-analytics-business` (draft PR #60) brings its app, scripts, suites,
   README section and website hunks to `main`'s tree (as of 2026-10-31); what still waits is its migration files'
   placement, production's `_migrations` rows, migration 18 and the `hidden_at` message types: the owner's questions
@@ -361,10 +352,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 
 | Item | Where it is written up |
 | --- | --- |
-| Two migrations not on production (44, 46), while `main`, which deploys production, already uses them (47 was applied on 2026-10-27) | [migrations.md](migrations.md) |
-| Business v2's code is on `main` (PRs #49 and #51) while migrations 49 and 50 are not on production (read-only check, 2026-10-28): posts, invites and the Ads screens in the portal fail until they are applied | "UniBuzz Business v2 is on `main` without its migrations" above |
 | `db:setup` token mode resets the production auth Site URL to localhost by default | [supabase/CLAUDE.md](../supabase/CLAUDE.md) |
-| A security fix for a live part of the database is pending | "Security fix pending" above |
+| Until `fix/security-2026-10-27`'s PR is merged, production's website is `main`'s (the docs merge of 2026-11-05 22:14 CST redeployed it over the branch's deployment): migration 67 still decides in the database, but the portal sends a staff admin without a second factor to errors instead of its two-factor page; merge that PR before anything else | "Admin authority fix live" above |
 | Supabase CLI history empty on production; `supabase db push` would re-run everything | `supabase/applied-outside-repo/README.md` |
 | Calls are paused and hidden for the launch (operating costs, 2026-11-02); switching them on also needs an Apple Developer Program membership (USD 99/yr), and the native ring (CallKit/PushKit, Android full-screen intent) is not built. Since migration 66 went live (2026-11-05) the database refuses new calls too; switching calls on takes its rollback as well as a build with `EXPO_PUBLIC_CALLS_ENABLED=1` | README §"Calls"; "Calls hidden for the launch" above |
 | `is_suspended(uuid)` callable while signed out (low severity) | applied-outside-repo README §"Security review" |
@@ -373,8 +362,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | Supabase CDN may serve a just-deleted Snap to the same viewer for ~1 minute | README §"Snaps" |
 | Supabase free projects pause after a week idle (Pro, USD 25/mo, before real users); built-in auth email is rate-limited (custom SMTP needed) | README §"Production checklist" |
 | Vercel Hobby optimizes 5,000 source images a month | README §"Photos" |
-| An EAS update from `main` would reach a build that cannot run it (read-only check, 2026-11-03): the app's runtime policy is `sdkVersion`, so every SDK 58 build takes any SDK 58 update, and the only one, the Android preview build of 2026-10-26 07:12 UTC (`2e0e4458`), predates `expo-camera`, `expo-media-library`, `expo-video-thumbnails` and `react-native-view-shot` (added 20:28 UTC that day, used by the create flow). No update has been published since. **Addressed by `ads-delivery` (merged, PR #97):** the runtime version is now the native fingerprint (`828b9d3`), so an update reaches only builds with the same native code, and the old build gets none; a new Android preview build on it, `0493abcf` (EAS, 2026-11-03, commit `828b9d3`, runtime `048bb02e…`, artifact until 2026-11-17), matches the code's fingerprint by `eas fingerprint:compare`. Its code is `ads-delivery`'s as of `828b9d3`, merged since; on 2026-11-05 `eas fingerprint:compare` against `main` at `63335d4` still matches (no native change since), so an update from `main` on the `preview` channel reaches it, and only it: the old preview build `9dea92b5` (runtime `exposdk:58.0.0`) gets none. Sharing it with testers and any update wait on the owner's approval; no update published (as of 2026-11-05). No EAS build exists for an iPhone (the iOS build is an SDK 57 simulator build); iPhones run the app in Expo Go | "Ads reach students" above |
-| The README still says the Vercel project is not connected to Git, and that 41 and 42 are not live; both are out of date | this file, [migrations.md](migrations.md) |
+| Testers' app: EAS updates reach only builds with the same native fingerprint (since `828b9d3`); today that is Android build `0493abcf` alone (update of 2026-11-05 03:13 UTC), whose install link stops working on 2026-11-17 (installed apps keep working); the old Android build gets no more updates; there is no iPhone build (an Apple Developer Program membership, USD 99/yr, then an iOS build) and no store build (the last Play Store build is on SDK 57) | "Ads refresh with the feed" above |
+| Production has no listings and no For You or Reels campaigns (read-only, 2026-11-05): Housing is empty everywhere and no student sees an ad until listings and campaigns exist | "Production's one live campaign is not visible yet" above |
 
 ## Future plans
 

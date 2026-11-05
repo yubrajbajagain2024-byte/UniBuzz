@@ -235,12 +235,18 @@ open work is in [status.md](status.md).
   (migrations.md). From then on no new call can start, whoever asks; no call was open to end.
 - 2026-11-05: the admin authority fix (`fix/security-2026-10-27`, local since 2026-10-27) brought up to `main`,
   its migration renumbered 67, rehearsed on staging with its rollback; with the owner's approval, step by step:
-  a full backup, the website deployed from the branch (22:05 CST), then 67 alone on production (04:15 UTC).
+  a full backup, the website deployed from the branch (22:05 CST), then 67 alone on production (04:15 UTC,
+  22:15 CST). The docs PR #105, merged at 22:14 CST, had redeployed `main`'s website over the branch's 17 seconds
+  before; the portal's two-factor routing returns with this branch's merge.
 - 2026-11-05 01:50 UTC: PR #102 (`pause-calls`: migration 66 and its tests, `main` merged in) merged into
   `main` by the owner; 66 was already live.
 - 2026-11-05 02:42 UTC: PR #103 (`ads-refresh`: a pull-to-refresh asks for the feed's ads again in the app's
   Orbit, Reels and Housing) merged into `main` by the owner; the website and CampConnect Admin redeployed
-  (Vercel: both Ready, their production addresses on the new deployments); no EAS update yet.
+  (Vercel: both Ready, their production addresses on the new deployments).
+- 2026-11-05: Android preview build `0493abcf` approved for testers by the owner (its APK checked: production's
+  backend, calls hidden), its install link forwarded by the owner; at 03:13 UTC, with the owner's approval, an EAS update
+  to the `preview` channel, Android only, from `main` at `d2bf09f` (group `c83f7fb4…`): the two ad fixes (an ad keeping
+  its slot when its listing is on the page; a pull-to-refresh asking for the feed's ads again) reach that build only.
 
 ## Retired branches
 
