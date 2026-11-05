@@ -331,12 +331,13 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 - **Buzz on the website.** The app has the threaded replies, top replies and prompt threads; the
   website still shows two levels of replies, no top reply, and prompt threads as ordinary buzzes
   (categories it has). See [branches/ankur/dev.md](branches/ankur/dev.md).
-- **Security fix pending.** A security fix for a live part of the database is ready on a local,
-  unpushed branch (2026-10-27) and is **not applied to production**. Its details stay out of this
-  repository until production is patched, because the repository is public. As of 2026-11-05 it has
-  `main` merged in, its migration renumbered 67 (`20261119000000_…`, after every migration production has),
-  every suite passing, and a rehearsal on staging with its rollback (where 67 stays applied); the
-  production steps wait on the owner's approval.
+- **Admin authority fix live** (migration 67, branch `fix/security-2026-10-27`, 2026-11-05). Until then the business
+  portal's staff tools (business review, payments, and since Business v2 ad review) trusted the admin role on its own,
+  with a password alone. Now an admin is a staff owner or admin, not suspended, past a second factor; the portal
+  sends a staff admin to `/business/two-factor` first. The website went live first (22:05 CST, from the branch), then
+  67 alone (04:15 UTC), each with the owner's approval, after a full backup (docs/migrations.md). Still to do: the
+  owner's check in a browser, then the branch's PR (its merge, the owner's approval) so `main` carries the website
+  change before anything else is merged.
 - **Decide and merge `step-admin`.** `admin-analytics-business` (draft PR #60) brings its app, scripts, suites,
   README section and website hunks to `main`'s tree (as of 2026-10-31); what still waits is its migration files'
   placement, production's `_migrations` rows, migration 18 and the `hidden_at` message types: the owner's questions
