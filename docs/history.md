@@ -237,7 +237,11 @@ open work is in [status.md](status.md).
   `main` by the owner; 66 was already live.
 - 2026-11-05 02:42 UTC: PR #103 (`ads-refresh`: a pull-to-refresh asks for the feed's ads again in the app's
   Orbit, Reels and Housing) merged into `main` by the owner; the website and CampConnect Admin redeployed
-  (Vercel: both Ready, their production addresses on the new deployments); no EAS update yet.
+  (Vercel: both Ready, their production addresses on the new deployments).
+- 2026-11-05: Android preview build `0493abcf` approved for testers by the owner (its APK checked: production's
+  backend, calls hidden), its install link forwarded by the owner; at 03:13 UTC, with the owner's approval, an EAS update
+  to the `preview` channel, Android only, from `main` at `d2bf09f` (group `c83f7fb4…`): the two ad fixes (an ad keeping
+  its slot when its listing is on the page; a pull-to-refresh asking for the feed's ads again) reach that build only.
 
 ## Retired branches
 
