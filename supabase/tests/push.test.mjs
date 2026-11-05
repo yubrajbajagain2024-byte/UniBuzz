@@ -3,8 +3,8 @@
 // rings. Run: node supabase/tests/push.test.mjs
 import { boot, expectError, expectOk, done } from "./harness.mjs";
 
-// Without migration 64's pause, so a call can still ring here (supabase/tests/calls-paused.test.mjs tests the pause).
-const { db, mk, as } = await boot({ skip: ["20261116000000_calls_paused.sql"] });
+// Without migration 66's pause, so a call can still ring here (supabase/tests/calls-paused.test.mjs tests the pause).
+const { db, mk, as } = await boot({ skip: ["20261118000000_calls_paused.sql"] });
 const rows = async (p) => (await p).rows;
 const one = async (q, params) => (await db.query(q, params)).rows[0];
 

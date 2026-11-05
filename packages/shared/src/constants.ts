@@ -432,6 +432,12 @@ export const AD_CAPTION_MAX = 2200;
 export const AD_HEADLINE_MAX = 80;
 /** One ad at most for every this many organic posts, reels or listings: "about one per 8 to 10". */
 export const ADS_EVERY = 9;
+/**
+ * The organic row a feed's first ad follows; ADS_EVERY rows apart after it. Each feed's first page has 8 to 12 rows
+ * (FOR_YOU_PAGE, REELS_PAGE_SIZE, DEFAULT_PAGE_SIZE), so a first ad only after the 9th row meant no ad on any first
+ * page, and none at all on a campus with fewer than 9 posts.
+ */
+export const ADS_FIRST_AFTER = 3;
 
 export const BUSINESS_REPORT_REASONS = [
   { value: "misleading", label: "Misleading or false" },

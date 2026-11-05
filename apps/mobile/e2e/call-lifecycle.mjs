@@ -3,7 +3,7 @@
 // caller gives up on (missed, with the other side's notification); a group call that some decline and some join
 // late; a stranger refused; and the token function's answer (a token once LiveKit is set up on the server, otherwise
 // its "not set up yet" refusal). Needs SUPABASE_ACCESS_TOKEN (to make and remove its throwaway accounts); everything
-// else runs signed in as them. Leaves nothing behind. While migration 64 pauses calls the database refuses every new
+// else runs signed in as them. Leaves nothing behind. While migration 66 pauses calls the database refuses every new
 // call ("Calls are paused for now."), so this runs only once calls are back on.
 //   SUPABASE_ACCESS_TOKEN=sbp_… node apps/mobile/e2e/call-lifecycle.mjs
 import { createClient } from "@supabase/supabase-js";

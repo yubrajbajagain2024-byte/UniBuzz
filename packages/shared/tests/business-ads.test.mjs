@@ -1,6 +1,6 @@
 // Unit tests for UniBuzz Business v2 (src/business.ts, src/schemas, src/queries/business.ts): team roles as the
-// database decides them, an ad's status over time, where ads go in a feed (one per 9 at most), where an ad's button
-// leads, placements, media, money, and the forms' schemas. Run: npm run test:shared
+// database decides them, an ad's status over time, where ads go in a feed (after row 3, then one per 9 at most), where
+// an ad's button leads, placements, media, money, and the forms' schemas. Run: npm run test:shared
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { register } from "node:module";
@@ -82,11 +82,60 @@ test("interleaveAds: at most one ad per 9 organic rows, never first, never two i
   assert.ok(ads <= Math.floor(organic / 9));
 });
 
-test("interleaveAds: an ad promoting a listing already in the feed gives its slot to the next ad; no ads, no slots", () => {
+test("the apps' spacing: every feed's first page (8 to 12 rows) has room for an ad; the old rule gave none", async () => {
+  const { ADS_FIRST_AFTER, FOR_YOU_PAGE, REELS_PAGE_SIZE, DEFAULT_PAGE_SIZE } = await import("../src/constants.ts");
+  const apps = { first: ADS_FIRST_AFTER };
+  const firstPages = [FOR_YOU_PAGE.posts + FOR_YOU_PAGE.reels, REELS_PAGE_SIZE, DEFAULT_PAGE_SIZE];
+  // Why ads did not show: the first page of For You and of Reels is 8 rows, under the 9 the old rule waited for.
+  assert.deepEqual(firstPages.map((n) => biz.adSlotCount(n, ADS_EVERY)), [0, 0, 1]);
+  assert.deepEqual(firstPages.map((n) => biz.adSlotCount(n, ADS_EVERY, apps)), [1, 1, 2]);
+  // After row 3, then 9 apart: rows 3, 12, 21, 30.
+  assert.deepEqual(biz.adSlotsAfter(0, 31, ADS_EVERY, apps), [2, 11, 20, 29]);
+  assert.deepEqual(biz.adSlotsAfter(8, 8, ADS_EVERY, apps), [11]);
+  assert.equal(biz.adSlotCount(31, ADS_EVERY, apps), 4);
+  assert.equal(biz.adSlotCount(2, ADS_EVERY, apps), 0, "a short feed still loading waits");
+  assert.equal(biz.adSlotCount(0, ADS_EVERY, { ...apps, ended: true }), 0, "an empty feed shows no ad");
+});
+
+test("interleaveAds with the apps' spacing: the first ad after row 3, then 9 apart; never first, never two in a row", () => {
+  const spacing = { first: 3 };
+  const kinds = (rows) => rows.map((r) => (r.kind === "ad" ? r.ad.id : "·")).join("");
+  assert.equal(kinds(biz.interleaveAds(posts(14), [ad("a1"), ad("a2"), ad("a3")], 9, spacing)), "···a1·········a2··");
+  assert.equal(kinds(biz.interleaveAds(posts(8), [ad("a1"), ad("a2")], 9, spacing)), "···a1·····");
+  assert.equal(kinds(biz.interleaveAds(posts(3), [ad("a1")], 9, spacing)), "···a1");
+  // A feed shorter than that: no ad while more may come, one at its end once it has ended, none when it is empty.
+  assert.equal(kinds(biz.interleaveAds(posts(2), [ad("a1")], 9, spacing)), "··");
+  assert.equal(kinds(biz.interleaveAds(posts(2), [ad("a1"), ad("a2")], 9, { ...spacing, ended: true })), "··a1");
+  assert.equal(kinds(biz.interleaveAds(posts(1), [ad("a1")], 9, { ...spacing, ended: true })), "·a1");
+  assert.equal(biz.interleaveAds([], [ad("a1")], 9, { ...spacing, ended: true }).length, 0);
+  // Ended or not, a feed long enough keeps the same places: ending adds nothing past the first slot.
+  assert.equal(kinds(biz.interleaveAds(posts(5), [ad("a1"), ad("a2")], 9, { ...spacing, ended: true })), "···a1··");
+  // The slots the feed asks for are the slots it fills.
+  for (let n = 0; n <= 40; n++) {
+    for (const ended of [false, true]) {
+      const s = { ...spacing, ended };
+      const placed = biz.interleaveAds(posts(n), Array.from({ length: 10 }, (_, i) => ad(`a${i}`)), 9, s).filter((r) => r.kind === "ad").length;
+      assert.equal(placed, biz.adSlotCount(n, 9, s), `${n} rows, ended ${ended}`);
+    }
+  }
+});
+
+test("interleaveAds: an ad promoting a listing already in the feed runs, and the listing's own row leaves the feed", () => {
+  const ids = (rows) => rows.map((r) => (r.kind === "ad" ? `ad:${r.ad.id}` : r.item.id));
   const rows = biz.interleaveAds(posts(18), [ad("a1", { type: "apartment", id: "p3" }), ad("a2")], 9);
-  assert.deepEqual(rows.filter((r) => r.kind === "ad").map((r) => r.ad.id), ["a2"]);
+  assert.deepEqual(rows.filter((r) => r.kind === "ad").map((r) => r.ad.id), ["a1", "a2"]);
+  assert.ok(!ids(rows).includes("p3"), "the promoted listing shows once, as the ad");
+  assert.equal(rows.filter((r) => r.kind === "item").length, 17);
+  // The case staging found: a campus whose whole Housing feed is 5 listings, the promoted one among them.
+  const small = biz.interleaveAds(posts(5), [ad("h1", { type: "apartment", id: "p0" })], 9, { first: 3, ended: true });
+  assert.deepEqual(ids(small), ["p1", "p2", "ad:h1", "p3", "p4"]);
+  // At the slot itself, the ad stands where the listing was.
+  assert.deepEqual(ids(biz.interleaveAds(posts(5), [ad("h1", { type: "apartment", id: "p2" })], 9, { first: 3, ended: true })), ["p0", "p1", "ad:h1", "p3", "p4"]);
+  // A promoted listing further down, or an ad not placed, takes nothing out.
+  assert.deepEqual(ids(biz.interleaveAds(posts(5), [ad("h1"), ad("h2", { type: "apartment", id: "p4" })], 9, { first: 3, ended: true })), ["p0", "p1", "p2", "ad:h1", "p3", "p4"]);
   assert.equal(biz.interleaveAds(posts(18), [], 9).length, 18);
   assert.equal(biz.interleaveAds(posts(5), [ad("a1")], 9).filter((r) => r.kind === "ad").length, 0);
+  assert.equal(biz.interleaveAds(posts(2), [ad("a1", { type: "apartment", id: "p0" })], 9, { first: 3 }).length, 2, "no slot yet: nothing taken out");
 });
 
 test("adDestination: links, listings, posts, a chat the student starts, or the profile", () => {

@@ -29,7 +29,7 @@ import { radius, space } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 
 /** The picture an ad shows: its own, or the listing's or post's it promotes; only from UniBuzz's storage or Mux. */
-function picture(ad: FeedAd): string | null {
+export function adPicture(ad: FeedAd): string | null {
   const own = mediaCover(ad.media);
   if (own) return safeBusinessImage(own);
   if (ad.promoted?.type === "apartment") return safeBusinessImage(ad.promoted.images[0]);
@@ -38,20 +38,15 @@ function picture(ad: FeedAd): string | null {
 }
 
 /**
- * An ad as students meet it in the app: a post in For You or a listing in Housing like any other, "Sponsored" under the
- * business's name, its button under the picture. The ••• menu hides it, reports it, blocks the business or says why it
- * is there; what the student does is counted, and the business only ever gets the numbers.
+ * What a student can do with an ad wherever it shows (a card in For You or Housing, a page in Reels): its button, the
+ * ••• menu (hide, report, block, why), the business's profile and Save. `gone` is the message once the ad stepped aside.
  */
-export function SponsoredCard({ ad, placement }: { ad: FeedAd; placement: AdPlacement }) {
-  const styles = useStyles();
-  const colors = useColors();
+export function useAdActions(ad: FeedAd, placement: AdPlacement) {
   const router = useRouter();
   const show = useActionSheet();
   const { user } = useSession();
   const [gone, setGone] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const image = picture(ad);
-  const listing = ad.promoted?.type === "apartment" ? ad.promoted : null;
   const openProfile = () => router.push({ pathname: "/businesses/[id]", params: { id: ad.business_id, ad: ad.id } });
 
   async function act() {
@@ -101,6 +96,28 @@ export function SponsoredCard({ ad, placement }: { ad: FeedAd; placement: AdPlac
     );
   }
 
+  function toggleSave() {
+    if (!user) return router.push("/(auth)/login" as never);
+    const next = !saved;
+    setSaved(next);
+    void saveAd(supabase, ad.id, next).catch(() => setSaved(!next));
+  }
+
+  return { gone, saved, act, menu, openProfile, toggleSave };
+}
+
+/**
+ * An ad as students meet it in the app: a post in For You or a listing in Housing like any other, "Sponsored" under the
+ * business's name, its button under the picture. The ••• menu hides it, reports it, blocks the business or says why it
+ * is there; what the student does is counted, and the business only ever gets the numbers.
+ */
+export function SponsoredCard({ ad, placement }: { ad: FeedAd; placement: AdPlacement }) {
+  const styles = useStyles();
+  const colors = useColors();
+  const { gone, saved, act, menu, openProfile, toggleSave } = useAdActions(ad, placement);
+  const image = adPicture(ad);
+  const listing = ad.promoted?.type === "apartment" ? ad.promoted : null;
+
   if (gone) return <Text style={styles.gone}>{gone}</Text>;
   return (
     <View style={styles.card} testID="sponsored-card" accessibilityLabel={`Sponsored by ${ad.business_name}`}>
@@ -147,12 +164,7 @@ export function SponsoredCard({ ad, placement }: { ad: FeedAd; placement: AdPlac
           {ad.caption}
         </Text>
         <Pressable
-          onPress={() => {
-            if (!user) return router.push("/(auth)/login" as never);
-            const next = !saved;
-            setSaved(next);
-            void saveAd(supabase, ad.id, next).catch(() => setSaved(!next));
-          }}
+          onPress={toggleSave}
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel={saved ? "Saved" : "Save"}

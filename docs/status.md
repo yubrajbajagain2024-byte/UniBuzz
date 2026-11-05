@@ -104,7 +104,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   probe exercised). **Ankur's "Invalid login
   credentials"** on production was not looked up (that reads a student's account): with Google sign-in off there, it
   is a wrong password or no account for that email; Forgot password now covers the first, Create an account the second.
-- **Calls hidden for the launch** (`pause-calls`, merged as PR #90, 2026-11-02 23:59 UTC; migration 64 after it): calls were already paused behind
+- **Calls hidden for the launch** (`pause-calls`, merged as PR #90, 2026-11-02 23:59 UTC; migration 66 after it, first written as 64 and renamed on 2026-11-04): calls were already paused behind
   `CALLS_PAUSED`, but every chat's bar still showed Audio call and Video call, which only brought up a "Coming Soon"
   pill. The owner postponed calls for the launch to hold down operating costs (docs/decisions.md), so now nothing of
   them shows in the app: Info stands alone in a direct or group chat's bar, no ring is listened for (no incoming-call
@@ -116,9 +116,10 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   tap on a missed call does nothing while a tap on a bubble beside it works, long press opens the message's menu, a
   ring from Ann while Sim's chat was open showed no incoming screen, and a call link landed on Messages. Testers get it
   with the next EAS update. The app alone left a gap: a signed-in request made outside the app could still start a
-  call (it then showed in the chat as a live "Ringing" row and rang the other phone through a push). **Migration 64**
-  (`20261116000000_calls_paused.sql`, written the same day, pushed to `pause-calls` after PR #90 was merged; PR to
-  open) closes it: the database refuses every
+  call (it then showed in the chat as a live "Ringing" row and rang the other phone through a push). **Migration 66**
+  (`20261118000000_calls_paused.sql`, written the same day as `20261116000000_calls_paused.sql`, 64, and pushed to
+  `pause-calls` after PR #90 was merged; renamed on 2026-11-04, `main` merged in, because `main`'s report auto-hide had
+  gone live as `20261116000000_report_auto_hide.sql`; PR to open) closes it: the database refuses every
   new call, whoever asks, and ends any call still open when it runs, keeping every past call; `start_call()` and its
   grants stay as they are. Rehearsed offline (`calls-paused.test.mjs`; the other rollout suites leave it out of production's state until it is
   live) and on staging (12/12), where it stays applied;
@@ -151,15 +152,30 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   and shares work against production from then on (checked as students in a rolled-back transaction). **Not checked
   in the app on an iPhone** (the Mac's iOS Simulator stopped drawing within a minute of each boot). Still to do: the
   pull request; an EAS update for the app's part (share reasons, group chats, the heart), not approved yet.
-- **Apply the pending migrations.** One run of `db:setup` from `main` in database-URL mode
-  ([supabase/CLAUDE.md](../supabase/CLAUDE.md)), after a backup, applies them in file order: 44 and
-  46 together, 49 and 50 (Business v2), 51 to 54 (Buzz), 55 and 56 (Business v2, PR #51), once
-  `business-v2`'s ad trigger fix is merged (the order of release below). Confirm with `verify.mjs --live`, then
-  publish the app update. Their code is already on `main`, which deploys production, so this is
-  overdue. Needs the owner and a credential. Ankur's 44, 46 and 51 to 54 (Discover and Buzz) can go
-  ahead of that run on their own, in two transactions, rehearsed offline on 2026-11-01
-  ([migrations.md](migrations.md), "44, 46 and 51 to 54 ahead of the release"); they wait on the
-  staging rehearsal and Sunil's approval.
+- **The Business v2 release is live (2026-11-03 00:19 UTC).** 44, 46, 49 to 57 and 63 applied in one `db:setup` run with the
+  owner's approval, after a full verified backup and a zero-difference schema diff; the diff is zero again after it and
+  rows, accounts and files are as in the backup ([migrations.md](migrations.md)). Still to do: the app's EAS update for
+  the features that need these migrations (owner's approval).
+- **Ads reach students** (branch `ads-delivery`, 2026-11-03, not merged yet; no migration). Ads approved in UniBuzz
+  Business did not show in the student feeds. Not the connection: the portal is part of the website, and the website's
+  and the app's settings name the same Supabase project (`apps/web/.env.local`, `apps/mobile/.env`; Vercel's own
+  variables not read), which has had the ads schema since the release above (read-only check as `anon`, 2026-11-03). Not
+  the approval or the serving: an ad built, submitted and approved through the apps' own code is returned by
+  `ads_for_feed()` on production's migrations (`supabase/tests/ad-delivery.test.mjs`). The cause was where the feeds put
+  ads: the first one waited for the 9th organic row, but the first page of For You and of Reels has 8 rows (Housing 12),
+  so those feeds never asked for an ad on their first page, and a campus with fewer than 9 posts never showed one; and
+  the app's Reels had no ads at all. Now the first ad follows the 3rd row, then one per 9 at most; a feed that has ended
+  with 1 or 2 rows ends with its ad ([decisions.md](decisions.md)); the app's Reels shows Sponsored reels. Staging found
+  one more (2026-11-04): an ad whose promoted listing was already on the page was skipped, leaving the only slot empty,
+  so on a campus with a page or less of listings a Housing ad never showed; now the ad runs and the listing's organic
+  row leaves the feed (the owner's choice, decisions.md). The website's
+  part goes live with the merge; the app's needs a new native build before any EAS update (see the EAS row under
+  "Blockers and known risks"). The live website and portal (their public JavaScript), EAS's production, preview and
+  development variables and the local settings all name the same live project, with the same anon key (2026-11-03).
+  Draft PR from `ads-delivery`. On staging, 2026-11-04 (staging first brought to production's schema, history.md): the
+  API run 13/13 and the browser 6/6, both as the run's student and as a fresh one whose impressions and clicks reached
+  the businesses; the iPhone in Expo Go is in [testing.md](testing.md). Merging (the website's part goes live) and any
+  EAS update each wait on the owner's approval.
 - **UniBuzz Business v2 is on `main` without its migrations.** PR #49 was merged on 2026-10-28 at
   04:07 UTC (and #51 at 07:06 UTC), so production's website runs Business v2 code while neither
   migration 49 nor 50 is applied (production's `_migrations`, read-only, 2026-10-28). Until they are, the code
@@ -183,6 +199,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   - analytics from real events;
   - an Apple-style portal with light and dark modes.
 
+  **Released 2026-11-03 00:19 UTC** (steps 2 and 3 below done; step 4, the app update, still waits on the owner).
   Order of release (the full list, rollbacks included, is "Production deployment checklist" in
   [branches/business-v2.md](branches/business-v2.md); rehearsed on staging on 2026-10-28). PR #51,
   the website part with 55 and 56, is live since 2026-10-28 07:06 UTC.
@@ -287,10 +304,10 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   a rate card, students' reports and the business audit log. The PR also brings the admin app itself to `main` from
   `step-admin`, with its scripts, suites and README section (its migration files stay where they are:
   [branches/step-admin.md](branches/step-admin.md)); on the website only two sign-in and account-deletion messages
-  change. **Migration 63** (`20261115000000_console_business.sql`), **not on production**: until it is, both sections say
-  they need it. Rehearsed on staging 2026-10-30/31 with the Business v2 release, through the API and in the admin app
-  signed in as staff with a second factor. Still to do, each with the owner's approval: the release (63 goes with it),
-  `grant_role` for business admins, the `campconnect-admin` Vercel project (reconnected to the repository on 2026-11-02) deployed from `main`, which its first merge touching `apps/admin` does. See
+  change. **Migration 63** (`20261115000000_console_business.sql`), **live since 2026-11-03 00:19 UTC** with the release: both
+  sections work for the owner (staff owner, admin role, authenticator). Rehearsed on staging 2026-10-30/31 with the Business v2 release, through the API and in the admin app
+  signed in as staff with a second factor. The `campconnect-admin` Vercel project is reconnected to the repository and deployed from `main` (PR #91,
+  2026-11-02); no `grant_role` was needed (the only staff account already has the admin role). See
   [branches/admin-analytics-business.md](branches/admin-analytics-business.md).
 - **Buzz on the website.** The app has the threaded replies, top replies and prompt threads; the
   website still shows two levels of replies, no top reply, and prompt threads as ordinary buzzes
@@ -326,13 +343,14 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | `db:setup` token mode resets the production auth Site URL to localhost by default | [supabase/CLAUDE.md](../supabase/CLAUDE.md) |
 | A security fix for a live part of the database is pending | "Security fix pending" above |
 | Supabase CLI history empty on production; `supabase db push` would re-run everything | `supabase/applied-outside-repo/README.md` |
-| Calls are paused and hidden for the launch (operating costs, 2026-11-02); switching them on also needs an Apple Developer Program membership (USD 99/yr), and the native ring (CallKit/PushKit, Android full-screen intent) is not built. Until migration 64 is on production the pause is in the app only, and the database still starts a call asked for outside it | README §"Calls"; "Calls hidden for the launch" above |
+| Calls are paused and hidden for the launch (operating costs, 2026-11-02); switching them on also needs an Apple Developer Program membership (USD 99/yr), and the native ring (CallKit/PushKit, Android full-screen intent) is not built. Until migration 66 is on production the pause is in the app only, and the database still starts a call asked for outside it | README §"Calls"; "Calls hidden for the launch" above |
 | `is_suspended(uuid)` callable while signed out (low severity) | applied-outside-repo README §"Security review" |
 | Buzz's `admin.spam` rule pack flags ordinary phrases (staff can turn it off under Rules) | README §"Buzz (anonymous)" |
 | A Buzz photo can be dated by Storage's `Last-Modified` despite the publication delay | same |
 | Supabase CDN may serve a just-deleted Snap to the same viewer for ~1 minute | README §"Snaps" |
 | Supabase free projects pause after a week idle (Pro, USD 25/mo, before real users); built-in auth email is rate-limited (custom SMTP needed) | README §"Production checklist" |
 | Vercel Hobby optimizes 5,000 source images a month | README §"Photos" |
+| An EAS update from `main` would reach a build that cannot run it (read-only check, 2026-11-03): the app's runtime policy is `sdkVersion`, so every SDK 58 build takes any SDK 58 update, and the only one, the Android preview build of 2026-10-26 07:12 UTC (`2e0e4458`), predates `expo-camera`, `expo-media-library`, `expo-video-thumbnails` and `react-native-view-shot` (added 20:28 UTC that day, used by the create flow). No update has been published since. **Addressed on `ads-delivery` (not merged):** the runtime version is now the native fingerprint (`828b9d3`), so an update reaches only builds with the same native code, and the old build gets none; a new Android preview build on it, `0493abcf` (EAS, 2026-11-03, commit `828b9d3`, runtime `048bb02e…`, artifact until 2026-11-17), matches the code's fingerprint by `eas fingerprint:compare`. It carries the branch's unmerged code: not for testers before the PR is approved; no update published. No EAS build exists for an iPhone (the iOS build is an SDK 57 simulator build); iPhones run the app in Expo Go | "Ads reach students" above |
 | The README still says the Vercel project is not connected to Git, and that 41 and 42 are not live; both are out of date | this file, [migrations.md](migrations.md) |
 
 ## Future plans

@@ -15,9 +15,9 @@ const STORIES = "20261110000100_stories.sql";
 const MEDIA = "20261112000100_story_media.sql";
 const FOLDERS = "20261112000200_upload_folders.sql";
 const STORIES_SET = [STORIES, MEDIA, FOLDERS];
-// 61 (Events), 62 (story actions) and 64 (calls paused) follow the same path later, on their own (events-rollout.test.mjs,
+// 61 (Events), 62 (story actions) and 66 (calls paused) follow the same path later, on their own (events-rollout.test.mjs,
 // story-actions-rollout.test.mjs, calls-paused.test.mjs); they are not part of this rehearsal.
-const AHEAD = ["20261113000000_events.sql", "20261114000000_story_actions.sql", "20261116000000_calls_paused.sql"];
+const AHEAD = ["20261113000000_events.sql", "20261114000000_story_actions.sql", "20261118000000_calls_paused.sql"];
 const ROLLBACKS = ["rollbacks/20261112000200_upload_folders.down.sql", "rollbacks/20261112000100_story_media.down.sql", "rollbacks/20261110000100_stories.down.sql"];
 // The release 58, 59 and 60 go ahead of, in file order.
 const REST = [

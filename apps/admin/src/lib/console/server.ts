@@ -7,7 +7,8 @@ import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdCounts, AdRate, AdsAnalytics, AnalyticsOverview, BusinessCounts, BusinessOpsOverview, ConsoleAd, ConsoleAdRow, ConsoleBusiness, ConsoleBusinessRow,
-  ConsolePage, PaymentsPage, RevenueAnalytics,
+  ConsoleEvent, ConsoleEventsCounts, ConsoleEventsFilter, ConsoleFeed, ConsoleOrganization, ConsolePage, PaymentsPage, QueueCounts, RevenueAnalytics,
+  RulePackState, StaffAppeal, StaffPage, SystemHealth,
 } from "./ops-types";
 import { consoleRpc, toConsoleError } from "./rpc";
 
@@ -72,3 +73,17 @@ export function requireUuid(id: string): string {
   if (!UUID.test(id)) notFound();
   return id;
 }
+
+// --- Moderation, events, operations and settings (migrations 41, 61 and 65): for every staff member with a second factor.
+// The pages call requireStaff first; each function checks the caller again in SQL (ts_require_staff / ts_require_admin).
+
+export const fetchQueueCounts = cache(() => consoleFetch<QueueCounts>("console_queue_counts"));
+export const fetchAppeals = (view: string, offset: number, limit: number) =>
+  consoleFetch<StaffPage<StaffAppeal>>("console_appeals", { p_view: view, p_limit: limit, p_offset: offset });
+export const fetchRulePacks = () => consoleFetch<RulePackState[]>("console_rule_packs");
+export const fetchSystemHealth = () => consoleFetch<SystemHealth>("console_system_health");
+export const fetchEventsCounts = cache(() => consoleFetch<ConsoleEventsCounts>("events_console_counts"));
+export const fetchEventFeeds = () => consoleFetch<ConsoleFeed[]>("events_console_feeds");
+export const fetchConsoleOrganizations = (filter: { verified?: boolean; status?: string; q?: string } = {}) =>
+  consoleFetch<ConsoleOrganization[]>("events_console_organizations", { p_filter: filter });
+export const fetchConsoleEvents = (filter: ConsoleEventsFilter = {}) => consoleFetch<{ items: ConsoleEvent[]; total: number }>("events_console_events", { p_filter: filter });

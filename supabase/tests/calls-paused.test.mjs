@@ -1,35 +1,20 @@
-// Migration 64 (calls paused for the launch) applied to production on its own, ahead of the Business v2 release,
-// rehearsed offline the way 58 to 62 were: a database in production's state (production's migration order, the
-// migrations applied outside this repo, 47 and 58 to 62 applied although 44, 46, 49 to 57 and 63 are not) holding a call
-// that is over, one still ringing and one going on; 64 alone, as the next migration, twice; then no call can start or
-// ring, the open calls are ended, past calls stay readable as history and start_call() is untouched; then the release
-// (44, 46, 49 to 57 and 63) applied after it, in file order, as `npm run db:setup` will, with calls still refused; then 64's
-// own rollback, which must leave exactly the schema of a database that never had it, with calls ringing again; then 64
-// again. Run: node supabase/tests/calls-paused.test.mjs
+// Migration 66 (calls paused for the launch) applied to production on its own, rehearsed offline the way 58 to 65 were:
+// a database in production's state (production's migration order, the migrations applied outside this repo, every
+// migration up to 65 applied: the Business v2 release, the report auto-hide 64 and the console health 65) holding a call
+// that is over, one still ringing and one going on; 66 alone, as the next migration, twice; then no call can start or
+// ring, the open calls are ended, past calls stay readable as history and start_call() is untouched; then 66's own
+// rollback, which must leave exactly the schema of a database that never had it, with calls ringing again; then 66
+// again. (Written as 64 to go live ahead of the release; renamed 66 on 2026-11-04, after the release, 64 and 65 went
+// live first.) Run: node supabase/tests/calls-paused.test.mjs
 import { boot, read, expectOk, expectError, done } from "./harness.mjs";
 import { catalog, diffCatalogs } from "./catalog.mjs";
 import { callOf } from "../../packages/shared/src/calls.ts";
 
-const PAUSED = "20261116000000_calls_paused.sql";
-const ROLLBACK = "rollbacks/20261116000000_calls_paused.down.sql";
-// What 64 goes ahead of, in file order: the release.
-const REST = [
-  "20261103000300_discover.sql",
-  "20261104000100_discover_audience.sql",
-  "20261107000000_business_teams.sql",
-  "20261107000100_business_ads.sql",
-  "20261108000000_buzz_reply_tree.sql",
-  "20261108000100_buzz_top_reply.sql",
-  "20261108000200_buzz_prompt_threads.sql",
-  "20261108000300_buzz_categories.sql",
-  "20261109000000_media_server_fields.sql",
-  "20261109000100_business_hardening.sql",
-  "20261110000000_business_hours.sql",
-  "20261115000000_console_business.sql",
-];
+const PAUSED = "20261118000000_calls_paused.sql";
+const ROLLBACK = "rollbacks/20261118000000_calls_paused.down.sql";
 const check = (cond, message) => { if (!cond) throw new Error(message); };
 
-const { db, mk, as, asService } = await boot({ live: true, skip: [...REST, PAUSED] });
+const { db, mk, as, asService } = await boot({ live: true, skip: [PAUSED] });
 const one = async (p) => (await p).rows[0];
 const rows = async (p) => (await p).rows;
 const val = async (q, params = []) => { const r = await one(db.query(q, params)); return r[Object.keys(r)[0]]; };
@@ -51,8 +36,8 @@ const missedNotes = async (uid, id) => (await rows(db.query("select 1 from publi
 const counts = async () => one(db.query("select (select count(*)::int from public.calls) as calls, (select count(*)::int from public.call_participants) as participants, (select count(*)::int from public.messages) as messages, (select count(*)::int from public.notifications) as notifications"));
 
 let over, ringing, going, before;
-await expectOk("before: production's state (62 applied; 44, 46, 49 to 57, 63 and 64 not); a call over, one ringing, one going on", async () => {
-  check(await has("select to_regclass('public.story_likes') is not null and to_regclass('public.ads') is null and to_regprocedure('public.guard_calls_paused()') is null as ok"), "not production's state");
+await expectOk("before: production's state (everything up to 65 applied, 66 not); a call over, one ringing, one going on", async () => {
+  check(await has("select to_regclass('public.ads') is not null and to_regclass('public.report_auto_hides') is not null and to_regprocedure('public.console_system_health()') is not null and to_regprocedure('public.guard_calls_paused()') is null as ok"), "not production's state");
   over = await start(A, AB);
   await leave(A, over.call_id);
   ringing = await start(A, AB);
@@ -63,7 +48,7 @@ await expectOk("before: production's state (62 applied; 44, 46, 49 to 57, 63 and
   before = { schema: await schema(), over: await call(over.call_id) };
 });
 
-await expectOk("64 applies alone, as the next migration, and re-runs cleanly", async () => { await db.exec(read(`migrations/${PAUSED}`)); await db.exec(read(`migrations/${PAUSED}`)); });
+await expectOk("66 applies alone, as the next migration, and re-runs cleanly", async () => { await db.exec(read(`migrations/${PAUSED}`)); await db.exec(read(`migrations/${PAUSED}`)); });
 
 await expectOk("the open calls ended as the app ends them: the ring missed (Bob notified), the call going on completed (Carol, still rung, missed and notified)", async () => {
   const r = await call(ringing.call_id), g = await call(going.call_id);
@@ -87,7 +72,7 @@ const refusals = async (label) => {
   });
   await expectError(`${label}: nor does the service role write a call`, () => asService(() => db.query("insert into public.calls (conversation_id, started_by, kind) values ($1, $2, 'audio')", [AB, A])), "Calls are paused");
 };
-await refusals("64 alone");
+await refusals("66 alone");
 
 await expectOk("past calls stay history: both read them, current_call finds none to join, answer_call hands an ended call back unjoined", async () => {
   check((await get(B, ringing.call_id)).status === "ended" && (await get(A, over.call_id)).status === "ended", "a past call cannot be read");
@@ -104,14 +89,8 @@ await expectOk("the guard is closed to the API", async () => {
   check(await has("select not has_function_privilege('authenticated', 'public.guard_calls_paused()', 'execute') and not has_function_privilege('anon', 'public.guard_calls_paused()', 'execute') as ok"), "the API may call the guard");
 });
 
-await expectOk("the release (44, 46, 49 to 57 and 63) applies after 64, in file order, as db:setup will", async () => { for (const f of REST) await db.exec(read(`migrations/${f}`)); });
-await expectOk("after them the guard is still on calls (no later migration removed it)", async () => {
-  check(await has("select to_regclass('public.ads') is not null and exists (select 1 from pg_trigger where tgname = 'calls_paused' and tgrelid = 'public.calls'::regclass) as ok"), "the guard is gone");
-});
-await refusals("after the release");
-
 let again;
-await expectOk("64's rollback leaves exactly the schema of a database that never had it", async () => {
+await expectOk("66's rollback leaves exactly the schema of a database that never had it", async () => {
   await db.exec(read(ROLLBACK));
   const reference = await boot({ live: true, skip: [PAUSED] });
   const changed = diffCatalogs(await catalog(async (q) => (await reference.db.query(q)).rows), await schema());
@@ -122,11 +101,11 @@ await expectOk("after the rollback a call starts and rings again", async () => {
   again = await start(A, AB);
   check((await states(again.call_id))[B] === "ringing", "Bob is not rung");
 });
-await expectOk("64 applies again afterwards and ends that ring", async () => {
+await expectOk("66 applies again afterwards and ends that ring", async () => {
   await db.exec(read(`migrations/${PAUSED}`));
   const r = await call(again.call_id);
   check(r.status === "ended" && r.ended_reason === "missed", JSON.stringify(r));
 });
-await refusals("64 re-applied");
+await refusals("66 re-applied");
 
-done("CALLS PAUSED AHEAD OF THE RELEASE (64 AFTER 62, THEN 44, 46, 49 TO 57 AND 63)");
+done("CALLS PAUSED ON PRODUCTION'S STATE (66 AFTER 65)");

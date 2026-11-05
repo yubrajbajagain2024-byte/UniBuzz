@@ -25,8 +25,10 @@ const REST = [
   "20261110000000_business_hours.sql",
   "20261115000000_console_business.sql",
 ];
-// 64 (calls paused) goes to production on its own later (calls-paused.test.mjs); it is not part of this rehearsal.
-const AHEAD = ["20261116000000_calls_paused.sql"];
+// Migrations written after 62 went live (2026-11-02), left out so the rehearsal keeps to production's state as it
+// was; 64 replaces ts_snapshot() and ts_set_content_status() again, so 62's rollback would not restore its schema
+// under it (rollbacks run newest first). 66 (calls paused) goes to production on its own (calls-paused.test.mjs).
+const AHEAD = ["20261116000000_report_auto_hide.sql", "20261118000000_calls_paused.sql"];
 const check = (cond, message) => { if (!cond) throw new Error(message); };
 
 const { db, mk, as } = await boot({ live: true, skip: [...REST, ACTIONS, ...AHEAD] });

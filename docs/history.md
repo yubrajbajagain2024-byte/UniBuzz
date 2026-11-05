@@ -52,6 +52,8 @@ open work is in [status.md](status.md).
   ([decisions.md](decisions.md)).
 - **2026-11-01:** PRs #77 to #81 merge (the app's viewers, bottom bar, Home's top edge, Settings, Explore's and Events'
   filters); migration 61 (Events) reaches production on its own, ahead of the Business v2 release (23:31 UTC).
+- **2026-11-03:** the Business v2 release reaches production (00:19 UTC): 44, 46, 49 to 57 and 63 in one `db:setup`
+  run, after a full verified backup; CampConnect Admin's Analytics and Business work from then on.
 - **2026-11-02:** migration 62 (story actions) reaches production on its own (04:32 UTC). PR #60 merges:
   CampConnect Admin (`apps/admin`, from `step-admin`) is on `main` with its Analytics and Business sections
   (migration 63, not on production) and the rest of `step-admin` outside its migration files.
@@ -190,7 +192,41 @@ open work is in [status.md](status.md).
   (`20261109000000_media_server_fields.sql`, `20261109000100_business_hardening.sql`): now 55 and
   56.
 
+- 2026-11-03: PR #53 (`auto-hide-reports`: content 10 different people report is hidden, flagged for
+  CampConnect Admin's Flagged page, its owner told, the hide audited) merged into `main` with its
+  migration renamed from `20261110000000_…` (57, a timestamp `main` had taken for the business hours)
+  to `20261116000000_report_auto_hide.sql` (64), after a merge of `main` that kept migration 62's
+  story branches in the two Trust & Safety functions it replaces. Applied to production the same day
+  (below).
+- 2026-11-03 04:14 UTC: migration 64 (`20261116000000_report_auto_hide.sql`) applied to production
+  alone, with the owner's approval, after a full backup (`before-migration-64`) and a zero-difference
+  schema diff; every object checked after and the schema matching the repo exactly (migrations.md).
+  CampConnect Admin's Flagged page works from then on.
+- 2026-11-03: PR #95 (`admin-sections`) merged into `main`: CampConnect Admin's sidebar becomes nine
+  sections (Dashboard, Users, Moderation, Content, Business & Ads, Analytics, Operations, Support,
+  Administration), each section's pages as tabs; new pages Appeals, Events, System health, Email,
+  Support requests, Issues and Settings; Alerts and Pending decisions on the dashboard; Verification
+  on Users (docs/technical-reference.md, "CampConnect Admin: sections"). Migration 65
+  (`20261117000000_console_health.sql`) applied to production at 05:02 UTC the same day, alone, with
+  the owner's approval, after a full backup (`before-migration-65`) and a zero-difference schema diff;
+  checked after, the schema matching the repo exactly (migrations.md).
+- 2026-11-04 08:30–08:31 UTC: staging (`campconnect-staging`) brought to production's schema, with
+  the owner's approval, for the `ads-delivery` staging run. Since the release rehearsal's rollback it
+  lacked 15 migrations production has: staff invitations by email (applied outside the repo), 44, 46,
+  49 to 57, 63, 64 and 65. First one dry run of all 15 in a transaction rolled back, then each in its
+  own transaction with its `_migrations` row; no existing table's rows changed. Staging also keeps
+  `pause-calls`' calls pause, which production does not have.
+- 2026-11-04: `pause-calls`' migration renamed from `20261116000000_calls_paused.sql` (64, the timestamp
+  `main`'s live report auto-hide also has) to `20261118000000_calls_paused.sql` (66), with `main` merged
+  into the branch; staging's `_migrations` row renamed with it (the objects were already there, and the
+  migration shares no object with 64 or 65, so the order it ran in makes no difference). Not on production.
+
 ## Retired branches
 
-None deleted yet. When a branch is merged and deleted, add a line here (name, what it delivered,
-its PRs) and delete its file in `branches/`.
+When a branch is merged and deleted, add a line here (name, what it delivered, its PRs) and delete
+its file in `branches/`.
+
+- `auto-hide-reports` (Yubraj, 2026-10-28 to 2026-11-03): the report auto-hide backstop, migration 64
+  and its PGlite suite, the console's limitation note U1. PR #53. Deleted after the merge.
+- `admin-sections` (Yubraj, 2026-11-03): the admin app's nine sections and their pages, migration 65 and its
+  suite. PR #95. Deleted after the merge.

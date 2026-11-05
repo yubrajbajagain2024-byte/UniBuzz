@@ -10,20 +10,21 @@ import {
   type AutoHiddenRow,
   type AutoHideStatus,
 } from "@apartment-book/shared";
-import { requireStaff } from "@/lib/admin";
+import { hasRole, requireStaff } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/server";
 import { cn, firstParam } from "@/lib/utils";
 import { FormMessage } from "@/components/ui/field";
 import { SetupNotice } from "@/components/ui/setup-notice";
 import { FlaggedList } from "@/components/flagged/flagged-list";
 import { PageHeader } from "@/components/shell/page-header";
+import { SectionTabs } from "@/components/shell/section-tabs";
 
 export const metadata: Metadata = { title: "Flagged" };
 
 const TABS: { value: AutoHideStatus | "all"; label: string }[] = [...AUTO_HIDE_STATUSES.map((s) => ({ value: s.value, label: s.label })), { value: "all", label: "All" }];
 
 export default async function FlaggedPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  await requireStaff("/flagged");
+  const access = await requireStaff("/flagged");
   const params = await searchParams;
   const requested = firstParam(params.status);
   const status = TABS.find((t) => t.value === requested)?.value ?? "pending";
@@ -45,9 +46,10 @@ export default async function FlaggedPage({ searchParams }: { searchParams: Prom
         title="Flagged"
         description={`Content hidden automatically because ${AUTO_HIDE_THRESHOLD} different people reported it (buzzes can be hidden sooner by Buzz's own threshold). It stays hidden until you restore it, keep it hidden or delete it; its owner was told it is under review.`}
       />
+      <SectionTabs section="moderation" admin={hasRole(access, "admin")} />
       {firstParam(params.deleted) ? <FormMessage success="The content was deleted permanently. Its files and videos are being removed." /> : null}
       {needsMigration ? (
-        <SetupNotice migration="20261110000000_report_auto_hide (on main)" what="Hiding content automatically after reports" />
+        <SetupNotice migration="20261116000000_report_auto_hide" what="Hiding content automatically after reports" />
       ) : (
         <>
           <nav aria-label="Review status" className="flex gap-1 overflow-x-auto rounded-lg bg-gray-200/60 p-1">

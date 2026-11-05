@@ -57,9 +57,13 @@ Supabase's `auth` and `storage` schemas.
   Storage; `events.mjs`, Events through the same (it applies 61 on staging when missing);
   `story-actions.mjs`, a story's likes, replies and shares into direct and group chats through the
   app's own code (it applies 62 on staging when missing); `calls-paused.mjs`, every new call
-  refused and open calls ended (it applies 64 on staging when missing); `auth-recovery.mjs`, sign-up, confirmation,
+  refused and open calls ended (it applies 66 on staging when missing); `auth-recovery.mjs`, sign-up, confirmation,
   login and password recovery through Supabase Auth and the apps' own code (links made with the
   admin API; staging's built-in mailer allows two emails an hour); and
+  `ad-delivery.mjs`, an ad from a business's sign-up to students' first pages through the apps' own code, with
+  `--keep` to leave the campaigns live three hours for the website (`apps/web/e2e/sponsored-ads.mjs`) and a phone
+  (`student <label>` makes a fresh student per device, since impressions and clicks count once per student, ad and
+  hour; `pause <placement>` and `resume <placement>` for the phone's pause check), then `verify` and `cleanup`; and
   `release-rehearsal.mjs`, which rehearses a release step by step (see its header) and expects every
   migration that went live ahead of the release (58 to 61) to be applied on staging first.
   Staging's `media_jobs` grows on its own: leave it out of row-count comparisons.

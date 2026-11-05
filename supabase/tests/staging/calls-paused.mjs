@@ -1,15 +1,15 @@
-// Calls paused for the launch (migration 64) on the staging project, through the real Supabase stack and the app's own
-// call code (startCall, answerCall, getCall, currentCall from packages/shared): before 64, one call that is over and one
-// still ringing; then 64 on its own, as production will take it; then the ringing call ended as missed, every new call
+// Calls paused for the launch (migration 66) on the staging project, through the real Supabase stack and the app's own
+// call code (startCall, answerCall, getCall, currentCall from packages/shared): before 66, one call that is over and one
+// still ringing; then 66 on its own, as production will take it; then the ringing call ended as missed, every new call
 // refused for students (direct and group, audio and video) and for the service role with nothing written, past calls
 // still readable, nothing to join, and no LiveKit token for an ended call. Never runs against production: it refuses
 // production's ref and any project not named as staging.
 //
 //   SUPABASE_ACCESS_TOKEN=… STAGING_SUPABASE_REF=<ref> node supabase/tests/staging/calls-paused.mjs [--restore]
 //
-// Applies 64 when staging does not have it yet (the file, then its public._migrations row, as db:setup records them).
+// Applies 66 when staging does not have it yet (the file, then its public._migrations row, as db:setup records them).
 // Three students of one campus (confirmed txstate.edu accounts made by the admin API, no email sent). Everything made is
-// deleted at the end and every table's row count compared with the start. With --restore, 64 is rolled back afterwards
+// deleted at the end and every table's row count compared with the start. With --restore, 66 is rolled back afterwards
 // (its rollback file and the removal of its _migrations row).
 import fs from "node:fs";
 import { register } from "node:module";
@@ -40,7 +40,7 @@ if (REF === PRODUCTION) throw new Error("This test writes, deletes and may roll 
 
 const ROOT = new URL("../../../", import.meta.url);
 const read = (rel) => fs.readFileSync(new URL(rel, ROOT), "utf8");
-const MIGRATION = "20261116000000_calls_paused.sql";
+const MIGRATION = "20261118000000_calls_paused.sql";
 const S = (rel) => import(new URL(`packages/shared/src/${rel}`, ROOT));
 const { answerCall, currentCall, getCall, leaveCall, startCall } = await S("queries/calls.ts");
 const { createGroupConversation } = await S("queries/messages.ts");
@@ -106,12 +106,12 @@ const { data: direct, error: directError } = await ann.c.rpc("get_or_create_dire
 if (directError) throw new Error(directError.message);
 const group = await createGroupConversation(ann.c, "Calls paused group", [bob.id, cara.id]);
 
-// --- Before 64: a call that is over and one still ringing (only when staging does not have 64 yet) -------------------------
+// --- Before 66: a call that is over and one still ringing (only when staging does not have 66 yet) -------------------------
 const had = new Set((await sql("select name from public._migrations")).map((r) => r.name)).has(MIGRATION);
 let over = null, ringing = null, overBefore = null;
 if (had) ok(`${MIGRATION} is already on staging (the calls it ends cannot be set up again)`);
 else {
-  await check("before 64: Ann calls Bob and hangs up; then calls again and leaves it ringing", async () => {
+  await check("before 66: Ann calls Bob and hangs up; then calls again and leaves it ringing", async () => {
     over = await startCall(ann.c, direct, "audio");
     await leaveCall(ann.c, over.callId);
     ringing = await startCall(ann.c, direct, "audio");
@@ -189,14 +189,14 @@ await check("everything made is deleted; every table's row count is as at the st
   for (const id of accounts) await admin.auth.admin.deleteUser(id);
   await sleep(2000);
   const after = await counts();
-  // 64's own _migrations row is the one row this run keeps, when it applied 64.
+  // 66's own _migrations row is the one row this run keeps, when it applied 66.
   const expected = { ...baseline, _migrations: baseline._migrations + (had ? 0 : 1) };
   const drift = Object.entries(after).filter(([t, n]) => t !== "media_jobs" && n !== expected[t]).map(([t, n]) => `${t}: ${expected[t]} → ${n}`);
   expect(drift.length === 0, drift.join(", "));
 });
 if (RESTORE) {
-  await check("64 rolled back: its rollback file and its _migrations row removed", async () => {
-    await sql(read("supabase/rollbacks/20261116000000_calls_paused.down.sql"));
+  await check("66 rolled back: its rollback file and its _migrations row removed", async () => {
+    await sql(read("supabase/rollbacks/20261118000000_calls_paused.down.sql"));
     await sql(`delete from public._migrations where name = ${lit(MIGRATION)}`);
     expect((await val("select to_regprocedure('public.guard_calls_paused()') is null")) === true, "the guard is still there");
   });

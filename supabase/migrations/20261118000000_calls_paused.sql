@@ -1,9 +1,10 @@
 -- =============================================================================
--- UniBuzz - migration 64: calls paused for the launch
--- Follows 20261115000000_console_business.sql (migration 63, not on production) in file order. Needs only migration
--- 35's calls (the calls table, end_call()) and 36's ring, both on production. No pending migration (44, 46, 49 to 57,
--- 63) touches calls, so it can go live on its own, ahead of them, as 58 to 62 did.
--- Rollback: supabase/rollbacks/20261116000000_calls_paused.down.sql. Safe to run more than once.
+-- UniBuzz - migration 66: calls paused for the launch
+-- Follows 20261117000000_console_health.sql (migration 65, on production) in file order. First written as
+-- 20261116000000_calls_paused.sql (64), renamed on 2026-11-04 because main's report auto-hide took that timestamp and
+-- went live as 64 (staging's public._migrations row was renamed with it). Needs only migration 35's calls (the calls
+-- table, end_call()) and 36's ring, both on production; nothing applied since touches calls.
+-- Rollback: supabase/rollbacks/20261118000000_calls_paused.down.sql. Safe to run more than once.
 --
 -- Audio and video calls are postponed for the launch to hold down what they cost to run (the owner's decision,
 -- 2026-11-02; docs/decisions.md). The app already offers no way to start one (CALLS_PAUSED in

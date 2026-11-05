@@ -456,42 +456,63 @@ export function isVerticalVideo(item: { width?: number | null; height?: number |
 }
 
 /**
- * The organic positions after which an ad goes, for the rows numbered `start` to `start + count - 1` of a feed (0-based,
- * counted over the whole feed so pages agree): after the every-th row, the 2×every-th, and so on. At most one ad per
- * `every` organic rows, never two in a row, never before the first `every`.
+ * Where a feed's ads go besides `every`. `first`: the organic row the first ad follows (ADS_FIRST_AFTER in the apps;
+ * `every` when left out). `ended`: the feed has no more pages, so a feed shorter than `first` (but not empty) ends
+ * with its one ad instead of having none.
  */
-export function adSlotsAfter(start: number, count: number, every: number): number[] {
+export type AdSpacing = { first?: number; ended?: boolean };
+
+/** Whether an ad goes after organic row `index` (0-based) of a feed of `total` rows so far. */
+function isAdSlot(index: number, total: number, every: number, spacing: AdSpacing): boolean {
+  if (every < 1) return false;
+  const first = Math.max(1, spacing.first ?? every);
+  const n = index + 1;
+  if (n === first || (n > first && (n - first) % every === 0)) return true;
+  return Boolean(spacing.ended) && total < first && n === total;
+}
+
+/**
+ * The organic positions after which an ad goes, for the rows numbered `start` to `start + count - 1` of a feed (0-based,
+ * counted over the whole feed so pages agree): after row `first`, then every `every` rows. Never two in a row, never
+ * before the first organic row.
+ */
+export function adSlotsAfter(start: number, count: number, every: number, spacing: AdSpacing = {}): number[] {
   const out: number[] = [];
-  if (every < 1) return out;
-  for (let i = Math.max(0, start); i < start + count; i++) if ((i + 1) % every === 0) out.push(i);
+  for (let i = Math.max(0, start); i < start + count; i++) if (isAdSlot(i, start + count, every, spacing)) out.push(i);
   return out;
 }
 
 export type FeedRow<T> = { kind: "item"; item: T; index: number } | { kind: "ad"; ad: FeedAd; slot: number };
 
 /**
- * A feed's rows with its ads between them: ad k after organic row (k + 1) × every − 1, while there are ads. The ads
- * keep their order (the database's rotation); an ad whose promoted listing or post is already in the feed, or which
- * already ran, is skipped for the next one, so a student never meets the same thing twice in a row.
+ * A feed's rows with its ads between them, at the positions adSlotsAfter() gives, while there are ads. The ads keep
+ * their order (the database's rotation) and each runs once. A student never meets the same thing twice: when an ad
+ * promotes a listing or post that is also in the feed, the ad keeps its slot and the organic copy is left out
+ * (docs/decisions.md). Skipping the ad instead left its slot empty, since a feed asks for only as many ads as it has
+ * slots, so on a campus with a page or less of listings a Housing ad never showed.
  */
-export function interleaveAds<T extends { id: string }>(items: T[], ads: FeedAd[], every: number): FeedRow<T>[] {
+export function interleaveAds<T extends { id: string }>(items: T[], ads: FeedAd[], every: number, spacing: AdSpacing = {}): FeedRow<T>[] {
+  const slots = items.map((_, index) => isAdSlot(index, items.length, every, spacing));
+  const placed = ads.filter((a, i) => ads.findIndex((b) => b.id === a.id) === i).slice(0, slots.filter(Boolean).length);
+  const shownByAd = new Set(placed.flatMap((a) => (a.promoted ? [a.promoted.id] : [])));
   const rows: FeedRow<T>[] = [];
-  const present = new Set(items.map((i) => i.id));
-  const queue = ads.filter((a, i) => ads.findIndex((b) => b.id === a.id) === i && !(a.promoted && present.has(a.promoted.id)));
   let slot = 0;
   items.forEach((item, index) => {
-    rows.push({ kind: "item", item, index });
-    if (every >= 1 && (index + 1) % every === 0 && slot < queue.length) {
-      rows.push({ kind: "ad", ad: queue[slot], slot });
+    if (!shownByAd.has(item.id)) rows.push({ kind: "item", item, index });
+    if (slots[index] && slot < placed.length) {
+      rows.push({ kind: "ad", ad: placed[slot], slot });
       slot += 1;
     }
   });
   return rows;
 }
 
-/** How many ads a feed of `count` organic rows has room for. */
-export function adSlotCount(count: number, every: number): number {
-  return every >= 1 ? Math.floor(Math.max(0, count) / every) : 0;
+/** How many ads a feed of `count` organic rows has room for (what the feed asks ads_for_feed() for). */
+export function adSlotCount(count: number, every: number, spacing: AdSpacing = {}): number {
+  if (every < 1 || count <= 0) return 0;
+  const first = Math.max(1, spacing.first ?? every);
+  if (count < first) return spacing.ended ? 1 : 0;
+  return 1 + Math.floor((count - first) / every);
 }
 
 export type AdDestination =
