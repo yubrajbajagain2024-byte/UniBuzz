@@ -23,6 +23,12 @@ const at = (ms) => new Date(Date.now() + ms).toISOString();
 const ms = (offset) => Date.now() + offset;
 /** The Central-time day (the console's days) of now + offset, as YYYY-MM-DD. */
 const centralDay = (offset = 0) => new Date(Date.now() + offset).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+/** When a Central-time day (YYYY-MM-DD) starts, in epoch ms: its midnight is 05:00 or 06:00 UTC, by daylight saving. */
+const centralStart = (day) => [5, 6].map((h) => Date.parse(`${day}T00:00:00Z`) + h * HOUR).find((t) =>
+  new Date(t).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }) === day &&
+  new Date(t).toLocaleTimeString("en-GB", { timeZone: "America/Chicago", hour12: false }) === "00:00:00");
+/** How long a Central-time day is: 24 hours, but 23 when the clocks spring forward and 25 when they fall back. */
+const centralDayLength = (day) => centralStart(new Date(centralStart(day) + 26 * HOUR).toLocaleDateString("en-CA", { timeZone: "America/Chicago" })) - centralStart(day);
 const check = (cond, message) => { if (!cond) throw new Error(message); };
 
 const ANALYTICS = ["public.console_analytics_overview(30, null)", "public.console_analytics_ads(30, null)", "public.console_analytics_revenue(30)"];
@@ -273,7 +279,11 @@ async function setup(h) {
     // Earned: $100 over ten days, five gone ($50). The two ads' payments began when they were submitted (a start in
     // the past moves to that minute), so they have earned a cent at most yet.
     check(r.totals.recognizedCents >= 5000 && r.totals.recognizedCents <= 5002, `earned ${r.totals.recognizedCents}, want about 5000`);
-    check(r.perDay.find((x) => x.day === centralDay(-3 * DAY)).recognizedCents === 1000, JSON.stringify(r.perDay.find((x) => x.day === centralDay(-3 * DAY))));
+    // A whole day of the ten earns its share by its length: 1000 cents for 24 hours, 1042 for the 25 when the clocks
+    // fall back (2026-11-01), 958 for 23 (the console counts seconds; the check used to assume 24 hours a day).
+    const earnedDay = centralDay(-3 * DAY);
+    const dayShare = Math.round((10000 * centralDayLength(earnedDay)) / (10 * DAY));
+    check(r.perDay.find((x) => x.day === earnedDay).recognizedCents === dayShare, `${JSON.stringify(r.perDay.find((x) => x.day === earnedDay))}, want ${dayShare}`);
     check(r.perDay.find((x) => x.day === centralDay(-5 * DAY)).bookedCents === 10000, "the $100 payment's day");
     const placement = Object.fromEntries(r.byPlacement.map((p) => [p.placement, p.bookedCents]));
     check(placement.for_you === 13000 && placement.reels === 5000 && Object.keys(placement).length === 2, JSON.stringify(r.byPlacement));
