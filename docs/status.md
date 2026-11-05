@@ -157,6 +157,17 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   owner's approval, after a full verified backup and a zero-difference schema diff; the diff is zero again after it and
   rows, accounts and files are as in the backup ([migrations.md](migrations.md)). Still to do: the app's EAS update for
   the features that need these migrations (owner's approval).
+- **Ads refresh with the feed** (branch `ads-refresh`, 2026-11-04, not merged; no migration). On an iPhone, a
+  campaign paused in UniBuzz Business stayed in Orbit after a pull-to-refresh: the app fetched a feed's ads once per
+  screen (`useFeedAds` kept them and asked again only as the feed grew), so a paused, ended or hidden ad stayed and a
+  resumed or newly approved one did not appear until the screen was opened again. `ads_for_feed()` was right: it decides
+  by the ad's state and the clock on every call. Now each first page (a pull-to-refresh, a new filter) starts a new round
+  of a feed's ads (`nextAdsRequest`, `receiveAds` in `packages/shared`) in Orbit, Reels and Housing: asked for again from
+  the first, the old ones kept on screen until the new arrive, an unchanged set left as it was so the list does not
+  re-render, late answers from an earlier round dropped; a screen counts an impression once, refreshes included
+  (`adsToCount`). The website has no in-place refresh: a reload or a navigation already asks again
+  (`apps/web/e2e/sponsored-ads-refresh.mjs`). Results in [testing.md](testing.md). The app's part reaches testers only
+  with an EAS update, the owner's approval; it changes no native code.
 - **Ads reach students** (branch `ads-delivery`, merged by the owner as PRs #97, #98 and #99, 2026-11-03 21:25 UTC to
   2026-11-04 09:14 UTC; no migration; the website's part is live on production). Ads approved in UniBuzz
   Business did not show in the student feeds. Not the connection: the portal is part of the website, and the website's
