@@ -62,10 +62,15 @@ const nullCall = (f) => {
 };
 /** Staff functions say "Not allowed"; the business portal's (main's migration 39, require_admin()) say "Only CampConnect admins can do this". */
 const REFUSED = /Not allowed|Only CampConnect admins can do this/;
-await expectOk("called by a student (with or without a second factor) every admin_* function is refused; admin_me answers 'not staff'", async () => {
+await expectOk("called by a student (with or without a second factor) every admin_* function is refused; admin_me answers 'not staff' and admin_standing nothing", async () => {
   for (const f of adminApi) {
     const q = nullCall(f);
     if (f.name === "admin_me") { if ((await as(S, () => rows(db.query(q)), MFA)).length !== 0) throw new Error("admin_me returned a row for a student"); continue; }
+    // The caller's own standing (migration 67): a student is told nothing, with or without a second factor.
+    if (f.name === "admin_standing") {
+      for (const claims of [{}, MFA]) if ((await as(S, () => rows(db.query(q)), claims))[0]?.admin_standing !== null) throw new Error("admin_standing told a student something");
+      continue;
+    }
     await fails(() => as(S, () => db.query(q)), REFUSED).catch((e) => { throw new Error(`${f.name} (aal1): ${e.message}`); });
     await fails(() => as(S, () => db.query(q), MFA), REFUSED).catch((e) => { throw new Error(`${f.name} (aal2): ${e.message}`); });
   }

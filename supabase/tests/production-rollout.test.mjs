@@ -13,8 +13,9 @@ import { BUZZ_GUIDELINES_VERSION, BUZZ_CATEGORIES } from "../../packages/shared/
 import { catalog, diffCatalogs, isBuzz, BUZZ_DATA_SQL, DATA_HELPER_SQL, DROP_DATA_HELPER_SQL } from "./catalog.mjs";
 
 // Migrations that go to production on their own, as 58 to 62 and 66 did, are left out here until they are live, so the
-// database starts in production's state as it is. None waits: 66 (calls paused) went live on 2026-11-05.
-const AHEAD = [];
+// database starts in production's state as it is. 66 (calls paused) went live on 2026-11-05; 67 (admin authority,
+// admin-authority.test.mjs) waits.
+const AHEAD = ["20261119000000_admin_authority.sql"];
 const PENDING = [
   "20261103000300_discover.sql",
   "20261104000100_discover_audience.sql",

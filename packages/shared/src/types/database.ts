@@ -2566,6 +2566,11 @@ export type Database = {
         Args: Record<string, never>;
         Returns: string;
       };
+      /** Migration 48: the caller's standing for the admin screens: 'admin', 'mfa_required' (a staff admin who has not passed two-factor sign-in) or null. */
+      admin_standing: {
+        Args: Record<string, never>;
+        Returns: string | null;
+      };
       /** Migration 39: a student's chat with the business behind a listing or deal; one per student and business. */
       start_business_inquiry: {
         Args: { p_target_type: string; p_target_id: string };

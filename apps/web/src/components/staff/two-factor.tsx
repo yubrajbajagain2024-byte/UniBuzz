@@ -12,9 +12,10 @@ const message = (e: unknown) => (e instanceof Error && e.message ? e.message : "
 
 /**
  * Steps the session up to aal2: a code from an authenticator the account already has, or adding one first (QR code
- * or the secret typed by hand, then its first code). Afterwards the console opens.
+ * or the secret typed by hand, then its first code). Afterwards `doneHref` opens: the console by default, the business
+ * portal's admin screens from the portal (which name themselves with `subject`).
  */
-export function StaffTwoFactor() {
+export function StaffTwoFactor({ doneHref = "/admin", subject = "The staff console" }: { doneHref?: string; subject?: string }) {
   const router = useRouter();
   const [status, setStatus] = useState<MfaStatus | null>(null);
   const [enrollment, setEnrollment] = useState<TotpEnrollment | null>(null);
@@ -25,11 +26,11 @@ export function StaffTwoFactor() {
   useEffect(() => {
     getMfaStatus(createClient())
       .then((s) => {
-        if (s.verified) router.replace("/admin");
+        if (s.verified) router.replace(doneHref);
         else setStatus(s);
       })
       .catch((e) => setError(message(e)));
-  }, [router]);
+  }, [router, doneHref]);
 
   const factor = status?.factors.find((f) => f.status === "verified") ?? null;
 
@@ -57,7 +58,7 @@ export function StaffTwoFactor() {
         const supabase = createClient();
         if (enrollment) await confirmTotpEnrollment(supabase, enrollment.factorId, digits);
         else if (factor) await verifyTotp(supabase, factor.id, digits);
-        router.replace("/admin");
+        router.replace(doneHref);
         router.refresh();
       } catch (err) {
         setCode("");
@@ -84,12 +85,12 @@ export function StaffTwoFactor() {
         </>
       ) : factor ? (
         <p className="text-sm text-gray-700">
-          The staff console needs a code from your authenticator app each time you sign in. It&apos;s the same app as CampConnect Admin.
+          {subject} needs a code from your authenticator app each time you sign in. It&apos;s the same app as CampConnect Admin.
         </p>
       ) : (
         <>
           <p className="text-sm text-gray-700">
-            The staff console needs two-factor sign-in. Add an authenticator app (Google Authenticator, 1Password, Authy or similar) to this
+            {subject} needs two-factor sign-in. Add an authenticator app (Google Authenticator, 1Password, Authy or similar) to this
             account. It&apos;s the same one CampConnect Admin uses.
           </p>
           <Button onClick={addAuthenticator} loading={pending}>

@@ -233,6 +233,11 @@ open work is in [status.md](status.md).
   zero-difference schema diff and a full backup (`before-migration-66`) first, the file and its
   `_migrations` row in one transaction; checked after, the schema matching the branch exactly
   (migrations.md). From then on no new call can start, whoever asks; no call was open to end.
+- 2026-11-05: the admin authority fix (`fix/security-2026-10-27`, local since 2026-10-27) brought up to `main`,
+  its migration renumbered 67, rehearsed on staging with its rollback; with the owner's approval, step by step:
+  a full backup, the website deployed from the branch (22:05 CST), then 67 alone on production (04:15 UTC,
+  22:15 CST). The docs PR #105, merged at 22:14 CST, had redeployed `main`'s website over the branch's 17 seconds
+  before; the portal's two-factor routing returns with this branch's merge.
 - 2026-11-05 01:50 UTC: PR #102 (`pause-calls`: migration 66 and its tests, `main` merged in) merged into
   `main` by the owner; 66 was already live.
 - 2026-11-05 02:42 UTC: PR #103 (`ads-refresh`: a pull-to-refresh asks for the feed's ads again in the app's

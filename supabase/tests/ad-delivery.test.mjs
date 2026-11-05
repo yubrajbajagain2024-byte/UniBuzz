@@ -92,6 +92,9 @@ const TX = (await one(db.query("select id from public.universities where email_d
 const UTSA = (await one(db.query("select id from public.universities where name = 'University of Texas at San Antonio'"))).id;
 const adminId = await mk("ann@txstate.edu", "Ann Avery");
 await db.query("select public.grant_role($1, 'admin')", [adminId]);
+// On production's schema an admin is a staff owner or admin, not suspended, signed in with a second factor (migration
+// 67): the role alone is not enough. The aal2 session below brings the verified factor.
+await db.query("select public.admin_bootstrap_owner('ann@txstate.edu')");
 const team = client(adminId, { aal: "aal2" });
 const benId = await mk("ben@txstate.edu", "Ben Brooks");
 const ben = client(benId);

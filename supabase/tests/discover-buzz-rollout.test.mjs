@@ -24,8 +24,9 @@ const REST = [
   "20261115000000_console_business.sql",
 ];
 // Others going to production on their own, left out until they are live. 62 (story actions) went live on 2026-11-02 and
-// 66 (calls paused) on 2026-11-05, so production's state includes both; none waits.
-const AHEAD = [];
+// 66 (calls paused) on 2026-11-05, so production's state includes both; 67 (admin authority, admin-authority.test.mjs)
+// waits.
+const AHEAD = ["20261119000000_admin_authority.sql"];
 const check = (cond, message) => { if (!cond) throw new Error(message); };
 
 const { db, mk, as, asAnon, asService } = await boot({ live: true, skip: [...DISCOVER, ...BUZZ, ...REST, ...AHEAD] });

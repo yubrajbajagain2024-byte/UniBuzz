@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { canUsePortal, getMyBusiness, getProfile, isBusinessRole, roleOf, standingOf, teamRoleAllows, type BusinessCapability, type BusinessStanding, type MyBusiness, type ProfileWithUniversity, type UserRole } from "@apartment-book/shared";
+import { notFound, redirect } from "next/navigation";
+import { canUsePortal, getAdminStanding, getMyBusiness, getProfile, isBusinessRole, roleOf, standingOf, teamRoleAllows, type BusinessCapability, type BusinessStanding, type MyBusiness, type ProfileWithUniversity, type UserRole } from "@apartment-book/shared";
 import { getBusinessHost, getBusinessSiteUrl, getSiteUrl } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { joinPortal, PORTAL_PREFIX } from "./paths";
@@ -11,6 +11,9 @@ export const getPortalBase = cache(async (): Promise<string> => {
   const base = (await headers()).get("x-portal-base");
   return base === null ? PORTAL_PREFIX : base;
 });
+
+/** Where a staff admin confirms it's them with their authenticator app before the admin screens open. */
+export const PORTAL_TWO_FACTOR_PATH = "/two-factor";
 
 /** A portal path as this request should link to it. */
 export async function portalPath(path: string): Promise<string> {
@@ -114,5 +117,11 @@ export async function requireBusinessOwner(nextPath = "/", allowed: BusinessStan
 export async function requireAdmin(nextPath = "/admin"): Promise<PortalSession> {
   const session = await requirePortalSession(nextPath);
   if (session.role !== "admin") redirect(await portalPath("/"));
+  // The role only shows the way in; the database decides (getAdminStanding). A staff admin confirms two-factor first.
+  // Anyone else gets "not found", like the staff console: the portal's front page sends the admin role here, so a
+  // redirect back there would loop.
+  const standing = await getAdminStanding(await createClient(), session.role);
+  if (standing === "mfa_required") redirect(await portalPath(PORTAL_TWO_FACTOR_PATH));
+  if (standing !== "admin") notFound();
   return session;
 }

@@ -63,7 +63,9 @@ Supabase's `auth` and `storage` schemas.
   `ad-delivery.mjs`, an ad from a business's sign-up to students' first pages through the apps' own code, with
   `--keep` to leave the campaigns live three hours for the website (`apps/web/e2e/sponsored-ads.mjs`) and a phone
   (`student <label>` makes a fresh student per device, since impressions and clicks count once per student, ad and
-  hour; `pause <placement>` and `resume <placement>` for the phone's pause check), then `verify` and `cleanup`; and
+  hour; `pause <placement>` and `resume <placement>` for the phone's pause check), then `verify` and `cleanup`;
+  `admin-authority.mjs`, migration 67 applied, checked through Auth and the REST API, rolled back and applied again
+  (`--restore` leaves it rolled back); and
   `release-rehearsal.mjs`, which rehearses a release step by step (see its header) and expects every
   migration that went live ahead of the release (58 to 61) to be applied on staging first.
   Staging's `media_jobs` grows on its own: leave it out of row-count comparisons.

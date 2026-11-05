@@ -321,9 +321,14 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 - **Buzz on the website.** The app has the threaded replies, top replies and prompt threads; the
   website still shows two levels of replies, no top reply, and prompt threads as ordinary buzzes
   (categories it has). See [branches/ankur/dev.md](branches/ankur/dev.md).
-- **Security fix pending.** A security fix for a live part of the database is ready on a local,
-  unpushed branch (2026-10-27) and is **not applied to production**. Its details stay out of this
-  repository until production is patched, because the repository is public.
+- **Admin authority fix live** (migration 67, branch `fix/security-2026-10-27`, 2026-11-05). Until then the business
+  portal's staff tools (business review, payments, and since Business v2 ad review) trusted the admin role on its own,
+  with a password alone. Now an admin is a staff owner or admin, not suspended, past a second factor; the portal
+  sends a staff admin to `/business/two-factor` first. The website went live first (22:05 CST, from the branch), then
+  67 alone (04:15 UTC), each with the owner's approval, after a full backup (docs/migrations.md). Still to do: the
+  owner's check in a browser (passed, 2026-11-05), then the branch's PR (its merge, the owner's approval): the docs
+  merge of 22:14 CST redeployed `main`'s website over the branch's, so until the PR is merged the portal lacks its
+  two-factor routing (the database still enforces the rule).
 - **Decide and merge `step-admin`.** `admin-analytics-business` (draft PR #60) brings its app, scripts, suites,
   README section and website hunks to `main`'s tree (as of 2026-10-31); what still waits is its migration files'
   placement, production's `_migrations` rows, migration 18 and the `hidden_at` message types: the owner's questions
@@ -348,7 +353,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | Item | Where it is written up |
 | --- | --- |
 | `db:setup` token mode resets the production auth Site URL to localhost by default | [supabase/CLAUDE.md](../supabase/CLAUDE.md) |
-| A security fix for a live part of the database is pending | "Security fix pending" above |
+| Until `fix/security-2026-10-27`'s PR is merged, production's website is `main`'s (the docs merge of 2026-11-05 22:14 CST redeployed it over the branch's deployment): migration 67 still decides in the database, but the portal sends a staff admin without a second factor to errors instead of its two-factor page; merge that PR before anything else | "Admin authority fix live" above |
 | Supabase CLI history empty on production; `supabase db push` would re-run everything | `supabase/applied-outside-repo/README.md` |
 | Calls are paused and hidden for the launch (operating costs, 2026-11-02); switching them on also needs an Apple Developer Program membership (USD 99/yr), and the native ring (CallKit/PushKit, Android full-screen intent) is not built. Since migration 66 went live (2026-11-05) the database refuses new calls too; switching calls on takes its rollback as well as a build with `EXPO_PUBLIC_CALLS_ENABLED=1` | README §"Calls"; "Calls hidden for the launch" above |
 | `is_suspended(uuid)` callable while signed out (low severity) | applied-outside-repo README §"Security review" |
