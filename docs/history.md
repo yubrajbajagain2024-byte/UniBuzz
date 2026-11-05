@@ -228,6 +228,11 @@ open work is in [status.md](status.md).
 - 2026-11-05 01:12 UTC: PR #100 (`ads-delivery-followup`: `console-business.test.mjs`'s revenue check
   made daylight-saving proof, the docs brought up to `ads-delivery`'s merge) merged into `main` by the
   owner; then `main` merged into `pause-calls`.
+- 2026-11-05 01:44 UTC: migration 66 (`20261118000000_calls_paused.sql`, calls paused in the database)
+  applied to production alone, with the owner's approval, from `pause-calls` before its PR: a
+  zero-difference schema diff and a full backup (`before-migration-66`) first, the file and its
+  `_migrations` row in one transaction; checked after, the schema matching the branch exactly
+  (migrations.md). From then on no new call can start, whoever asks; no call was open to end.
 
 ## Retired branches
 

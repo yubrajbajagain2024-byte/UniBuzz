@@ -12,9 +12,9 @@ import { boot, read, expectOk, done } from "./harness.mjs";
 import { BUZZ_GUIDELINES_VERSION, BUZZ_CATEGORIES } from "../../packages/shared/src/buzz/constants.ts";
 import { catalog, diffCatalogs, isBuzz, BUZZ_DATA_SQL, DATA_HELPER_SQL, DROP_DATA_HELPER_SQL } from "./catalog.mjs";
 
-// Migrations that go to production on their own, ahead of this release, as 58 to 62 did, are left out here until they
-// are live, so the database starts in production's state as it is. Waiting: 66 (calls paused, calls-paused.test.mjs).
-const AHEAD = ["20261118000000_calls_paused.sql"];
+// Migrations that go to production on their own, as 58 to 62 and 66 did, are left out here until they are live, so the
+// database starts in production's state as it is. None waits: 66 (calls paused) went live on 2026-11-05.
+const AHEAD = [];
 const PENDING = [
   "20261103000300_discover.sql",
   "20261104000100_discover_audience.sql",
