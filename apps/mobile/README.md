@@ -719,7 +719,9 @@ Haptics and tap-to-top are covered with the comments above.
 - iOS capabilities: Push Notifications (the `aps-environment` entitlement from expo-notifications; EAS enables it on the
   App ID when it sets up credentials) and background audio (`UIBackgroundModes`, no App ID setting). No Sign in with
   Apple, associated domains, location or App Groups.
-- iOS credentials on EAS: **none yet** (checked 2026-11-09); see "Set up Apple signing" below.
+- iOS credentials on EAS (2026-11-10): the distribution certificate (expires 2027-11-09), the App Store profile, the
+  push key, and an ad hoc profile holding one iPhone (the owner's). The first iPhone build is `preview` build
+  `b2aaee9d` (internal, 1.0.0 (1), install link valid until 2026-11-24). See "Set up Apple signing" below.
 - Build profiles: `eas.json` (`production` auto-increments build numbers on EAS)
 - Workflow: `.eas/workflows/create-production-builds.yml` builds both platforms on push to `main`
   once the GitHub repo is linked on expo.dev (set base directory to `apps/mobile`).
