@@ -712,23 +712,51 @@ Haptics and tap-to-top are covered with the comments above.
 
 - EAS project: `@apartmentbooks-team/apartment-book` (id in `app.json` → `extra.eas.projectId`)
 - Bundle id / package: `com.apartmentbook.app`
+- Apple Developer team: `H7F8K4XUB4` (paid membership active as of 2026-11-09). It is in `eas.json` → `submit.production.ios`,
+  and deliberately **not** in `app.json` (`ios.appleTeamId`): any change to `app.json` changes the native fingerprint of
+  both platforms, which would cut the testers' Android build off from updates. EAS records the team with the credentials
+  when you sign in with the Apple ID, and signs every build with it.
+- iOS capabilities: Push Notifications (the `aps-environment` entitlement from expo-notifications; EAS enables it on the
+  App ID when it sets up credentials) and background audio (`UIBackgroundModes`, no App ID setting). No Sign in with
+  Apple, associated domains, location or App Groups.
+- iOS credentials on EAS: **none yet** (checked 2026-11-09); see "Set up Apple signing" below.
 - Build profiles: `eas.json` (`production` auto-increments build numbers on EAS)
 - Workflow: `.eas/workflows/create-production-builds.yml` builds both platforms on push to `main`
   once the GitHub repo is linked on expo.dev (set base directory to `apps/mobile`).
 - Backend features the stores require are live: account deletion (Settings → Account & Profile → Account Management), report and
   block (••• menu on posts, More on profiles), privacy policy and terms (website `/privacy`, `/terms`).
 
-## Ship to the App Store (first time, needs Xcode + Apple Developer account)
+## Set up Apple signing (once, needs the Apple ID's password and two-factor code)
+
+EAS makes and keeps every certificate and profile; nothing is stored on a Mac or in the repo. Run these in your own
+Terminal (they ask questions), from `apps/mobile`, logged in to Expo (`npx eas-cli@latest whoami` says `apartmentbook`):
+
+```bash
+npx eas-cli@latest credentials -p ios
+# → production → log in to your Apple account: yes → Apple ID, password, 2FA code → team H7F8K4XUB4
+# → Build Credentials → "All: Set up all the required credentials to build your project"
+#   (registers com.apartmentbook.app on the team with Push Notifications, makes the distribution certificate and the
+#   App Store provisioning profile)
+# → Push Notifications → set up a push key (the APNs key the Expo push service sends with)
+npx eas-cli@latest device:create          # each tester's iPhone, for internal (preview, development-device) builds
+npx eas-cli@latest credentials -p ios     # → preview → Build Credentials → All (an ad hoc profile with those iPhones)
+```
+
+The distribution certificate is shared by the App Store and ad hoc profiles. A team holds at most a few distribution
+certificates; when EAS says the limit is reached, let it revoke one it does not use, never one another app ships with.
+A new iPhone means `eas device:create`, then the next `preview` build offers to add it to the profile.
+
+## Ship to the App Store (first time)
 
 ```bash
 cd apps/mobile
-npx eas-cli@latest login
-npx eas-cli@latest build --profile production --platform ios   # sign in with your Apple ID when asked
+npx eas-cli@latest build --profile production --platform ios   # after "Set up Apple signing"
 npx eas-cli@latest submit --platform ios --latest              # uploads to TestFlight / App Store Connect
 ```
 
-Before submitting, in App Store Connect create the app (name "Apartment Book",
-bundle id `com.apartmentbook.app`) and fill the listing: screenshots, description,
+`eas submit` offers to create the app in App Store Connect on the first run (name "UniBuzz", or another if that name is
+taken, bundle id `com.apartmentbook.app`, team `H7F8K4XUB4`); add its Apple id to `eas.json` → `submit.production.ios`
+→ `ascAppId` afterwards so later submissions run without questions. Then fill the listing: screenshots, description,
 privacy policy URL `https://apartment-book-vyass.vercel.app/privacy`, support URL,
 age rating, and the App Privacy questionnaire (email, name, photos, messages,
 user content; not used for tracking).
