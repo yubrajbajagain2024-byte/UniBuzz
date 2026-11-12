@@ -16,14 +16,14 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   editor, publish with title, link, audience (campus | global | friends | selected) and comments
   switch; roommate posts and Marketplace items made in the same flow, optionally anonymous.
 - **Search** (the former Discover tab, a screen behind the magnifier beside the bell since the
-  `events` branch): search plus popular posts, topics and accounts per campus (falls back until 44
-  is live).
+  `events` branch): search plus popular posts, topics and accounts per campus (44 and 46, live
+  since 2026-11-03).
 - **Buzz v2:** anonymous threads, moderation engine, staff console at `/admin` (41 + 42 live since
   2026-10-26). Since PR #41 (2026-10-27) an emoji no longer holds a Buzz for review. In the app,
   replies form a Reddit-style tree, feed cards show a top reply, and each day's prompt has one
-  thread per feed; in the app and on the website a buzz may have a category. These need 51 to 54,
-  not live as of 2026-11-01; until then both fall back (two levels, no top reply, prompt answers
-  as their own buzz, no category kept).
+  thread per feed; in the app and on the website a buzz may have a category (51 to 54, live since
+  2026-11-03). The website's Buzz has no reply tree, top reply or prompt threads yet, and nothing
+  filters by category.
 - **Messages:** realtime chats, groups, semester course chats, voice messages, replies,
   attachments, requests, mute; **Snaps** (view-once); **Calls** (built; paused and hidden for the
   launch, "Calls hidden for the launch" below).
