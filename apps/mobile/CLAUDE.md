@@ -33,7 +33,8 @@ npx eas-cli@latest update --channel preview --environment preview   # publish JS
 
 - **Run every Expo and EAS command from `apps/mobile/`.** At the repo root EAS finds no project
   and writes a stub `app.json` there (it happened on 2026-10-26; see
-  docs/branches/business-portal-prelaunch.md).
+  docs/branches/business-portal-prelaunch.md), and `npx expo start` writes `.expo/` and a stub
+  `tsconfig.json` there (2026-11-15). Delete such stubs; never commit them.
 - `eas update` publishes JavaScript only. A change to native configuration (`app.json` plugins,
   permissions, SDK) needs a new native build; `npx eas-cli@latest build:list` shows which exist.
   The runtime version is the native fingerprint, so an update reaches only builds with the same
@@ -62,10 +63,30 @@ Why each exists: [docs/decisions.md](../../docs/decisions.md).
 - `EXPO_PUBLIC_BUZZ_FIXTURES=<variant>` in `.env.local`: development only, answers Buzz from
   sample data.
 
+## Media, gestures and the keyboard
+
+- A photo that zooms uses `src/components/zoomable.tsx`; a video's timeline and its "2×" pill are
+  `src/components/video-controls.tsx` (1× always, 2× only while a finger is held on it). In the
+  full-screen viewer a double tap on a photo zooms it; in the feeds a double tap likes
+  ([docs/decisions.md](../../docs/decisions.md)).
+- A bar that rides the keyboard (the chat's message bar, a story's reply row) moves by Reanimated's
+  `useAnimatedKeyboard` and a transform (`keyboardLift` in `src/components/messages/composer.tsx`),
+  not a KeyboardAvoidingView, and needs no new native module, so an EAS update still reaches it.
+- Gesture Handler inside a React Native `Modal` needs its own `GestureHandlerRootView` in it.
+
 ## End-to-end checks
 
+- **Signed-in checks run on staging, never the live project.** `SUPABASE_ACCESS_TOKEN=…
+  STAGING_SUPABASE_REF=… node e2e/sim-seed.mjs` makes three throwaway students with posts, two chats
+  and a story, and prints the test login (**without `STAGING_SUPABASE_REF` it seeds production**).
+  Start Metro with staging's `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` in the
+  environment (they win over `.env`), sign in with
+  `exp://<host>:<port>/--/dev-login?email=…&password=…&to=<route>&theme=light|dark`, and clean up with
+  `node e2e/sim-cleanup.mjs` (it follows the seed's project). The token goes on the command line only.
+- A temporary development screen under `src/app/` with sample data is fine for a look; never commit it.
+- The iOS Simulator has no VoiceOver: check VoiceOver on a real iPhone.
 - Simulator: `e2e/run.sh e2e/flows/00-signed-out.yaml` (Maestro), with data from
   `node e2e/sim-seed.mjs`; remove it afterwards with `node e2e/sim-cleanup.mjs`.
 - `e2e/snap-lifecycle.mjs` and `e2e/call-lifecycle.mjs` run between two real accounts.
-- **These scripts create throwaway accounts and data on the live project** (they need
-  `SUPABASE_ACCESS_TOKEN`), so they are production writes. Always clean up afterwards.
+- **Without a staging ref these scripts create throwaway accounts and data on the live project**
+  (they need `SUPABASE_ACCESS_TOKEN`), so they are production writes. Always clean up afterwards.

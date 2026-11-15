@@ -103,8 +103,7 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
   `node_modules/next/dist/docs/` before using a Next.js API you have not checked.
 - Paused features stay behind their flags instead of being deleted (apps/mobile/CLAUDE.md lists them).
 - Database changes: follow [supabase/CLAUDE.md](supabase/CLAUDE.md).
-- Settled product and technical choices, with their reasons, are in
-  [docs/decisions.md](docs/decisions.md). Do not re-open one without a reason.
+- Settled choices and why: [docs/decisions.md](docs/decisions.md); do not re-open one without a reason.
 
 ## Workflow
 
@@ -133,7 +132,8 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
   commits that are already pushed.
 - **Every production write needs the owner's explicit approval**: a migration, a role grant, an EAS
   publish, a script that writes to the live project, a manual deploy of either app (`npm run deploy:admin`;
-  `vercel deploy --prod --yes --archive=tgz` from the repo root ships the local tree).
+  `vercel deploy --prod --yes --archive=tgz` from the repo root ships the local tree). Signed-in checks
+  use staging's throwaway accounts instead (apps/mobile/CLAUDE.md, "End-to-end checks").
 - Never chain `cd` with `;` in front of a command that writes files; use `&&` or absolute paths
   (a failed `cd` once let EAS write a stray `app.json` at the repo root).
 
@@ -195,6 +195,5 @@ environment variable. Typos, formatting and read-only exploration are not.
 6. No changelog sections: git history is the record. Old per-branch `CLAUDE.md` copies (2026-10-27)
    lose to `main`'s in a merge (docs/branches/README.md); resolve any other conflict on its merits.
 
-On the owner's Mac a local Claude Code `Stop` hook, not in git (`.claude/settings.local.json` →
-`.claude/hooks/claude-md-reminder.sh`), reminds a session when files changed but no documentation
-did. It only reminds; deciding what is significant is still your job.
+On the owner's Mac a local `Stop` hook (not in git: `.claude/hooks/claude-md-reminder.sh`) reminds a
+session when files changed but no documentation did; deciding what is significant is still your job.
