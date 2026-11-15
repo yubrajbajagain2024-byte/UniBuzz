@@ -1,5 +1,5 @@
 import { memo, useCallback } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { STORY_RING, STORY_RING_GAP, type StoryGroup } from "@apartment-book/shared";
 import { Avatar } from "@/components/avatar";
@@ -95,7 +95,8 @@ export const StoriesTray = memo(function StoriesTray({ active = true }: { active
 });
 
 const useStyles = makeStyles((colors) => ({
-  tray: { paddingTop: 10, paddingBottom: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  // No divider above or below: the tray runs on from the tabs into the feed as one surface.
+  tray: { paddingTop: 10, paddingBottom: 6 },
   row: { paddingHorizontal: 12, gap: 14 },
   item: { width: RING + 10, alignItems: "center", gap: 6 },
   pressed: { opacity: 0.75 },

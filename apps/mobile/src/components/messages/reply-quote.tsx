@@ -71,14 +71,14 @@ export function ReplyQuote({
 }
 
 const useStyles = makeStyles((colors) => ({
-  quote: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 14, borderCurve: "continuous", overflow: "hidden", maxWidth: "100%" },
-  // Behind a bubble: a soft panel, the words a touch quieter, its bottom tucked under the reply.
-  inChat: { backgroundColor: colors.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, paddingVertical: 6, paddingRight: 10, paddingBottom: 12, marginBottom: -8 },
+  quote: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 16, borderCurve: "continuous", overflow: "hidden", maxWidth: "100%" },
+  // Behind a bubble: a soft panel, smaller and quieter than the reply, its bottom tucked under it.
+  inChat: { backgroundColor: colors.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, paddingTop: 7, paddingRight: 12, paddingBottom: 15, marginBottom: -10 },
   composer: { flex: 1, paddingVertical: 6, paddingRight: 10 },
-  accent: { alignSelf: "stretch", width: 3, borderRadius: 1.5, marginLeft: 6 },
+  accent: { alignSelf: "stretch", width: 3, borderRadius: 1.5, marginLeft: 7 },
   body: { flexShrink: 1, gap: 1 },
-  name: { fontSize: 12, fontWeight: "600", color: colors.muted },
+  name: { fontSize: 12, lineHeight: 15, fontWeight: "600", color: colors.muted },
   line: { flexDirection: "row", alignItems: "center", gap: 4 },
-  text: { flexShrink: 1, fontSize: 14, lineHeight: 18, color: colors.muted },
+  text: { flexShrink: 1, fontSize: 13, lineHeight: 17, color: colors.muted },
   thumb: { width: 36, height: 36, borderRadius: 8, borderCurve: "continuous", backgroundColor: colors.skeleton },
 }));

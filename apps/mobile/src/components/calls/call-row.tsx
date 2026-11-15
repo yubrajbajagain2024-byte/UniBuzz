@@ -47,9 +47,10 @@ export function CallRow({ call, mine, width, onPress, onLongPress }: { call: Mes
 
 const useStyles = makeStyles((colors) => ({
   // As wide as a sent photo, so "Missed audio call" always fits on its line.
-  row: { flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 10, paddingRight: 14, paddingVertical: 9, borderRadius: 18, borderCurve: "continuous" },
-  mine: { backgroundColor: colors.brand },
-  theirs: { backgroundColor: colors.input },
+  // The chat's bubbles' fills and corner (message-bubble.tsx).
+  row: { flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 10, paddingRight: 14, paddingVertical: 9, borderRadius: 20, borderCurve: "continuous" },
+  mine: { backgroundColor: colors.bubbleMine[0], experimental_backgroundImage: `linear-gradient(to bottom, ${colors.bubbleMine[0]} 0%, ${colors.bubbleMine[1]} 100%)` },
+  theirs: { backgroundColor: colors.bubble },
   circle: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: colors.card },
   circleMine: { backgroundColor: "rgba(255,255,255,0.22)" },
   words: { flex: 1, minWidth: 0, gap: 1 },

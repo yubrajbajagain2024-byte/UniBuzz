@@ -1,77 +1,79 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import { ActivityIndicator, Alert, Keyboard, LayoutAnimation, Platform, Pressable, StyleSheet, Text, TextInput, View, type KeyboardEvent, type LayoutChangeEvent, type TextInputInstance } from "react-native";
+import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type TextInputInstance } from "react-native";
+import Reanimated, { FadeIn, FadeOut, ZoomIn, ZoomOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MESSAGE_ATTACHMENT_LIMITS, type MessageReply } from "@apartment-book/shared";
 import { useActionSheet } from "@/components/action-sheet";
 import { GlassBackdrop, GlassIconButton } from "@/components/glass";
 import { Icon } from "@/components/icon";
 import { ProgressiveBlur } from "@/components/progressive-blur";
+import { useReduceMotion } from "@/lib/accessibility";
 import { hapticTap, alertWithHaptic } from "@/lib/haptics";
 import { errorText } from "@/lib/hooks";
 import { ATTACHMENT_LIMIT_TEXT, captureMedia, pickDocuments, pickLibraryMedia, type PendingAttachment, type PickResult } from "@/lib/message-attachments";
-import { auroraGradient } from "@/lib/theme";
+import { auroraGradient, scrollEdge } from "@/lib/theme";
 import { makeStyles, useAppTheme } from "@/lib/theme-provider";
 import { AttachmentStrip } from "./attachment-strip";
+import { CHAT_EDGE } from "./chat-header";
 import { ReplyQuote, type ReplyContext } from "./reply-quote";
 import { VOICE_AVAILABLE } from "@/lib/voice";
 
 // expo-audio is loaded only where this build has it.
 const VoiceRecorder = VOICE_AVAILABLE ? (require("./voice-recorder") as typeof import("./voice-recorder")).VoiceRecorder : null;
 
-const SHOW_EVENT = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-const HIDE_EVENT = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-
 /**
- * The bar's sizes: the "+" circle and the capsule are the system's 44pt touch target, the capsule fully rounded; the
- * microphone and Send inside it are 34pt circles, centred on its first line however tall the text grows.
+ * The bar's sizes: the "+" circle and the capsule are the system's 44pt touch target, the same height as the chat's top
+ * bar, the capsule fully rounded; the microphone and Send inside it are 32pt circles, centred on its first line however
+ * tall the text grows.
  */
 const BAR = 44;
 const CAPSULE = BAR / 2;
-const CONTROL = 34;
+const CONTROL = 32;
 const CONTROL_INSET = (BAR - CONTROL) / 2;
+/**
+ * Above the bar, the messages fade out over this many points before its backdrop reaches full strength: shorter than
+ * the room the chat leaves under its newest message, so that message and its "Delivered" stay clear at rest.
+ */
+const FADE = 16;
+/** Send pops in on a quick spring that settles without a wobble; the microphone it replaces just fades. */
+const SEND_IN = ZoomIn.springify().damping(17).stiffness(340).mass(0.6);
+const SEND_OUT = ZoomOut.duration(120);
+const MIC_IN = FadeIn.duration(160);
+const MIC_OUT = FadeOut.duration(100);
 
-/** Animate the next layout change along with the keyboard (iPhone tells how long it takes). */
-function followKeyboard(e: KeyboardEvent) {
-  if (Platform.OS !== "ios" || !e.duration) return;
-  LayoutAnimation.configureNext({ duration: e.duration, update: { duration: e.duration, type: LayoutAnimation.Types.keyboard } });
+/**
+ * The bar keeps this much under its field above the home indicator (or the screen's edge), and, with the keyboard up,
+ * KEYBOARD_GAP above the keyboard. The chat lifts the bar (and the messages with it) by how far the keyboard reaches
+ * past its resting room (see keyboardLift), frame by frame on the UI thread, so the bar rides on the keyboard as it
+ * slides, and follows it down under the finger when it is swiped away.
+ */
+export const KEYBOARD_GAP = 8;
+export function barRestingPad(bottomInset: number): number {
+  return Math.max(bottomInset, 12);
 }
-
-/** True while the keyboard is up (from the moment it starts to slide in on iPhone). */
-export function useKeyboardVisible(): boolean {
-  const [visible, setVisible] = useState(() => Keyboard.isVisible());
-  const current = useRef(visible);
-  useEffect(() => {
-    // iPhone repeats "will show" when the keyboard only changes height (suggestions bar, emoji): act on real changes only.
-    const update = (next: boolean) => (e: KeyboardEvent) => {
-      if (current.current === next) return;
-      current.current = next;
-      followKeyboard(e);
-      setVisible(next);
-    };
-    const show = Keyboard.addListener(SHOW_EVENT, update(true));
-    const hide = Keyboard.addListener(HIDE_EVENT, update(false));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-  return visible;
+/** How far the bar and the messages rise for a keyboard `keyboard` points tall: nothing until it reaches the bar's field. */
+export function keyboardLift(keyboard: number, restingPad: number): number {
+  "worklet";
+  return Math.max(0, keyboard - restingPad + KEYBOARD_GAP);
 }
 
 /** What the person is about to answer, shown above the field until they send or dismiss it. */
 export type ComposerReply = { reply: MessageReply; context: ReplyContext };
 
 /**
- * The floating bar under a chat, with nothing solid behind it: the messages scroll under it, softened by a blur that
- * fades in towards the bottom edge. With the keyboard down it keeps the home-indicator space; with the keyboard up it
- * sits right on top of it. `onHeight` tells the chat how much of the list it covers.
+ * The floating bar under a chat, with nothing solid behind it: the messages scroll under it and are dimmed and blurred
+ * into the screen's colour (iOS 26's scroll edge effect, as under the chat's top bar), nearly solid behind the field and
+ * fading out just above it. It keeps the home-indicator space under it, always: the chat lifts it onto the keyboard
+ * (see keyboardLift), so its own height never changes as the keyboard comes and goes. `onHeight` tells the chat how
+ * much of the list it covers.
  */
 function FloatingBar({ onHeight, children }: { onHeight?: (height: number) => void; children: ReactNode }) {
   const styles = useStyles();
-  const { isDark } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const keyboard = useKeyboardVisible();
   const [height, setHeight] = useState(0);
+  // The share of the backdrop's band that the bar itself covers: held at full strength, the fade above it.
+  const solid = height > 0 ? height / (height + FADE) : 0.8;
   function measured(e: LayoutChangeEvent) {
     const h = Math.round(e.nativeEvent.layout.height);
     if (h === height) return;
@@ -79,8 +81,11 @@ function FloatingBar({ onHeight, children }: { onHeight?: (height: number) => vo
     onHeight?.(h);
   }
   return (
-    <View style={[styles.bar, { paddingBottom: keyboard ? 10 : Math.max(insets.bottom, 14) }]} onLayout={measured}>
-      <ProgressiveBlur edge="bottom" height={height + 28} intensity={50} tint={isDark ? "dark" : "light"} />
+    <View style={[styles.bar, { paddingBottom: barRestingPad(insets.bottom) }]} onLayout={measured}>
+      <View pointerEvents="none" style={[styles.edge, { top: -FADE }]}>
+        <ProgressiveBlur edge="bottom" height={height + FADE} solid={solid} intensity={40} tint={isDark ? "dark" : "light"} />
+        <View style={[StyleSheet.absoluteFill, { experimental_backgroundImage: scrollEdge(colors.bg, "bottom", solid) }]} />
+      </View>
       {children}
     </View>
   );
@@ -92,7 +97,7 @@ function GlassPanel({ children, style }: { children: ReactNode; style?: object }
   const { colors } = useAppTheme();
   return (
     <View style={[styles.panel, { borderColor: colors.glassEdge }, style]}>
-      <GlassBackdrop variant="float" radius={20} />
+      <GlassBackdrop variant="float" radius={CAPSULE} />
       {children}
     </View>
   );
@@ -101,9 +106,10 @@ function GlassPanel({ children, style }: { children: ReactNode; style?: object }
 /**
  * The message bar, laid out like the Messages app's: "+" in a glass circle on the left (photo or video, camera, file),
  * then a see-through glass capsule holding the growing field and, at its end, the microphone (a voice message records
- * in the bar, where the build can) or, once something is typed or picked, the blue Send. Picked files wait on a glass
- * panel above the capsule until they are sent with the message; a message being answered shows there too, with its
- * quote and an ✕. The bar floats over the chat and rises with the keyboard.
+ * in the bar, where the build can) or, once something is typed or picked, the aurora Send, which springs in as the
+ * microphone fades out (and back). Picked files wait on a glass panel above the capsule until they are sent with the
+ * message; a message being answered shows there too, with its quote and an ✕. The bar floats over the chat; the chat
+ * lifts it with the keyboard (see keyboardLift).
  */
 export function Composer({
   value,
@@ -138,11 +144,18 @@ export function Composer({
   const { colors, isDark } = useAppTheme();
   const styles = useStyles();
   const show = useActionSheet();
+  const reduceMotion = useReduceMotion();
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
   const remaining = MESSAGE_ATTACHMENT_LIMITS.maxItems - items.length;
   const canSend = value.trim().length > 0 || items.length > 0;
   const canRecord = Boolean(VoiceRecorder && onSendVoice) && !canSend;
+  // The microphone and Send trade places with a little motion once the bar is up; the first draw is still.
+  const settled = useRef(false);
+  useEffect(() => {
+    settled.current = true;
+  }, []);
+  const animate = settled.current && !reduceMotion;
 
   async function add(pick: () => Promise<PickResult>) {
     setBusy(true);
@@ -209,7 +222,7 @@ export function Composer({
       {panels}
       <View style={styles.row}>
         {onAddItems ? (
-          <GlassIconButton icon="add" label="Attach a photo, video or file" variant="float" size={BAR} iconSize={24} weight="medium" disabled={busy} onPress={attach}>
+          <GlassIconButton icon="add" label="Attach a photo, video or file" variant="float" size={BAR} iconSize={22} weight="medium" disabled={busy} onPress={attach}>
             {busy ? <ActivityIndicator color={colors.text} /> : undefined}
           </GlassIconButton>
         ) : null}
@@ -229,33 +242,40 @@ export function Composer({
             style={styles.input}
             accessibilityLabel="Message"
           />
-          {canRecord ? (
-            <Pressable
-              onPress={() => {
-                Keyboard.dismiss();
-                hapticTap();
-                setRecording(true);
-              }}
-              hitSlop={8}
-              style={({ pressed }) => [styles.control, pressed && { opacity: 0.6 }]}
-              accessibilityRole="button"
-              accessibilityLabel="Record a voice message"
-            >
-              <Icon name="mic" size={22} color={colors.muted} weight="medium" />
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={onSend}
-              disabled={!canSend}
-              hitSlop={8}
-              style={({ pressed }) => [styles.control, styles.send, { backgroundColor: colors.brand, experimental_backgroundImage: auroraGradient(colors.aurora, 135) }, !canSend && { opacity: 0.35 }, pressed && { transform: [{ scale: 0.92 }] }]}
-              accessibilityRole="button"
-              accessibilityLabel="Send"
-              accessibilityState={{ disabled: !canSend }}
-            >
-              <Icon name="arrow-up" size={19} color={colors.onBrand} weight="bold" />
-            </Pressable>
-          )}
+          {/* One slot for both: the one leaving fades or shrinks away in place while the other comes in over it. */}
+          <View style={styles.controlSlot}>
+            {canRecord ? (
+              <Reanimated.View key="mic" entering={animate ? MIC_IN : undefined} exiting={animate ? MIC_OUT : undefined} style={styles.controlLayer}>
+                <Pressable
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    hapticTap();
+                    setRecording(true);
+                  }}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.control, pressed && { opacity: 0.6 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Record a voice message"
+                >
+                  <Icon name="mic" size={21} color={colors.muted} weight="medium" />
+                </Pressable>
+              </Reanimated.View>
+            ) : (
+              <Reanimated.View key="send" entering={animate ? SEND_IN : undefined} exiting={animate ? SEND_OUT : undefined} style={styles.controlLayer}>
+                <Pressable
+                  onPress={onSend}
+                  disabled={!canSend}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.control, { backgroundColor: colors.brand, experimental_backgroundImage: auroraGradient(colors.aurora, 135) }, !canSend && { opacity: 0.35 }, pressed && { transform: [{ scale: 0.9 }] }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send"
+                  accessibilityState={{ disabled: !canSend }}
+                >
+                  <Icon name="arrow-up" size={17} color={colors.onBrand} weight="bold" />
+                </Pressable>
+              </Reanimated.View>
+            )}
+          </View>
         </View>
       </View>
     </FloatingBar>
@@ -283,29 +303,34 @@ export function ComposerNotice({ title, body, action, onHeight }: { title: strin
 }
 
 const useStyles = makeStyles((colors) => ({
-  bar: { paddingHorizontal: 12, paddingTop: 8, gap: 10 },
-  row: { flexDirection: "row", alignItems: "flex-end", gap: 10 },
-  panel: { borderRadius: 20, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  // The chat's side margin (CHAT_EDGE), so the "+" and the capsule line up with the bubbles and the top bar.
+  bar: { paddingHorizontal: CHAT_EDGE, paddingTop: 8, gap: 8 },
+  // The backdrop reaches FADE above the bar (see `top` where it is drawn), so the messages fade out under its edge.
+  edge: { position: "absolute", left: 0, right: 0, bottom: 0 },
+  row: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  panel: { borderRadius: CAPSULE, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
   stripPanel: { paddingBottom: 8 },
-  replyRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingLeft: 2, paddingRight: 6 },
+  replyRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingLeft: 4, paddingRight: 6 },
   replyClose: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  capsule: { flex: 1, flexDirection: "row", alignItems: "flex-end", minHeight: BAR, borderRadius: CAPSULE, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
-  // One line of 17pt text sits centred in the 44pt capsule (11 + 22 + 11); it grows to about six lines, then scrolls.
+  capsule: { flex: 1, flexDirection: "row", alignItems: "flex-end", minHeight: BAR, borderRadius: CAPSULE, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  // One line of 16pt text sits centred in the 44pt capsule (11 + 21 + 12), as the bubbles' words are set; it grows to
+  // about six lines, then scrolls.
   input: {
     flex: 1,
     minHeight: BAR,
-    maxHeight: 154,
-    paddingLeft: 17,
+    maxHeight: 150,
+    paddingLeft: 16,
     paddingRight: 6,
     paddingTop: 11,
-    paddingBottom: 11,
-    fontSize: 17,
-    lineHeight: 22,
+    paddingBottom: 12,
+    fontSize: 16,
+    lineHeight: 21,
     color: colors.text,
     textAlignVertical: "center",
   },
-  control: { width: CONTROL, height: CONTROL, borderRadius: CONTROL / 2, marginRight: CONTROL_INSET, marginBottom: CONTROL_INSET, alignItems: "center", justifyContent: "center" },
-  send: {},
+  controlSlot: { width: CONTROL, height: CONTROL, marginRight: CONTROL_INSET, marginBottom: CONTROL_INSET },
+  controlLayer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
+  control: { width: CONTROL, height: CONTROL, borderRadius: CONTROL / 2, alignItems: "center", justifyContent: "center" },
   notice: { alignItems: "center", gap: 4, paddingHorizontal: 24, paddingTop: 14, paddingBottom: 14 },
   noticeTitle: { fontSize: 15, fontWeight: "700", color: colors.text, textAlign: "center" },
   noticeBody: { fontSize: 13, color: colors.muted, textAlign: "center" },

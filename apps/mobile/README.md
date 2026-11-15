@@ -162,9 +162,11 @@ needs none of this: every reel there is one video, so a sideways swipe on it is 
 ring on the left, which opens your menu (`src/components/home/profile-menu.tsx`, as UniVerse's: a card with your photo,
 name and @username that opens your profile, then Upload, Saved, Settings, Community Guidelines, and Log out on its own;
 over Reels too: the bar has no "+"), the UniBuzz wordmark in the middle (it reads "Following" while
-that feed shows) and the Notifications bell on the right; then the three labels spread across the row
-(`src/components/sliding-tabs.tsx`): the active one bold with a rounded aurora underline as wide as the label, sliding
-with the finger over a hairline; moving between sections, by tap or swipe, plays no haptic. Under the labels sits the Campus | Global
+that feed shows) and the Notifications bell on the right; then the three labels side by side in the middle of the row,
+24 points apart as in every tab row of the app (`TAB_GAP` in `src/components/sliding-tabs.tsx`; Explore's, Messages' and
+Events' rows too), Buzz's lime mask hanging just before its label while Buzz is near: the active one bold with a rounded aurora underline as wide as the label, sliding
+with the finger; moving between sections, by tap or swipe, plays no haptic. No line divides the tabs, the story tray and the
+feed: the bar is the screen's own colour (Buzz's canvas near Buzz), so they read as one surface. Under the labels sits the Campus | Global
 toggle, a small segmented pill whose thumb slides to the choice: Campus is your own university, Global every university (and,
 only while Posts has a tab, Following: the posts of people you follow, which switches to Posts); the choice scopes For you,
 Posts and Reels alike (`src/lib/home-scope.ts`; Buzz has its own Campus | Global, its two feeds being separate). Someone without a university has nothing to choose, so the row is not drawn.
@@ -208,7 +210,11 @@ never black or a flat colour (`BlurredBackdrop` in `src/components/blurred-backd
 then blurred and stretched, since a blur on a full-size photo barely shows once scaled to the screen). A video uploaded
 without its size takes its poster's shape once that loads. The chat's photo and video viewer
 (`src/components/messages/media-viewer.tsx`) and a Snap's (`src/app/snap/[id].tsx`) lay out the same way, a video's
-shape and blurred frame read from its own player. Stories have their own layout (`src/app/stories/[id].tsx`, `storyFrame` in
+shape and blurred frame read from its own player; the chat's videos have the app's own controls instead of the system's
+(a tap shows or hides them, and they fade a moment after it plays): play or pause in the middle, the sound switch, and the
+same timeline with the time gone and the time left, as in Photos, plus the hold for 2×; with VoiceOver on they never fade
+(`useScreenReader` in `src/lib/accessibility.ts`), and faded ones leave the accessibility tree as they leave touch.
+Stories have their own layout (`src/app/stories/[id].tsx`, `storyFrame` in
 `packages/shared/src/stories.ts`): on a tall phone a rounded 9:16 card under the status bar with the reply pill, the heart
 and the paper plane (or, on your own, Activity, Send and Delete) on black below it, so they are always legible and a near
 miss never moves the story on; on a short screen the story fills it and the bar floats over a deeper shade. Holding a
@@ -225,8 +231,20 @@ posted reels, `/apartments/<id>` or `/roommates/<id>` for listing tours); the vi
 since iOS presents a sheet from the screen on top and the root layout's one cannot appear over this modal screen. The
 rail's buttons, the words, the top row and the status bar are white on every page (a crisp dark edge on the rail's
 strokes keeps it readable on a white wall). A tap pauses a video: a play button appears in the middle with the sound
-button just above it, both fading away again the moment it plays (the sound button keeps it paused). A post with several
-photos or videos swipes sideways on its page, with dots just under the top row, over the picture on a small dark pill, and opens on the one that was showing in the feed; a video plays while its page and slide are on screen, and a double tap anywhere likes. On iOS a video tapped while it plays in the feed is played on in the viewer by the
+button just above it, both fading away again the moment it plays (the sound button keeps it paused). Every video plays at
+1×; pressed and held while it plays it runs at 2× until the finger lifts (or a scroll takes the touch), Instagram's way,
+with a glass "2×" pill under the top row while the words and the rail step aside (and leave the accessibility tree),
+VoiceOver hearing "Double speed" (`BOOST_RATE`, `HOLD_MS` in `src/components/video-controls.tsx`). Along its bottom, under the words, a thin timeline shows how far it has played (it
+glides between the player's reports on the UI thread) and drags sideways to fast-forward or rewind: it swells under the
+finger, the video holds on the frame under it (expo-video's scrubbing mode, loose seeks while it moves and an exact one as
+it lets go) with the time over the line, and a tap on it jumps (`VideoTimeline`; VoiceOver hears it as adjustable, five
+seconds a step). A post with several
+photos or videos swipes sideways on its page, with dots just under the top row, over the picture on a small dark pill, and opens on the one that was showing in the feed; a video plays while its page and slide are on screen, and a double tap on a video likes. A photo zooms instead, as in Photos
+(`src/components/zoomable.tsx`, on the UI thread): pinch around the fingers, double tap to zoom in on that point (until the
+photo fills the screen, 2× to 3×) or back out, and, zoomed, one finger pans with momentum, its edges rubber-banding; past
+4× or below its own size a pinch gives a little and springs back. While a photo is zoomed the words, the rail and the shades
+step aside, the page's sideways swipe and the viewer's pager hold still (`ViewerPagerLockContext`), and a second finger never
+starts a swipe; a photo turned away, or a viewer closing over it, settles back to rest. The like stays on the rail's heart. On iOS a video tapped while it plays in the feed is played on in the viewer by the
 feed's own player (`src/lib/video-handoff.ts`: lent as the viewer opens, in `openViewer`, so a tap that opens something
 else never lends it; counted, so the page showing it borrows it too, for as long as that page is in reach; given back as
 the viewer goes), so it opens on the very frame that was showing and never pauses, reloads or jumps, there or back. Neither
@@ -379,7 +397,7 @@ who-can-see settings, `profile_classes`, likes readable only through functions, 
 `feed_posts.pinned_at`); without it the header still shows, with zeros, and each tab says what it could not load.
 
 The Messages tab is the inbox (`src/app/(tabs)/messages.tsx`): the new-message pencil in the top-right corner, the big
-"Messages" title, Chats | Groups with Home's sliding aurora underline, a rounded search box and the All | Unread |
+"Messages" title, Chats | Groups with Home's sliding aurora underline (each label's unread count raised just after it), a rounded search box and the All | Unread |
 Requests pills (each with its count; Requests on Chats only), then the two pages side by side in a pager like Home's: a
 swipe or a tap on a label moves between your direct chats and your group chats, silently, as on Home. All of that header
 scrolls away with the list, point for point as if it were part of it, and comes back only as the list returns to its
@@ -402,21 +420,35 @@ A shared post, reel or listing in a chat is a photo bubble too, as a sent photo 
 (4:5 for a post or a listing, taller for a reel) with who posted it and its words on a shade along the bottom, and no label of what
 it is; one without a picture stays a card of its words. A tap opens it as before (`SharedPostBubble` in `message-bubble.tsx`).
 
-A chat (`src/app/messages/[id].tsx`) is laid out like the Messages app. Its floating top bar (`src/components/messages/chat-header.tsx`)
-is one row: Back in a 44pt glass circle on the left, then the other person's photo (with the green dot while they are active; a group
-shows its mark), their name in bold with a chevron and their activity line ("Active now", "Active 5 min ago", or "4 members") under
-it, and Audio call, Video call and Info in 40pt glass circles on the right (Search is in the chat's details). The photo and the name open the chat's details, as Info does. Nothing
-solid sits behind it: the messages scroll under it through a blur that fades in towards the top of the screen. The bubbles (`message-bubble.tsx`) have no photos beside them and, as in Instagram, no times under them: a small centred stamp
-("Today 14:05", "Yesterday 09:30", "Mon, 3 Mar 10:15", in the phone's own time zone) sits above the first message of each day and
+A chat (`src/app/messages/[id].tsx`) is laid out like the Messages app on iOS 26, its top bar, bubbles and message bar on one
+16-point side margin (`CHAT_EDGE`). The floating top bar (`src/components/messages/chat-header.tsx`) is one row of three glass
+pieces, each 44 points tall on one centre line: Back in a glass circle on the left; in the middle of the screen a glass capsule
+with the chat's name and, under it, the activity line ("Active now" after a small green dot, "Active 5 min ago", or "4 members");
+and the chat's photo on the right (the other person's, with the green dot while they are active; a group's two members
+overlapping, as in the inbox). The capsule and the photo open the chat's details (Search is there); Audio call and Video call
+join the right side only while calls are on. Nothing solid sits behind the bar: the messages scroll under it and are dimmed and
+blurred into the screen's colour (iOS 26's scroll edge effect, `scrollEdge` in `src/lib/theme.ts` over a `ProgressiveBlur` held
+at full strength behind the bar), nearly solid behind the controls and fading out 20 points below them, so the name and the
+clock always read. The bubbles (`message-bubble.tsx`) have no photos beside them and, as in Instagram, no times under them: a small centred stamp
+("**Today** 14:05", "**Yesterday** 09:30", "**Mon, 3 Mar** 10:15", the day a weight above the time, in the phone's own time zone) sits above the first message of each day and
 above any message that comes after half an hour's quiet; a tap on a message's words shows its exact time under it until the next tap
 (a hold shows it as the menu's title, for photos, voice messages and the like too); your newest message says "Sending…", "Sent" or
 "Delivered" under it; and "Seen", with the readers' small photos, sits under the last message they read. A group shows the sender's
-name above a run of theirs, and the words sit in 18pt-cornered blue (yours) or grey bubbles at the body size.
-A message that arrives, or that you send, rises in on a spring. The message bar (`composer.tsx`) floats too: "+" in a 44pt glass
-circle (photo or video, camera, file), a fully rounded 44pt see-through glass capsule holding the 17pt field (it grows to about six
-lines, then scrolls) and, at its end, a 34pt microphone or, once something is typed or picked, the blue Send; the voice recorder
+name above a run of theirs. The words are 16-point, in blue bubbles (yours, the brand blue deepening a touch towards the bottom,
+`bubbleMine`) or neutral grey ones (`bubble`), 36 points tall for one line, with 20-point corners; a run of messages from one
+person reads as one stack, its bubbles 2 points apart and their corners on the sender's side tightened to 6 points where they
+meet (a voice message or a call row too). A message that arrives, or that you send, rises a little and grows from its own bottom
+corner on a spring. The message bar (`composer.tsx`) floats too, the same fade over the messages above it: "+" in a 44pt glass
+circle (photo or video, camera, file), a fully rounded 44pt see-through glass capsule holding the 16pt field (it grows to about six
+lines, then scrolls) and, at its end, a 32pt microphone or, once something is typed or picked, the aurora Send, which springs in as the microphone fades out; the voice recorder
 that stands in for it while you record keeps the same sizes; picked files and the message being answered sit on glass panels above it. With the
-keyboard down the bar keeps the home-indicator space; with it up the bar rides on the keyboard, the newest message staying in view.
+keyboard down the bar keeps the home-indicator space; with it up the bar rides on the keyboard, 8 points above it, and the
+messages rise with it as one piece, the newest just above the bar and never under it. Both are lifted frame by frame on the
+UI thread by Reanimated's keyboard tracking (`useAnimatedKeyboard`, `keyboardLift` in `composer.tsx`) rather than laid out
+again by a KeyboardAvoidingView, so the bar never lags behind the keyboard or jumps, and the list's far end keeps the same
+extra room for its oldest message to clear the header. Where Reanimated can find the keyboard's view it also follows a
+swipe down on the messages (interactive dismissal); on the iOS 26 Simulator it could not, and the bar went down with the
+keyboard once it was let go, as before.
 
 Swipe a message to the right (`swipe-to-reply.tsx`, in direct and group chats alike; a hold offers Reply too) to answer it: a reply
 mark surfaces from under it, the phone ticks when the drag is far enough, and letting go puts the quote ("Replying to Maya", the

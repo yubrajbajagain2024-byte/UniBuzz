@@ -72,7 +72,7 @@ export function GlassBackdrop({ variant = "bar", radius, interactive = false }: 
 
 /**
  * A round floating icon button on glass: the Reels viewer's Back, a sound switch on a video, a cover's Back and menu,
- * a chat's Back, Search and Info. It sinks under the finger, answers with a haptic, and its glass reacts to the touch
+ * a chat's Back (and its call buttons, while calls are on). It sinks under the finger, answers with a haptic, and its glass reacts to the touch
  * on iOS 26. The icon is the text colour on `bar` and `float` glass and white on `media` glass. `label` is what
  * VoiceOver says.
  */

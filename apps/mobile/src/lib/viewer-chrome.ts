@@ -37,3 +37,9 @@ export const OpeningBandContext = createContext<(() => OpeningBand) | null>(null
  */
 export type ViewerClocks = { set: (key: string, slide: number, read: (() => number) | null) => void };
 export const ViewerClockContext = createContext<ViewerClocks | null>(null);
+
+/**
+ * Holds the viewer's pager still (true) while a photo on the page showing is zoomed in: one finger then pans the photo
+ * instead of moving to the next post. The page that locked it unlocks it, as it zooms back out or goes.
+ */
+export const ViewerPagerLockContext = createContext<((locked: boolean) => void) | null>(null);

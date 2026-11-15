@@ -106,7 +106,7 @@ export function VoiceBubble({
       accessibilityRole="button"
       accessibilityLabel={`Voice message, ${formatDuration(total) || "unknown length"}`}
       accessibilityHint={playing ? "Pauses it" : "Plays it"}
-      style={[styles.bubble, mine ? { backgroundColor: colors.brand } : { backgroundColor: colors.input }, corners, dimmed && { opacity: 0.6 }]}
+      style={[styles.bubble, mine ? styles.mine : styles.theirs, corners, dimmed && { opacity: 0.55 }]}
     >
       <View style={[styles.play, { backgroundColor: mine ? "rgba(255,255,255,0.22)" : colors.bg }]}>
         {loading || !uri ? <ActivityIndicator size="small" color={ink} /> : <Icon name={playing ? "pause" : "play"} size={17} color={ink} />}
@@ -135,8 +135,11 @@ export function VoiceBubble({
   );
 }
 
-const useStyles = makeStyles(() => ({
-  bubble: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 18, borderCurve: "continuous", paddingLeft: 6, paddingRight: 10, paddingVertical: 6, width: 248 },
+const useStyles = makeStyles((colors) => ({
+  // The chat's bubbles' fills and corner (message-bubble.tsx); `corners` tightens the ones that meet another bubble.
+  bubble: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 20, borderCurve: "continuous", paddingLeft: 6, paddingRight: 10, paddingVertical: 6, width: 248 },
+  mine: { backgroundColor: colors.bubbleMine[0], experimental_backgroundImage: `linear-gradient(to bottom, ${colors.bubbleMine[0]} 0%, ${colors.bubbleMine[1]} 100%)` },
+  theirs: { backgroundColor: colors.bubble },
   play: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   wave: { flex: 1, height: 26, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   bar: { width: 3, borderRadius: 1.5 },

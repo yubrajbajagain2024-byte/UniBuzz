@@ -46,6 +46,14 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 
 ## Open work, in priority order
 
+- **Chat redesign, media viewing and the keyboard (app)** (branch `chat-redesign`, PR open for review as of 2026-11-15,
+  **not merged, not on production**; [branches/chat-redesign.md](branches/chat-redesign.md)): an Apple-style chat, tab
+  labels side by side in every tab row, Home without lines between the tabs, the story tray and the feed, photos that
+  pinch and double tap to zoom in the full-screen viewer, a video timeline that scrubs and 2× while held (Reels, the
+  viewer, the chat's viewer), and the chat's message bar riding the keyboard. No migration and no native change. Checked
+  on the iOS Simulator signed out and, with seeded throwaway accounts, on staging (real chat, keyboard, story tray, light
+  and dark, a large text size, Reduce Motion). **Still to check on a real iPhone:** VoiceOver and swiping the keyboard
+  down; Android is unchecked. To reach testers it needs the owner's merge, then an EAS update (his approval).
 - **Events** (PR #74, merged and deployed 2026-10-31 03:43 UTC; [branches/events.md](branches/events.md)): the bar is
   Home, Explore, Messages, Events, Profile; the Events tab (For you | All events, date and category pills, search,
   saved), event pages, organizations that students create and staff verify, the university's ICS and RSS feeds synced by

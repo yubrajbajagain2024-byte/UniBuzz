@@ -76,7 +76,7 @@ function ThemedStack() {
         <Stack.Screen name="buzz/[id]" options={{ headerShown: false, contentStyle: buzzContent }} />
         <Stack.Screen name="buzz/search" options={{ headerShown: false, contentStyle: buzzContent }} />
         <Stack.Screen name="buzz/mine" options={{ headerShown: false, contentStyle: buzzContent }} />
-        {/* A chat draws its own floating bar (Back, the person's photo and name, Search and Info on glass), so the messages scroll under it. */}
+        {/* A chat draws its own floating bar (Back, the name in a capsule and the chat's photo, on glass), so the messages scroll under it. */}
         <Stack.Screen name="messages/[id]" options={{ headerShown: false, contentStyle: content }} />
         {/* A call fills the screen on its own dark stage, as FaceTime's does, and is left only by hanging up. */}
         <Stack.Screen name="call/[id]" options={{ headerShown: false, presentation: "fullScreenModal", animation: "fade", gestureEnabled: false, contentStyle: { backgroundColor: "#0b0b14" } }} />

@@ -128,12 +128,17 @@ function Tile({
       ) : null}
       {video && duration && !item.missing ? (
         <View style={[styles.duration, { pointerEvents: "none" }]}>
-          <Text style={styles.durationText}>{duration}</Text>
+          {/* Over the picture: it grows with the text size only so far, or it would cover the tile. */}
+          <Text style={styles.durationText} maxFontSizeMultiplier={1.4}>
+            {duration}
+          </Text>
         </View>
       ) : null}
       {more > 0 ? (
         <View style={[styles.center, styles.scrim, { pointerEvents: "none" }]}>
-          <Text style={styles.more}>+{more}</Text>
+          <Text style={styles.more} maxFontSizeMultiplier={1.4}>
+            +{more}
+          </Text>
         </View>
       ) : null}
       {busy ? (

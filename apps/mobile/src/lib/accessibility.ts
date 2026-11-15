@@ -8,7 +8,7 @@ import { AccessibilityInfo } from "react-native";
  */
 type Flag = { get: () => boolean; subscribe: (listener: () => void) => () => void };
 
-function createFlag(read: () => Promise<boolean>, event: "reduceMotionChanged" | "reduceTransparencyChanged"): Flag {
+function createFlag(read: () => Promise<boolean>, event: "reduceMotionChanged" | "reduceTransparencyChanged" | "screenReaderChanged"): Flag {
   let value = false;
   const listeners = new Set<() => void>();
   const set = (next: boolean) => {
@@ -31,6 +31,7 @@ function createFlag(read: () => Promise<boolean>, event: "reduceMotionChanged" |
 
 const reduceMotion = createFlag(() => AccessibilityInfo.isReduceMotionEnabled(), "reduceMotionChanged");
 const reduceTransparency = createFlag(() => AccessibilityInfo.isReduceTransparencyEnabled(), "reduceTransparencyChanged");
+const screenReader = createFlag(() => AccessibilityInfo.isScreenReaderEnabled(), "screenReaderChanged");
 
 /** Settings → Accessibility → Motion → Reduce Motion. */
 export function useReduceMotion(): boolean {
@@ -40,6 +41,14 @@ export function useReduceMotion(): boolean {
 /** Settings → Accessibility → Display & Text Size → Reduce Transparency. */
 export function useReduceTransparency(): boolean {
   return useSyncExternalStore(reduceTransparency.subscribe, reduceTransparency.get, reduceTransparency.get);
+}
+
+/**
+ * VoiceOver (or TalkBack) is on: controls that would fade away on their own (a video's) stay put, since someone who cannot
+ * see them could never find them again.
+ */
+export function useScreenReader(): boolean {
+  return useSyncExternalStore(screenReader.subscribe, screenReader.get, screenReader.get);
 }
 
 /** For code outside React (a press handler deciding whether to animate). */

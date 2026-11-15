@@ -18,7 +18,7 @@ import { errorText } from "@/lib/hooks";
 import { emitPostEngagement, emitPostRemoved, emitPostSlide } from "@/lib/posts-events";
 import { dropHanded, entryOf, loadViewerItems, peekHanded, posterAt, viewerItemFromPost, viewerItemFromReel, viewerKey, type ViewerEntry, type ViewerItem, type ViewerOrigin, type ViewerSource } from "@/lib/reel-viewer";
 import { useReduceMotion } from "@/lib/accessibility";
-import { ViewerChromeContext, ViewerClockContext, ViewerClosingContext, ViewerZoomContext, type ViewerClocks } from "@/lib/viewer-chrome";
+import { ViewerChromeContext, ViewerClockContext, ViewerClosingContext, ViewerPagerLockContext, ViewerZoomContext, type ViewerClocks } from "@/lib/viewer-chrome";
 import { returnPlayer } from "@/lib/video-handoff";
 import { videosMuted } from "@/lib/video-sound";
 import { usePageSwipe, ViewerSwipeContext, type ViewerSwipe } from "@/lib/viewer-swipe";
@@ -198,6 +198,8 @@ export default function ReelViewerScreen() {
   const onStartPage = useSharedValue(1);
   const [commentsKey, setCommentsKey] = useState<string | null>(null);
   const listRef = useRef<FlatList<ViewerEntry>>(null);
+  /** A photo on the page showing is zoomed in: the pager holds still, and one finger pans the photo (see ReelItem). */
+  const [pagerLocked, setPagerLocked] = useState(false);
   /** The slide each page is on (a post's photos and videos), as its page reports it. */
   const [shown, setShown] = useState<Record<string, number>>({});
   const onSlideChange = useCallback((key: string, slide: number) => setShown((prev) => (prev[key] === slide ? prev : { ...prev, [key]: slide })), []);
@@ -885,6 +887,7 @@ export default function ReelViewerScreen() {
           );
         }}
         extraData={listExtra}
+        scrollEnabled={!pagerLocked}
         pagingEnabled
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
@@ -964,6 +967,7 @@ export default function ReelViewerScreen() {
     <ViewerClosingContext.Provider value={closingNow}>
     <ViewerSwipeContext.Provider value={swipeBack}>
     <ViewerClockContext.Provider value={clockApi}>
+    <ViewerPagerLockContext.Provider value={setPagerLocked}>
     <View style={styles.root} onLayout={(e) => setHeight(Math.round(e.nativeEvent.layout.height))}>
       {body}
 
@@ -990,6 +994,7 @@ export default function ReelViewerScreen() {
 
       <ReelCommentsSheet reel={commentsReel} onClose={() => setCommentsKey(null)} onCountChange={onCommentCount} />
     </View>
+    </ViewerPagerLockContext.Provider>
     </ViewerClockContext.Provider>
     </ViewerSwipeContext.Provider>
     </ViewerClosingContext.Provider>

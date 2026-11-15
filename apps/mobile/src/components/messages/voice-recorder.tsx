@@ -164,8 +164,8 @@ export function VoiceRecorder({ onCancel, onSend }: { onCancel: () => void; onSe
 }
 
 const useStyles = makeStyles((colors) => ({
-  // The same 44pt sizes as the message bar it stands in for, so nothing jumps when recording starts or ends.
-  row: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // The same 44pt sizes and 8pt gaps as the message bar it stands in for, so nothing jumps when recording starts or ends.
+  row: { flexDirection: "row", alignItems: "center", gap: 8 },
   side: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   track: { flex: 1, height: 44, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", paddingHorizontal: 16, gap: 9, overflow: "hidden" },
   dot: { width: 9, height: 9, borderRadius: 4.5 },

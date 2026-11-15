@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, Platform, Text, TextInput, View, useWindowDimensions, type ListRenderItem, type TextInputInstance, type ViewInstance } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Keyboard, LayoutAnimation, Platform, Text, TextInput, View, useWindowDimensions, type ListRenderItem, type TextInputInstance } from "react-native";
+import Reanimated, { useAnimatedKeyboard, useAnimatedStyle } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import {
   MESSAGE_ATTACHMENT_LIMITS,
@@ -43,9 +45,9 @@ import { CallBanner } from "@/components/calls/call-banner";
 import { useCalls } from "@/components/calls/call-provider";
 import { CALLS_PAUSED } from "@/lib/calls";
 import { AnonymityBar } from "@/components/messages/anonymity-bar";
-import { ChatHeader } from "@/components/messages/chat-header";
+import { CHAT_EDGE, ChatHeader } from "@/components/messages/chat-header";
 import { shareVideoThumbnail } from "@/components/messages/attachment-thumb";
-import { Composer, ComposerNotice, type ComposerReply } from "@/components/messages/composer";
+import { barRestingPad, Composer, ComposerNotice, keyboardLift, type ComposerReply } from "@/components/messages/composer";
 import { MediaViewer, type MediaViewerItem } from "@/components/messages/media-viewer";
 import { MessageRow, messageMedia, type MediaResolver } from "@/components/messages/message-bubble";
 import type { ReplyContext } from "@/components/messages/reply-quote";
@@ -252,13 +254,11 @@ function Chat({
   const [activityFor, setActivityFor] = useState<ChatMessage | null>(null);
   /** Snaps this device has already said it received. */
   const delivered = useRef(new Set<string>());
-  const [windowTop, setWindowTop] = useState<number | null>(null);
   const [jumpTick, setJumpTick] = useState(0);
   // How much of the list the floating header and bar cover: the list keeps that much clear at each end.
   const [headerHeight, setHeaderHeight] = useState(0);
   const [barHeight, setBarHeight] = useState(0);
 
-  const rootRef = useRef<ViewInstance>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const inputRef = useRef<TextInputInstance>(null);
   const messagesRef = useRef(messages);
@@ -321,30 +321,30 @@ function Chat({
   }
 
   // ---------------------------------------------------------------------------
-  // Keyboard: the bar sits right on top of the keyboard. KeyboardAvoidingView measures the overlap from the top of the
-  // window, so it needs how far down the window this screen starts: measured (it draws its own header, so normally 0).
+  // Keyboard: the message bar rides on top of it and the messages rise with it, as one piece, frame by frame on the UI
+  // thread. Reanimated follows the keyboard as it slides in or out and as it is swiped down under the finger (the list's
+  // interactive dismissal), so nothing is laid out again while it moves, the bar never lags or jumps, and the newest
+  // message stays just above the bar, never under it. Risen, the list's top runs past the header by the same amount, so
+  // its far end keeps that much more room (`keyboardRoom`) for its oldest message to clear the header.
   // ---------------------------------------------------------------------------
-  const measure = useCallback(() => {
-    rootRef.current?.measureInWindow((_x, y) => {
-      if (typeof y === "number" && Number.isFinite(y) && y >= 0) setWindowTop(Math.round(y));
-    });
-  }, []);
-  useFocusEffect(
-    useCallback(() => {
-      // Again once the push animation has settled.
-      const timer = setTimeout(measure, 450);
-      return () => clearTimeout(timer);
-    }, [measure]),
-  );
-  const keyboardOffset = windowTop ?? 0;
-
-  // Opening the keyboard keeps the newest message in view (the list is inverted: offset 0 is the bottom).
+  const insets = useSafeAreaInsets();
+  const restingPad = barRestingPad(insets.bottom);
+  const keyboard = useAnimatedKeyboard();
+  const liftStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -keyboardLift(keyboard.height.value, restingPad) }] }));
+  const [keyboardRoom, setKeyboardRoom] = useState(0);
   useEffect(() => {
-    const sub = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", () => {
+    const show = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", (e) => {
+      setKeyboardRoom(keyboardLift(e.endCoordinates.height, restingPad));
+      // Opening the keyboard keeps the newest message in view (the list is inverted: offset 0 is the bottom).
       if (offsetRef.current < 160) listRef.current?.scrollToOffset({ offset: 0, animated: true });
     });
-    return () => sub.remove();
-  }, []);
+    // Only once it is gone: shrinking the far end while the list is still risen would let the oldest message jump.
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardRoom(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [restingPad]);
 
   // ---------------------------------------------------------------------------
   // Loading, realtime and catching up.
@@ -1091,18 +1091,22 @@ function Chat({
         : null;
 
   return (
-    <View ref={rootRef} onLayout={measure} collapsable={false} style={styles.screen}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "web" ? undefined : "padding"} keyboardVerticalOffset={keyboardOffset}>
+    <View style={styles.screen}>
+      <View style={styles.flex}>
         {/* The list runs under the floating bar (and under the header above), keeping that much of its ends clear;
-            the list is inverted, so its paddingTop is at the bottom of the screen and its paddingBottom at the top. */}
+            the list is inverted, so its paddingTop is at the bottom of the screen and its paddingBottom at the top (and
+            the same for its scroll bar's insets). It rises with the bar as the keyboard comes up. */}
+        <Reanimated.View style={[styles.flex, { marginBottom: -barHeight }, liftStyle]}>
         <FlatList
           ref={listRef}
           data={data}
           inverted
           keyExtractor={(m) => m.id}
           renderItem={renderItem}
-          style={[styles.flex, { marginBottom: -barHeight }]}
-          contentContainerStyle={[styles.list, { paddingTop: barHeight + 6, paddingBottom: headerHeight + 6 + (posterHidden ? ANONYMITY_BAR : 0) }]}
+          style={styles.flex}
+          contentContainerStyle={[styles.list, { paddingTop: barHeight + 12, paddingBottom: headerHeight + 10 + (posterHidden ? ANONYMITY_BAR : 0) + keyboardRoom }]}
+          automaticallyAdjustsScrollIndicatorInsets={false}
+          scrollIndicatorInsets={{ top: barHeight, bottom: headerHeight + keyboardRoom }}
           keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           keyboardShouldPersistTaps="handled"
           onScroll={(e) => {
@@ -1131,6 +1135,8 @@ function Chat({
             )
           }
         />
+        </Reanimated.View>
+        <Reanimated.View style={liftStyle}>
         {notice ? (
           <ComposerNotice title={notice.title} body={notice.body} action={"action" in notice ? notice.action : undefined} onHeight={setBarHeight} />
         ) : (
@@ -1149,7 +1155,8 @@ function Chat({
             onHeight={setBarHeight}
           />
         )}
-      </KeyboardAvoidingView>
+        </Reanimated.View>
+      </View>
       <ChatHeader
         conversation={conversation}
         subtitle={subtitle}
@@ -1179,9 +1186,10 @@ function Chat({
 const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
-  list: { paddingHorizontal: 12 },
+  // The chat's side margin, shared with the top bar and the message bar so their edges line up.
+  list: { paddingHorizontal: CHAT_EDGE },
   older: { marginVertical: 12 },
   emptyBox: { padding: 24, alignItems: "center" },
   errorBox: { padding: 16 },
-  empty: { textAlign: "center", color: colors.muted, padding: 24 },
+  empty: { textAlign: "center", fontSize: 15, lineHeight: 20, color: colors.muted, paddingHorizontal: 32, paddingVertical: 24 },
 }));
