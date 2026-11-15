@@ -207,8 +207,7 @@ export default function HousingScreen() {
       <View style={styles.body}>
         <Animated.View style={[styles.float, { transform: [{ translateY: floatShift }] }]}>
           <DiscoveryBar
-            // Spread like Home's labels: three labels do not fit a phone with the inbox's gap.
-            tabs={<SlidingTabs sections={HOUSING_SECTIONS} section={section} onSelect={select} scrollX={scrollX} pageWidth={width} tint={colors.accent} tintGradient={auroraGradient(colors.auroraGlow, 90)} labelColor={colors.text} dimColor={colors.muted} spread fontSize={16} />}
+            tabs={<SlidingTabs sections={HOUSING_SECTIONS} section={section} onSelect={select} scrollX={scrollX} pageWidth={width} tint={colors.accent} tintGradient={auroraGradient(colors.auroraGlow, 90)} labelColor={colors.text} dimColor={colors.muted} fontSize={16} />}
             query={q}
             onQuery={setQ}
             placeholder={placeholder}

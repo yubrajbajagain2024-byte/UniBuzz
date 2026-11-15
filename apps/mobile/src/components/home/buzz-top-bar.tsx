@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useIsFocused } from "expo-router";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, StyleSheet } from "react-native";
 import { HOME_TABS, type HomeSection } from "@apartment-book/shared";
 import { Icon } from "@/components/icon";
 import { MaskGlyph } from "@/components/buzz/ui";
@@ -18,8 +18,6 @@ import { statusShade } from "@/lib/theme";
 
 /** Where Buzz sits in the pager (-1 if it has no page). */
 export const BUZZ_PAGE_INDEX = HOME_TABS.findIndex((t) => t.value === "buzz");
-/** Space between the lime mask and the Buzz label. */
-const MASK_GAP = 4;
 
 type Flags = { near: boolean; avatarGone: boolean; glyphGone: boolean };
 
@@ -107,7 +105,10 @@ export function useBuzzBar(scrollX: Animated.Value, pageWidth: number, section: 
   return { near: flags.near, avatarShown: !flags.avatarGone, glyphShown: !flags.glyphGone, layer, avatarOpacity };
 }
 
-/** The bar's Phosphor background, over its usual one, as opaque as Buzz is near (`layer`). */
+/**
+ * The bar's Phosphor background, over its usual one, as opaque as Buzz is near (`layer`): Buzz's own canvas, with no
+ * line under it, so the tabs and the Buzz feed read as one surface, as the other pages' do.
+ */
 export function BuzzBarLayer({ layer }: { layer: BuzzBar["layer"] }) {
   if (!layer) return null;
   return <Animated.View pointerEvents="none" style={[styles.layer, { opacity: layer }]} />;
@@ -134,43 +135,23 @@ export function BuzzMeGlyph({ opacity, onPress, size }: { opacity: BuzzBar["laye
 }
 
 /**
- * The lime mask before the Buzz label: drawn over the labels row (SlidingTabs draws the labels), one cell per tab like
- * its `spread` layout, the mask just left of an invisible copy of the bold label, fading in as Buzz comes near.
+ * The lime mask before the Buzz label, fading in as Buzz comes near: SlidingTabs hangs it just before the label (its
+ * `leading`), so it follows the label wherever the row puts it.
  */
-export function BuzzLabelMask({ layer, fontSize, sidePad }: { layer: BuzzBar["layer"]; fontSize: number; sidePad: number }) {
+export function BuzzTabMask({ layer, fontSize }: { layer: BuzzBar["layer"]; fontSize: number }) {
   if (!layer || BUZZ_PAGE_INDEX < 0) return null;
   const glyph = Math.round(fontSize * 0.85);
   return (
-    <View pointerEvents="none" style={[styles.maskRow, { left: sidePad, right: sidePad }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {HOME_TABS.map((t) => (
-        <View key={t.value} style={styles.cell}>
-          {t.value === "buzz" ? (
-            // In flow, not offset by a percentage: the mask, the invisible label, and a spacer as wide as the mask, so the
-            // label stays centred over the real one and the mask sits just before it.
-            <View style={styles.maskLine}>
-              <Animated.View style={[styles.mask, { width: glyph, opacity: layer }]}>
-                <MaskGlyph size={glyph} color={phosphor.accent} />
-              </Animated.View>
-              <Text style={[styles.ghost, { fontSize }]} maxFontSizeMultiplier={1.2} numberOfLines={1}>
-                {t.label}
-              </Text>
-              <View style={{ width: glyph + MASK_GAP }} />
-            </View>
-          ) : null}
-        </View>
-      ))}
-    </View>
+    <Animated.View style={[styles.mask, { width: glyph, opacity: layer }]}>
+      <MaskGlyph size={glyph} color={phosphor.accent} />
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   // Opaque: under it sits the bar's own colour (white in Light), which a see-through Phosphor would turn grey.
-  layer: { position: "absolute", top: 0, left: 0, right: 0, bottom: -StyleSheet.hairlineWidth, backgroundColor: phosphor.surface1, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: phosphor.line },
-  shade: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 12, experimental_backgroundImage: statusShade(phosphor.surface1) },
+  layer: { position: "absolute", top: 0, left: 0, right: 0, bottom: -StyleSheet.hairlineWidth, backgroundColor: phosphor.canvas },
+  shade: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 12, experimental_backgroundImage: statusShade(phosphor.canvas) },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  maskRow: { position: "absolute", top: 0, bottom: 0, flexDirection: "row" },
-  cell: { flex: 1, alignItems: "center", justifyContent: "center" },
-  ghost: { fontWeight: "700", opacity: 0 },
-  maskLine: { flexDirection: "row", alignItems: "center" },
-  mask: { marginRight: MASK_GAP, alignItems: "center", justifyContent: "center" },
+  mask: { alignItems: "center", justifyContent: "center" },
 });

@@ -1,27 +1,41 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
+import { StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
+import Reanimated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ConversationSummary } from "@apartment-book/shared";
 import { Avatar } from "@/components/avatar";
-import { GlassIconButton } from "@/components/glass";
-import { Icon } from "@/components/icon";
+import { GlassBackdrop, GlassIconButton } from "@/components/glass";
 import { ProgressiveBlur } from "@/components/progressive-blur";
+import { AnimatedPressable, usePressScale } from "@/components/ui";
+import { useReduceMotion } from "@/lib/accessibility";
+import { scrollEdge } from "@/lib/theme";
 import { makeStyles, useAppTheme } from "@/lib/theme-provider";
+import { InboxAvatar } from "./inbox-row";
 
-/** Back, in a glass circle: the system's 44pt touch target. */
-const BUTTON = 44;
-/** The three actions on the right (Audio call, Video call, Info): a touch smaller, so a long name keeps its room. */
-const ACTION = 40;
-/** The person's photo beside their name. */
-const AVATAR = 38;
+/** Every control in the bar is the system's 44pt touch target, so all of them share one centre line. */
+const CONTROL = 44;
+/** The chat's photo, at the right: a touch smaller than the glass circle across from it, which it balances (a photo weighs more than glass). */
+const PHOTO = 40;
+/**
+ * A chat's side margin: the bar's controls, the bubbles and the message bar all keep this far from the screen's edges,
+ * so their outer edges line up down the screen.
+ */
+export const CHAT_EDGE = 16;
+/** Below the bar, the messages fade out over this many points before the bar's backdrop reaches full strength. */
+const FADE = 20;
+/** The capsule's two lines follow the phone's text size only this far, so they always fit its 44 points. */
+const MAX_FONT_SCALE = 1.2;
 
 /**
- * A chat's floating top bar, in one row: Back in a glass circle on the left, then who the chat is with (their photo,
- * with the green dot while they are active, their name with a chevron and their activity line under it; a group shows
- * its mark and member count), and Audio call, Video call and Info in glass circles on the right (Search is in the chat's
- * details, with everything else about the chat). The photo and the name open the chat's details, as Info does. Nothing solid behind it: the messages scroll under it through a blur that fades in towards the
- * top of the screen, so the clock always has something quiet behind it. `onHeight` tells the chat how much of the list
- * it covers.
+ * A chat's floating top bar, in one row of three glass pieces of the same height, iOS 26 style: Back in a glass circle
+ * on the left; in the middle of the screen a glass capsule with who the chat is with and, under it, their activity
+ * ("Active now", with a green dot) or a group's member count; and the chat's photo on the right (the other person's,
+ * with the green dot while they are active; a group's two members overlapping, as in the inbox). The capsule and the
+ * photo open the chat's details (Search is there, with everything else about the chat). Audio call and Video call join
+ * the right side only when calls are on. Nothing solid behind the bar: the messages scroll under it and are dimmed and
+ * blurred into the screen's colour (iOS 26's scroll edge effect), nearly solid behind the controls and fading out just
+ * below them, so the bar's words always read and nothing shows through them. `onHeight` tells the chat how much of
+ * the list it covers.
  */
 export function ChatHeader({
   conversation,
@@ -42,7 +56,7 @@ export function ChatHeader({
   keepSubtitleRoom: boolean;
   onBack: () => void;
   onOpenInfo: () => void;
-  /** The call buttons; left out (a chat you cannot call in, e.g. one that blocked you), the bar shows Info alone. */
+  /** The call buttons; left out (calls paused, or a chat you cannot call in), the right side is the photo alone. */
   onAudioCall?: () => void;
   onVideoCall?: () => void;
   onHeight: (height: number) => void;
@@ -51,9 +65,8 @@ export function ChatHeader({
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const [height, setHeight] = useState(0);
-  const other = conversation?.otherMembers[0];
-  const isGroup = conversation?.type === "group";
-  const title = conversation?.title ?? "";
+  // The share of the backdrop's band that the bar itself covers: held at full strength, the fade below it.
+  const solid = height > 0 ? height / (height + FADE) : 0.8;
 
   function measured(e: LayoutChangeEvent) {
     const h = Math.round(e.nativeEvent.layout.height);
@@ -64,72 +77,106 @@ export function ChatHeader({
 
   return (
     <View pointerEvents="box-none" style={styles.header} onLayout={measured}>
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        {/* The blur reaches well past the bar, so no line shows where it ends; the wash on top keeps the clock and the
-            name clear over any photo. */}
-        <ProgressiveBlur edge="top" height={height + 40} intensity={60} tint={isDark ? "dark" : "light"} />
-        <View style={[StyleSheet.absoluteFill, { experimental_backgroundImage: `linear-gradient(to bottom, ${colors.glass} 0%, ${colors.floatFill} 60%, transparent 100%)` }]} />
+      <View pointerEvents="none" style={[styles.edge, { bottom: -FADE }]}>
+        <ProgressiveBlur edge="top" height={height + FADE} solid={solid} intensity={40} tint={isDark ? "dark" : "light"} />
+        <View style={[StyleSheet.absoluteFill, { experimental_backgroundImage: scrollEdge(colors.bg, "top", solid) }]} />
       </View>
-      <View pointerEvents="box-none" style={[styles.row, { paddingTop: insets.top + 6 }]}>
-        <GlassIconButton icon="chevron-back" label="Back" variant="float" size={BUTTON} iconSize={22} weight="medium" haptic={false} onPress={onBack} />
-        {conversation ? (
-          <Pressable
-            onPress={onOpenInfo}
-            hitSlop={{ top: 6, bottom: 6 }}
-            accessibilityRole="button"
-            accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ""}. Chat details`}
-            style={({ pressed }) => [styles.identity, pressed && { opacity: 0.7 }]}
-          >
-            {conversation.anonymous?.role === "asker" && conversation.anonymous.hidden ? (
-              <Avatar name={title} size={AVATAR} anonymous />
-            ) : conversation.business ? (
-              <Avatar name={conversation.business.name} url={conversation.business.logo_url} size={AVATAR} online={false} ringColor={colors.bg} />
-            ) : isGroup ? (
-              <View style={styles.groupAvatar}>
-                <Icon name="people" size={18} color={colors.brand} />
-              </View>
-            ) : (
-              <Avatar name={other?.full_name} url={other?.avatar_url} size={AVATAR} online={activeNow} ringColor={colors.bg} />
-            )}
-            <View style={styles.text}>
-              <View style={styles.nameRow}>
-                <Text style={styles.name} numberOfLines={1}>
-                  {title}
-                </Text>
-                <Icon name="chevron-forward" size={13} color={colors.muted} weight="semibold" />
-              </View>
-              {subtitle ? (
-                <Text style={styles.sub} numberOfLines={1}>
-                  {subtitle}
-                </Text>
-              ) : keepSubtitleRoom ? (
-                <Text style={styles.sub}> </Text>
-              ) : null}
-            </View>
-          </Pressable>
-        ) : (
-          <View style={styles.identity} />
-        )}
-        {conversation ? (
-          <View style={styles.actions}>
-            {onAudioCall ? <GlassIconButton icon="call" label="Audio call" variant="float" size={ACTION} iconSize={19} weight="medium" onPress={onAudioCall} /> : null}
-            {onVideoCall ? <GlassIconButton icon="videocam" label="Video call" variant="float" size={ACTION} iconSize={21} weight="medium" onPress={onVideoCall} /> : null}
-            <GlassIconButton icon="information-circle-outline" label="Chat details" variant="float" size={ACTION} iconSize={22} weight="medium" onPress={onOpenInfo} />
-          </View>
-        ) : null}
+      <View pointerEvents="box-none" style={[styles.row, { paddingTop: insets.top + 4 }]}>
+        <View style={styles.side}>
+          <GlassIconButton icon="chevron-back" label="Back" variant="float" size={CONTROL} iconSize={20} weight="semibold" haptic={false} onPress={onBack} />
+        </View>
+        <View pointerEvents="box-none" style={styles.middle}>
+          {conversation ? <TitleCapsule title={conversation.title ?? ""} subtitle={subtitle} activeNow={activeNow} keepSubtitleRoom={keepSubtitleRoom} onPress={onOpenInfo} /> : null}
+        </View>
+        <View style={[styles.side, styles.sideEnd]}>
+          {onAudioCall ? <GlassIconButton icon="call" label="Audio call" variant="float" size={CONTROL} iconSize={18} weight="medium" onPress={onAudioCall} /> : null}
+          {onVideoCall ? <GlassIconButton icon="videocam" label="Video call" variant="float" size={CONTROL} iconSize={20} weight="medium" onPress={onVideoCall} /> : null}
+          {conversation ? <ChatPhoto conversation={conversation} activeNow={activeNow} onPress={onOpenInfo} /> : null}
+        </View>
       </View>
     </View>
   );
 }
 
+/** The name, and the activity line under it, centred in a glass capsule that sinks under the finger. */
+function TitleCapsule({ title, subtitle, activeNow, keepSubtitleRoom, onPress }: { title: string; subtitle: string; activeNow: boolean; keepSubtitleRoom: boolean; onPress: () => void }) {
+  const styles = useStyles();
+  const reduceMotion = useReduceMotion();
+  const press = usePressScale(0.96, 0.9);
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      hitSlop={{ top: 6, bottom: 6 }}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ""}. Chat details`}
+      style={[styles.capsule, { opacity: press.opacity, transform: [{ scale: press.scale }] }]}
+    >
+      <GlassBackdrop variant="float" radius={CONTROL / 2} interactive />
+      <Text style={styles.name} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+        {title}
+      </Text>
+      {subtitle ? (
+        // Keyed by the words, so "Active 5 min ago" turning into "Active now" fades in rather than snapping.
+        <Reanimated.View key={subtitle} entering={reduceMotion ? undefined : FadeIn.duration(220)} style={styles.subRow}>
+          {activeNow ? <View style={styles.liveDot} /> : null}
+          <Text style={styles.sub} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+            {subtitle}
+          </Text>
+        </Reanimated.View>
+      ) : keepSubtitleRoom ? (
+        <Text style={styles.sub} maxFontSizeMultiplier={MAX_FONT_SCALE}> </Text>
+      ) : null}
+    </AnimatedPressable>
+  );
+}
+
+/** Who the chat is with, as a photo: the other person's, a business's logo, an anonymous poster's mask, or a group's members. */
+function ChatPhoto({ conversation, activeNow, onPress }: { conversation: ConversationSummary; activeNow: boolean; onPress: () => void }) {
+  const styles = useStyles();
+  const { colors } = useAppTheme();
+  const press = usePressScale(0.92, 0.9);
+  const other = conversation.otherMembers[0];
+  const photo =
+    conversation.anonymous?.role === "asker" && conversation.anonymous.hidden ? (
+      <Avatar name={conversation.title} size={PHOTO} anonymous />
+    ) : conversation.business ? (
+      <Avatar name={conversation.business.name} url={conversation.business.logo_url} size={PHOTO} online={false} />
+    ) : conversation.type === "group" ? (
+      <InboxAvatar conversation={conversation} size={PHOTO} />
+    ) : (
+      <Avatar name={other?.full_name ?? conversation.title} url={other?.avatar_url} size={PHOTO} online={activeNow} ringColor={colors.bg} />
+    );
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel="Chat details"
+      style={[styles.photo, { opacity: press.opacity, transform: [{ scale: press.scale }] }]}
+    >
+      {photo}
+    </AnimatedPressable>
+  );
+}
+
 const useStyles = makeStyles((colors) => ({
   header: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 2 },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingBottom: 12 },
-  identity: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10 },
-  groupAvatar: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, backgroundColor: colors.brandSoft, alignItems: "center", justifyContent: "center" },
-  text: { flexShrink: 1, minWidth: 0, gap: 1 },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  name: { flexShrink: 1, fontSize: 17, lineHeight: 22, fontWeight: "700", color: colors.text },
-  sub: { fontSize: 13, lineHeight: 17, color: colors.muted },
-  actions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // The backdrop reaches FADE below the bar (see `bottom` where it is drawn), so the messages fade out under its edge.
+  edge: { position: "absolute", top: 0, left: 0, right: 0 },
+  row: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: CHAT_EDGE, paddingBottom: 8 },
+  // Both sides are at least one control wide, so with one control each (calls paused) the capsule is centred on the screen.
+  side: { minWidth: CONTROL, flexDirection: "row", alignItems: "center", gap: 8 },
+  sideEnd: { justifyContent: "flex-end" },
+  middle: { flex: 1, minWidth: 0, alignItems: "center" },
+  capsule: { height: CONTROL, maxWidth: "100%", minWidth: 112, paddingHorizontal: 18, borderRadius: CONTROL / 2, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassEdge, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  // Two lines in the 44pt capsule: 19 + 15, centred; one line alone sits on the capsule's centre line.
+  name: { maxWidth: "100%", fontSize: 15, lineHeight: 19, fontWeight: "600", letterSpacing: -0.1, color: colors.text },
+  subRow: { maxWidth: "100%", flexDirection: "row", alignItems: "center", gap: 5 },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.green },
+  sub: { flexShrink: 1, fontSize: 12, lineHeight: 15, color: colors.muted },
+  photo: { width: CONTROL, height: CONTROL, alignItems: "center", justifyContent: "center" },
 }));

@@ -13,7 +13,7 @@ import { useSession } from "@/lib/session";
 import { auroraGradient, radius, statusShade } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { ProfileMenuSheet } from "./profile-menu";
-import { BuzzBarLayer, BuzzLabelMask, BuzzMeGlyph, BuzzStatusShade, useBuzzBar } from "./buzz-top-bar";
+import { BuzzBarLayer, BuzzMeGlyph, BuzzStatusShade, BuzzTabMask, useBuzzBar } from "./buzz-top-bar";
 import { phosphor } from "@/lib/palette";
 import { Icon } from "@/components/icon";
 import { GlassBackdrop } from "@/components/glass";
@@ -107,13 +107,15 @@ export function campusSegments(profile: { university_id: string | null; universi
  * Floating top bar of Home, X style, in three rows. Row 1: your photo in a gradient ring on the left, which opens your
  * menu (ProfileMenuSheet: your profile, Upload, Saved, Settings, Community Guidelines, Log out; signed out, log in); the
  * UniBuzz wordmark in the middle (it reads "Following" while that feed shows); on the right the magnifier (the search
- * screen) and the Notifications bell (it opens the notifications screen; its badge counts the unread). Row 2: the Home tabs (Orbit | Buzz | Reels) spread across the row
- * with X's sliding underline (violet, as wide as the label) over a hairline. Row 3: the Campus | Global toggle, a small
+ * screen) and the Notifications bell (it opens the notifications screen; its badge counts the unread). Row 2: the Home tabs (Orbit | Buzz | Reels) side by side in
+ * the middle of the row (SlidingTabs' TAB_GAP apart, as in every tab row) with X's sliding underline (violet, as wide as
+ * the label), Buzz's lime mask hung just before its label while Buzz is near. No line under the bar: it is the screen's
+ * own colour, so the tabs, the stories and the feed read as one seamless surface. Row 3: the Campus | Global toggle, a small
  * segmented pill whose thumb slides to the choice (see useHomeScope: it scopes For you, Buzz, Posts and Reels alike;
  * Campus is the person's own university, Global every university; "Following" joins it only while Posts has a tab,
  * and moves to Posts). Someone without a university has nothing to choose, so the row is not drawn for them. `scrollX`
  * is the pager's offset in points and `pageWidth` the width of one page: the underline slides, the labels crossfade (see
- * SlidingTabs) and the bar's solid background (colors.bar and its hairline) fades out towards Reels with the finger, all
+ * SlidingTabs) and the bar's solid background (colors.bar) fades out towards Reels with the finger, all
  * on the native driver. `overVideo` says when the text, icons and the toggle turn white and glassy for the video: Home
  * flips it halfway between Posts and Reels. Creating starts from the floating "+" at the bottom right (X's compose
  * button) and the menu's Upload; your photo keeps the left slot over the Reels video too. `section` is the section committed once the pager settles: what screen readers hear as selected
@@ -223,8 +225,20 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
           </View>
         </View>
         <View style={styles.row}>
-          <SlidingTabs sections={HOME_TABS} section={section} onSelect={onSelect} scrollX={scrollX} pageWidth={pageWidth} tint={ink} tintGradient={overVideo || onBuzz ? undefined : auroraGradient(colors.auroraGlow, 90)} labelColor={fg} dimColor={dim} textStyle={overVideo ? styles.shadow : undefined} fontSize={LABEL_SIZE} spread />
-          <BuzzLabelMask layer={buzzBar.layer} fontSize={LABEL_SIZE} sidePad={SIDE_PAD} />
+          <SlidingTabs
+            sections={HOME_TABS}
+            section={section}
+            onSelect={onSelect}
+            scrollX={scrollX}
+            pageWidth={pageWidth}
+            tint={ink}
+            tintGradient={overVideo || onBuzz ? undefined : auroraGradient(colors.auroraGlow, 90)}
+            labelColor={fg}
+            dimColor={dim}
+            textStyle={overVideo ? styles.shadow : undefined}
+            fontSize={LABEL_SIZE}
+            leading={{ buzz: <BuzzTabMask layer={buzzBar.layer} fontSize={LABEL_SIZE} /> }}
+          />
         </View>
         {/* Temporarily hidden everywhere (SCOPE_TOGGLE_SHOWN): the bar is then its first two rows, as it is for anyone with
             no university to choose. */}
@@ -280,8 +294,9 @@ export function ScopeToggle({ segments, value, onChange, overVideo, shadow }: { 
 const useStyles = makeStyles((colors, scheme) => ({
   // The bar itself is see-through; its transparent hairline keeps the height the same as when the solid look was drawn on it.
   bar: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "transparent" },
-  // The solid look behind the rows, safe area included, its hairline on the bar's bottom edge: faded by the pager (see `solid`).
-  solid: { position: "absolute", top: 0, left: 0, right: 0, bottom: -StyleSheet.hairlineWidth, backgroundColor: colors.bar, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  // The solid look behind the rows, safe area included, down over the bar's (transparent) bottom edge: no divider under
+  // the tabs, the bar and the stories under it are one surface. Faded by the pager (see `solid`).
+  solid: { position: "absolute", top: 0, left: 0, right: 0, bottom: -StyleSheet.hairlineWidth, backgroundColor: colors.bar },
   statusShade: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 11, experimental_backgroundImage: statusShade(colors.bar) },
   row: { height: ROW, flexDirection: "row", alignItems: "center", paddingHorizontal: SIDE_PAD },
   side: { width: SIDE, height: ROW, alignItems: "center", justifyContent: "center" },
@@ -297,7 +312,7 @@ const useStyles = makeStyles((colors, scheme) => ({
   ringGap: { width: PHOTO + 2 * PHOTO_GAP, height: PHOTO + 2 * PHOTO_GAP, borderRadius: PHOTO / 2 + PHOTO_GAP, backgroundColor: colors.bar, alignItems: "center", justifyContent: "center" },
   // Under the white words and icons over Reels: dark and soft enough to hold them on a bright frame.
   shadow: { textShadowColor: colors.mediaTextShadow, textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } },
-  // The toggle sits centred in its row, just under the labels' hairline.
+  // The toggle sits centred in its row, just under the labels.
   toggleRow: { height: TOGGLE_ROW, alignItems: "center", justifyContent: "center" },
   // The pill on the input fill; over video a glass fill instead. The thumb is a card with a whisper of shadow in light.
   toggle: { flexDirection: "row", padding: TOGGLE_PAD, borderRadius: radius.pill, backgroundColor: colors.input },

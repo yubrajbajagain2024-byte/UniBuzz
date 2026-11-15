@@ -46,9 +46,25 @@ export function auroraGradient(stops: readonly string[], angle = 110): string {
  * enough to lift the icons off a picture of their own colour; the feed shows through, clearly, everywhere else.
  */
 export function statusShade(hex: string): string {
+  return `linear-gradient(to bottom, ${withAlpha(hex, 0.2)} 0%, ${withAlpha(hex, 0.1)} 55%, ${withAlpha(hex, 0)} 100%)`;
+}
+
+/** `hex` (#rrggbb) at `opacity` as an rgba() colour, for washes of a theme colour (black if `hex` is not #rrggbb). */
+export function withAlpha(hex: string, opacity: number): string {
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
   const rgb = m ? `${parseInt(m[1]!, 16)},${parseInt(m[2]!, 16)},${parseInt(m[3]!, 16)}` : "0,0,0";
-  return `linear-gradient(to bottom, rgba(${rgb},0.2) 0%, rgba(${rgb},0.1) 55%, rgba(${rgb},0) 100%)`;
+  return `rgba(${rgb},${opacity})`;
+}
+
+/**
+ * iOS 26's scroll edge effect, as a gradient for `experimental_backgroundImage`: what scrolls under a floating bar is
+ * dimmed into the screen's colour (`hex`), nearly solid behind the bar's own controls and words, then fading to nothing
+ * just past the bar. `edge` is the screen edge the bar sits on; `solid` is the share of the band, from that edge,
+ * covered at full strength (the bar itself), the rest being the fade.
+ */
+export function scrollEdge(hex: string, edge: "top" | "bottom", solid: number): string {
+  const at = Math.round(Math.max(0, Math.min(1, solid)) * 100);
+  return `linear-gradient(to ${edge === "top" ? "bottom" : "top"}, ${withAlpha(hex, 0.94)} 0%, ${withAlpha(hex, 0.82)} ${at}%, ${withAlpha(hex, 0)} 100%)`;
 }
 
 /** An iOS 26 sheet at a partial height: it floats inset from the screen's sides and bottom, its corners concentric with the phone's. */

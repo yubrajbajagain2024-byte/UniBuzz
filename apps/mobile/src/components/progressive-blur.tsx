@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Platform, StyleSheet, UIManager, View, type StyleProp, type ViewStyle } from "react-native";
 import { MaskedView } from "@/components/masked-view";
 import { BlurView, type BlurTint } from "expo-blur";
@@ -48,12 +49,16 @@ function rampAt(t: number): number {
   return 1;
 }
 
-/** The strips, first to last down the screen: the ramp runs up to a top band and down to a bottom one. */
-function stripsFor(edge: "top" | "bottom"): string[] {
+/**
+ * The strips, first to last down the screen: the ramp runs up to a top band and down to a bottom one. `solid` is the
+ * share of the band, from the screen's edge, held at full strength before the ramp starts.
+ */
+function stripsFor(edge: "top" | "bottom", solid = 0): string[] {
+  const ramp = Math.max(0.001, 1 - Math.max(0, Math.min(1, solid)));
   return Array.from({ length: STEPS }, (_, i) => {
     const centre = (i + 0.5) / STEPS;
     const t = edge === "bottom" ? centre : 1 - centre;
-    return `rgba(0,0,0,${rampAt(t).toFixed(3)})`;
+    return `rgba(0,0,0,${rampAt(Math.min(1, t / ramp)).toFixed(3)})`;
   });
 }
 const STRIPS = { top: stripsFor("top"), bottom: stripsFor("bottom") };
@@ -63,13 +68,15 @@ const STRIPS = { top: stripsFor("top"), bottom: stripsFor("bottom") };
  * under a bar: the picture behind it softens gradually, with no line where the blur starts. Draw it over the content and
  * under the words; `height` is how far it reaches in from that edge. `edge` is which edge it belongs to (the bottom,
  * as under a reel's caption, or the top, as under a chat's floating header); `tint` the blur's look (dark over video,
- * the theme's over a page). `shown` (0 to 1) fades it in and out.
+ * the theme's over a page). `solid` (0 to 1) holds that share of the band, from the screen's edge, at full strength
+ * (behind a bar's own words), the ramp taking only the rest. `shown` (0 to 1) fades it in and out.
  */
 export function ProgressiveBlur({
   height,
   intensity = 30,
   edge = "bottom",
   tint = "dark",
+  solid = 0,
   style,
   shown,
 }: {
@@ -77,10 +84,14 @@ export function ProgressiveBlur({
   intensity?: number;
   edge?: "top" | "bottom";
   tint?: BlurTint;
+  solid?: number;
   style?: StyleProp<ViewStyle>;
   shown?: Readonly<SharedValue<number>> | null;
 }) {
   const fade = useAnimatedStyle(() => ({ opacity: shown ? shown.value : 1 }));
+  // Rounded to a twentieth, so a bar whose height settles a point at a time does not rebuild its strips each time.
+  const held = Math.round(Math.max(0, Math.min(1, solid)) * 20) / 20;
+  const strips = useMemo(() => (held > 0 ? stripsFor(edge, held) : STRIPS[edge]), [edge, held]);
   if (!CAN_BLUR) return null;
   const place: ViewStyle = edge === "top" ? { top: 0 } : { bottom: 0 };
   const band = (
@@ -89,7 +100,7 @@ export function ProgressiveBlur({
       style={FADE_MASK ? [styles.band, place, { height }, style] : StyleSheet.absoluteFill}
       maskElement={
         <Reanimated.View style={[styles.mask, FADE_MASK && fade]}>
-          {STRIPS[edge].map((color, i) => (
+          {strips.map((color, i) => (
             <View key={i} style={[styles.strip, { backgroundColor: color }]} />
           ))}
         </Reanimated.View>

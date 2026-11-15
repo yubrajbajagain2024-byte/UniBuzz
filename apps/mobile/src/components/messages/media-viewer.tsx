@@ -4,14 +4,24 @@ import { Image } from "expo-image";
 import { StatusBar } from "expo-status-bar";
 import { useVideoPlayer, VideoView, type VideoThumbnail } from "expo-video";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import Reanimated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { makeStyles, useColors } from "@/lib/theme-provider";
+import { hapticTap } from "@/lib/haptics";
+import { useScreenReader } from "@/lib/accessibility";
 import { BACKDROP_PIXELS, BlurredBackdrop } from "@/components/blurred-backdrop";
+import { GlassBackdrop } from "@/components/glass";
 import { Icon } from "@/components/icon";
+import { BOOST_RATE, HOLD_MS, SpeedBadge, TIMELINE_TOUCH, VideoTimeline } from "@/components/video-controls";
 
 /** One photo or video in the viewer. `cacheKey` (the storage path) lets a fresh signed URL reuse the cached photo. */
 export type MediaViewerItem = { kind: "image" | "video"; uri: string; cacheKey?: string };
 
 const DOUBLE_TAP_MS = 280;
+/** A video's controls fade away this long after it starts playing (a tap brings them back), as Photos' do. */
+const CONTROLS_HIDE_MS = 2800;
+/** The round play or pause button in the middle of a video. */
+const PLAY_BUTTON = 64;
 const MAX_ZOOM = 4;
 /** How far a double tap zooms in. */
 const TAP_ZOOM = 2.5;
@@ -19,8 +29,9 @@ const TAP_ZOOM = 2.5;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 /**
- * Full-screen viewer for a message's photos and videos: swipe between them, pinch or double tap to zoom a photo, videos
- * play with the system controls, and the close button (or Android's back) returns to the chat. Each photo or video sits
+ * Full-screen viewer for a message's photos and videos: swipe between them, pinch or double tap to zoom a photo, and a
+ * video plays with the app's own controls (see VideoPage: play or pause, the timeline to scrub, the sound, and hold for
+ * 2×); the close button (or Android's back) returns to the chat. Each photo or video sits
  * whole from the screen's very top edge, the status bar and the close button over it, and a blurred copy of it fills
  * the rest of the screen, never black.
  */
@@ -35,7 +46,10 @@ export function MediaViewer({ visible, items, index, onClose }: { visible: boole
   wasVisible.current = open;
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent supportedOrientations={["portrait"]}>
-      {shown.current.items.length > 0 ? <ViewerBody key={shown.current.key} items={shown.current.items} index={shown.current.index} onClose={onClose} /> : null}
+      {/* A modal is a window of its own: the timeline's drag needs its own gesture root there. */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        {shown.current.items.length > 0 ? <ViewerBody key={shown.current.key} items={shown.current.items} index={shown.current.index} onClose={onClose} /> : null}
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -289,20 +303,64 @@ function TouchZoomPhoto({ item, width, height, onZoomChange }: { item: MediaView
 }
 
 /**
- * A video with the system controls; it plays while its page is the one showing. It sits whole from the screen's top edge
- * once its shape is known (the chat does not record it: it comes from the video's own track), in the middle until then,
- * and a small blurred frame of it fills the rest of the screen.
+ * A video with the app's own controls, Photos style: it plays with its sound while its page is the one showing. A tap
+ * shows or hides the controls (they fade away on their own a moment after it plays): play or pause in the middle, and
+ * along the bottom the timeline, with the time gone and the time left, which drags to fast-forward or rewind (the video
+ * holds on the frame under the finger), and the sound switch. Pressed and held while playing, it runs at 2× until the
+ * finger lifts, with a "2×" pill at the top. At its end it stops with the controls up; play starts it again. It sits
+ * whole from the screen's top edge once its shape is known (the chat does not record it: it comes from the video's own
+ * track), in the middle until then, and a small blurred frame of it fills the rest of the screen.
  */
 function VideoPage({ uri, active, width, height }: { uri: string; active: boolean; width: number; height: number }) {
+  const colors = useColors();
+  const styles = useStyles();
+  const insets = useSafeAreaInsets();
   const player = useVideoPlayer({ uri }, (p) => {
     p.loop = false;
   });
   const [aspect, setAspect] = useState<number | null>(null);
   const [frame, setFrame] = useState<VideoThumbnail | null>(null);
+  /** Paused by a tap (or by reaching its end), held still under the timeline's finger, held at 2× by a finger on it. */
+  const [paused, setPaused] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
+  const [boosted, setBoosted] = useState(false);
+  const [controls, setControls] = useState(true);
+  const [muted, setMuted] = useState(false);
+  const ended = useRef(false);
+  // With VoiceOver on the controls never fade away: they could not be found again.
+  const screenReader = useScreenReader();
   useEffect(() => {
-    if (active) player.play();
+    if (active && !paused && !scrubbing) player.play();
     else player.pause();
-  }, [active, player]);
+  }, [active, paused, scrubbing, player]);
+  // Swiped away: back to 1× and the controls up, for when it comes back.
+  useEffect(() => {
+    if (active) return;
+    setBoosted(false);
+    setControls(true);
+  }, [active]);
+  useEffect(() => {
+    const rate = boosted ? BOOST_RATE : 1;
+    if (player.playbackRate !== rate) player.playbackRate = rate;
+  }, [boosted, player]);
+  useEffect(() => {
+    if (player.muted !== muted) player.muted = muted;
+  }, [muted, player]);
+  useEffect(() => {
+    const sub = player.addListener("playToEnd", () => {
+      ended.current = true;
+      setPaused(true);
+      setBoosted(false);
+      setControls(true);
+    });
+    return () => sub.remove();
+  }, [player]);
+  // Shown while it plays, the controls step away after a moment; paused or under a finger, they stay.
+  useEffect(() => {
+    if (!controls || paused || scrubbing || !active || screenReader) return;
+    const timer = setTimeout(() => setControls(false), CONTROLS_HIDE_MS);
+    return () => clearTimeout(timer);
+  }, [controls, paused, scrubbing, active, screenReader]);
   useEffect(() => {
     let alive = true;
     const shape = (size: { width: number; height: number } | undefined) => {
@@ -323,14 +381,84 @@ function VideoPage({ uri, active, width, height }: { uri: string; active: boolea
       loaded.remove();
     };
   }, [player]);
+
+  function togglePlay() {
+    hapticTap();
+    if (!paused) {
+      setPaused(true);
+      return;
+    }
+    // From its end, it starts again.
+    if (ended.current) {
+      ended.current = false;
+      player.currentTime = 0;
+    }
+    setPaused(false);
+  }
+  function holdStart() {
+    if (paused || scrubbing) return;
+    hapticTap();
+    setBoosted(true);
+  }
+
+  const shown = (controls || paused || scrubbing || screenReader) && !boosted;
+  const fade = useSharedValue(1);
+  useEffect(() => {
+    fade.value = withTiming(shown ? 1 : 0, { duration: shown ? 160 : 240 });
+  }, [shown, fade]);
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
+
   const box = aspect ? { left: (width - Math.min(width, height * aspect)) / 2, top: 0, width: Math.min(width, height * aspect), height: Math.min(width, height * aspect) / aspect } : { left: 0, top: 0, width, height };
   return (
     <View style={{ width, height }}>
       <BlurredBackdrop small={frame} />
-      <VideoView player={player} style={[{ position: "absolute" }, box]} contentFit="contain" nativeControls fullscreenOptions={{ enable: false }} allowsPictureInPicture={false} />
+      <VideoView player={player} style={[{ position: "absolute" }, box]} contentFit="contain" nativeControls={false} allowsVideoFrameAnalysis={false} fullscreenOptions={{ enable: false }} allowsPictureInPicture={false} />
+      {/* Anywhere on the video: a tap shows or hides the controls, a hold plays at 2× until it lets go. */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={() => setControls((c) => !c)}
+        onLongPress={holdStart}
+        onPressOut={() => setBoosted(false)}
+        delayLongPress={HOLD_MS}
+        accessibilityRole="button"
+        accessibilityLabel={shown ? "Hide controls" : "Show controls"}
+        accessibilityHint="Press and hold to play at double speed"
+      />
+      {/* Faded away, the controls leave the accessibility tree too, as they leave touch. */}
+      <Reanimated.View pointerEvents={shown ? "box-none" : "none"} accessibilityElementsHidden={!shown} importantForAccessibility={shown ? "auto" : "no-hide-descendants"} style={[StyleSheet.absoluteFill, fadeStyle]}>
+        {/* In the middle of the screen, as Photos has it: over a short video at the top it would sit on the counter. */}
+        <View style={styles.middle} pointerEvents="box-none">
+          <Pressable onPress={togglePlay} hitSlop={8} accessibilityRole="button" accessibilityLabel={paused ? "Play" : "Pause"} style={({ pressed }) => [styles.playButton, pressed && { transform: [{ scale: 0.92 }] }]}>
+            <GlassBackdrop variant="media" radius={PLAY_BUTTON / 2} />
+            <Icon name={paused ? "play" : "pause"} sf={paused ? "play.fill" : "pause.fill"} size={28} color={colors.onMedia} style={paused ? { marginLeft: 3 } : undefined} />
+          </Pressable>
+        </View>
+        <View style={[styles.bottom, { paddingBottom: insets.bottom + 6 }]} pointerEvents="box-none">
+          <View style={styles.bottomRow} pointerEvents="box-none">
+            <VideoTimeline
+              player={player}
+              labels="always"
+              inset={0}
+              style={styles.timeline}
+              onScrubStart={() => {
+                ended.current = false;
+                setScrubbing(true);
+              }}
+              onScrubEnd={() => setScrubbing(false)}
+            />
+            <Pressable onPress={() => setMuted((m) => !m)} hitSlop={8} accessibilityRole="button" accessibilityLabel={muted ? "Turn sound on" : "Turn sound off"} style={({ pressed }) => [styles.sound, pressed && { opacity: 0.7 }]}>
+              <GlassBackdrop variant="media" radius={SOUND_BUTTON / 2} />
+              <Icon name={muted ? "volume-mute" : "volume-high"} size={17} color={colors.onMedia} />
+            </Pressable>
+          </View>
+        </View>
+      </Reanimated.View>
+      <SpeedBadge visible={boosted} style={{ top: insets.top + 58 }} />
     </View>
   );
 }
+
+const SOUND_BUTTON = 36;
 
 const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.mediaBg },
@@ -339,4 +467,12 @@ const useStyles = makeStyles((colors) => ({
   counter: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, backgroundColor: colors.mediaPill },
   counterText: { color: colors.onMedia, fontSize: 13, fontWeight: "700" },
   spacer: { width: 40 },
+  middle: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
+  playButton: { width: PLAY_BUTTON, height: PLAY_BUTTON, borderRadius: PLAY_BUTTON / 2, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  // Under the controls at the bottom, a soft shade from the screen's edge, so the white line and times read on a bright frame.
+  bottom: { position: "absolute", left: 0, right: 0, bottom: 0, paddingTop: 40, paddingHorizontal: 16, experimental_backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.45), rgba(0,0,0,0))" },
+  bottomRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  timeline: { flex: 1 },
+  // Centred on the timeline's line, not on the line and its times together.
+  sound: { width: SOUND_BUTTON, height: SOUND_BUTTON, borderRadius: SOUND_BUTTON / 2, alignItems: "center", justifyContent: "center", overflow: "hidden", marginTop: (TIMELINE_TOUCH - SOUND_BUTTON) / 2 },
 }));

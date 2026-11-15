@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo } from "react";
 import { Gesture } from "react-native-gesture-handler";
-import { cancelAnimation, runOnJS, useSharedValue, withSpring, type SharedValue } from "react-native-reanimated";
+import { cancelAnimation, runOnJS, useSharedValue, withSpring, type DerivedValue, type SharedValue } from "react-native-reanimated";
 
 /**
  * The full-screen viewer's swipe back. `drag` is how far the page on screen has been pulled sideways, in points (either
@@ -56,8 +56,10 @@ export type PageSlides = { count: number; pos: SharedValue<number>; onLand: (ind
  * back (see ViewerSwipe), otherwise the page springs home. Up and down is left to the pager between posts, and a tap or a
  * double tap still reaches the page. Off the viewer (no ViewerSwipe) it only moves a carousel. `swipedJustNow` tells a tap
  * handler on the page that the touch it is about to act on was a swipe (or the tail of one): it should do nothing.
+ * `locked` (above 0 while a photo on the page is zoomed, or its video's timeline is being scrubbed) leaves the touch to
+ * that, decided on the UI thread; so does a second finger, which is a pinch.
  */
-export function usePageSwipe(width: number, slides: PageSlides | null) {
+export function usePageSwipe(width: number, slides: PageSlides | null, locked?: Readonly<SharedValue<number>> | DerivedValue<number>) {
   const swipe = useContext(ViewerSwipeContext);
   const touchX = useSharedValue(0);
   const touchY = useSharedValue(0);
@@ -89,6 +91,10 @@ export function usePageSwipe(width: number, slides: PageSlides | null) {
         })
         .onTouchesMove((e, manager) => {
           if (mode.value !== 0) return;
+          if ((locked && locked.value > 0) || e.numberOfTouches > 1) {
+            manager.fail();
+            return;
+          }
           const t = e.allTouches[0];
           if (!t) return;
           const dx = t.absoluteX - touchX.value;
@@ -148,7 +154,7 @@ export function usePageSwipe(width: number, slides: PageSlides | null) {
           }
           mode.value = 0;
         }),
-    [count, width, strip, onLand, drag, close, touchX, touchY, mode, grab, busy, endedAt],
+    [count, width, strip, onLand, drag, close, touchX, touchY, mode, grab, busy, endedAt, locked],
   );
   const swipedJustNow = useCallback(() => busy.value === 1 || Date.now() - endedAt.value < TAP_AFTER_SWIPE_MS, [busy, endedAt]);
   return { gesture, swipedJustNow };

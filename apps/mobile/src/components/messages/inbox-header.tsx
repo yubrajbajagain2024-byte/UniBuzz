@@ -65,7 +65,7 @@ export function InboxHeader({ signedIn, page, onPage, scrollX, pageWidth, reques
       </View>
       {signedIn ? (
         <View style={styles.tabs}>
-          <SlidingTabs sections={INBOX_PAGES} section={page} onSelect={onPage} scrollX={scrollX} pageWidth={pageWidth} tint={colors.accent} tintGradient={auroraGradient(colors.auroraGlow, 90)} labelColor={colors.text} dimColor={colors.muted} gap={110} fontSize={16} badges={pageUnread} />
+          <SlidingTabs sections={INBOX_PAGES} section={page} onSelect={onPage} scrollX={scrollX} pageWidth={pageWidth} tint={colors.accent} tintGradient={auroraGradient(colors.auroraGlow, 90)} labelColor={colors.text} dimColor={colors.muted} fontSize={16} badges={pageUnread} />
         </View>
       ) : null}
       {children}

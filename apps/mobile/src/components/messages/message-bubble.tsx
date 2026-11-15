@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Animated, Pressable, StyleSheet, Text, View, type ViewInstance } from "react-native";
-import Reanimated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import { Animated, Pressable, StyleSheet, Text, View, type ViewInstance, type ViewStyle } from "react-native";
+import Reanimated, { FadeIn, withSpring, withTiming, type EntryAnimationsValues, type LayoutAnimation } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
@@ -25,7 +25,6 @@ import { CallRow } from "@/components/calls/call-row";
 import { useReduceMotion } from "@/lib/accessibility";
 import { openChatLink, sharedPostHref, type ChatMessage, type OutgoingFiles, type UploadStatus } from "@/lib/message-attachments";
 import { entryForPost, measureOrigin, openViewer } from "@/lib/reel-viewer";
-import { radius } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { AttachmentFileRow } from "./attachment-file-row";
 import { AttachmentGrid, type GridMedia } from "./attachment-grid";
@@ -125,8 +124,31 @@ function linkParts(text: string): { text: string; url?: string }[] {
   return parts;
 }
 
-/** How a new message comes in: it rises from the bar and settles, on a spring that never overshoots. */
-const ARRIVE = FadeInDown.springify().damping(24).stiffness(300).mass(0.8);
+/** The spring a new message settles on: quick, and without a visible overshoot. */
+const SETTLE = { damping: 22, stiffness: 280, mass: 0.7 };
+
+/**
+ * How a new message comes in: it rises a little from the bar and grows to its size from its own bottom corner (the row
+ * sets the corner, see `origin`), fading in quickly, the way a sent message leaves the field in the Messages app.
+ */
+function arrive(_values: EntryAnimationsValues): LayoutAnimation {
+  "worklet";
+  return {
+    initialValues: { opacity: 0, transform: [{ translateY: 14 }, { scale: 0.92 }] },
+    animations: { opacity: withTiming(1, { duration: 160 }), transform: [{ translateY: withSpring(0, SETTLE) }, { scale: withSpring(1, SETTLE) }] },
+  };
+}
+
+/** A bubble's corners: round, except on the sender's side where it meets the bubble above or below it in the same run. */
+const ROUND = 20;
+const JOINED = 6;
+function bubbleCorners(mine: boolean, joinedAbove: boolean, joinedBelow: boolean): ViewStyle {
+  const top = joinedAbove ? JOINED : ROUND;
+  const bottom = joinedBelow ? JOINED : ROUND;
+  return mine
+    ? { borderTopLeftRadius: ROUND, borderBottomLeftRadius: ROUND, borderTopRightRadius: top, borderBottomRightRadius: bottom }
+    : { borderTopRightRadius: ROUND, borderBottomRightRadius: ROUND, borderTopLeftRadius: top, borderBottomLeftRadius: bottom };
+}
 
 export type MessageRowProps = {
   message: ChatMessage;
@@ -172,10 +194,12 @@ export type MessageRowProps = {
 };
 
 /**
- * One message in the chat, laid out like the Messages app's: a centred stamp ("Today 14:05") above the first message of
- * a day and above any message that comes after half an hour's quiet, in a group the sender's name above a run of
+ * One message in the chat, laid out like the Messages app's: a centred stamp ("**Today** 14:05") above the first message
+ * of a day and above any message that comes after half an hour's quiet, in a group the sender's name above a run of
  * theirs, the quote of what it answers, a shared post, photos and videos, files, a Snap, a call, a voice message, and the words
- * in a blue (mine) or grey bubble. Nothing under a bubble by default, as in Instagram: a tap on the words shows the
+ * in a blue (mine) or grey bubble. A run of messages from one person reads as one stack: its bubbles sit 2 points
+ * apart and their corners on the sender's side tighten where they meet, the first and last keeping their round outer
+ * corners. Nothing under a bubble by default, as in Instagram: a tap on the words shows the
  * message's exact time there (a hold shows it in the menu), my newest message says where it stands ("Sent",
  * "Delivered"), and "Seen" with the readers' small photos sits under the last message they read. Every time is the
  * phone's own. No photos beside the bubbles: the chat's header says who you are talking to. A swipe to the right
@@ -187,6 +211,7 @@ export function MessageRow({
   isGroup,
   stamp,
   firstInGroup,
+  lastInGroup,
   receipt,
   seenBy,
   revealed,
@@ -229,12 +254,20 @@ export function MessageRow({
   const status = m.failed ? null : m.pending ? sendingLabel(m.outgoing) : receiptLabel;
   const footer = time || status;
   const reveal = !m.pending && !m.failed ? () => onReveal(m) : undefined;
+  const seen = seenBy && seenBy.length > 0;
+  // Where the run goes on below this message, its last bubble's corner on the sender's side tightens to meet the next
+  // one; anything between them (a footer, "Seen") keeps it round. A quote above tucks under the bubble, which keeps its
+  // round top; anything else above the words (a photo, a file, a voice message) meets them like a bubble of the run.
+  const joinedBelow = !lastInGroup && !footer && !m.failed && !seen;
+  const partsAbove = Boolean(shared || media.length > 0 || files.length > 0 || call || snap || voices.length > 0);
+  const textCorners = bubbleCorners(mine, !reply && (!firstInGroup || partsAbove), joinedBelow);
+  const voiceCorners = bubbleCorners(mine, !reply && !firstInGroup, joinedBelow || showText);
 
   return (
-    <Reanimated.View entering={appear && !reduceMotion ? ARRIVE : undefined}>
+    <Reanimated.View entering={appear && !reduceMotion ? arrive : undefined} style={mine ? styles.originMine : styles.originTheirs}>
       {stamp ? (
         <Text style={styles.day} accessibilityRole="header">
-          {formatDayLabel(m.created_at)} {formatTimeOfDay(m.created_at)}
+          <Text style={styles.dayName}>{formatDayLabel(m.created_at)}</Text> {formatTimeOfDay(m.created_at)}
         </Text>
       ) : null}
       <Highlight active={highlighted}>
@@ -262,14 +295,14 @@ export function MessageRow({
             {snap ? <SnapBubble snap={snap} mine={mine} width={mediaWidth} dimmed={Boolean(m.pending)} onOpen={onOpenSnap ? () => onOpenSnap(m) : undefined} onActivity={onSnapActivity ? () => onSnapActivity(m) : undefined} onLongPress={actions} /> : null}
             {voices.map((v) =>
               VoiceBubble ? (
-                <VoiceBubble key={v.key} uri={v.uri} cacheKey={v.key} duration={v.duration} mine={mine} dimmed={Boolean(m.pending)} onLongPress={actions} />
+                <VoiceBubble key={v.key} uri={v.uri} cacheKey={v.key} duration={v.duration} mine={mine} dimmed={Boolean(m.pending)} corners={voiceCorners} onLongPress={actions} />
               ) : v.attachment ? (
                 <AttachmentFileRow key={v.key} attachment={v.attachment} onPress={() => onOpenFile(v.attachment as MessageAttachment)} onLongPress={actions} style={{ width: mediaWidth }} />
               ) : null,
             )}
             {showText ? (
               <Pressable onPress={retry ?? reveal} onLongPress={actions} delayLongPress={350} accessibilityHint={m.failed ? "Not sent. Tap for options." : reveal ? "Shows when it was sent" : undefined}>
-                <View style={[styles.bubble, mine ? styles.mine : styles.theirs, m.pending && styles.dim, m.failed && styles.failed]}>
+                <View style={[styles.bubble, textCorners, m.failed ? styles.failed : mine ? styles.mine : styles.theirs, m.pending && styles.dim]}>
                   <Text style={[styles.text, { color: textColor }]} selectable={false}>
                     {linkParts(m.content).map((part, i) =>
                       part.url ? (
@@ -300,11 +333,11 @@ export function MessageRow({
           </SwipeToReply>
         </View>
       </Highlight>
-      {seenBy && seenBy.length > 0 ? (
+      {seen ? (
         <View style={styles.seen} accessibilityLabel={`Seen by ${seenBy.map((p) => p.full_name).join(", ")}`}>
           <Text style={styles.seenText}>Seen</Text>
           {seenBy.map((p) => (
-            <Avatar key={p.id} name={p.full_name} url={p.avatar_url} size={16} online={false} />
+            <Avatar key={p.id} name={p.full_name} url={p.avatar_url} size={15} online={false} />
           ))}
         </View>
       ) : null}
@@ -415,28 +448,35 @@ function SharedPostBubble({ shared, width, dimmed, onLongPress }: { shared: Shar
 }
 
 const useStyles = makeStyles((colors) => ({
-  day: { textAlign: "center", fontSize: 11, lineHeight: 14, color: colors.faint, marginTop: 18, marginBottom: 8 },
+  // A new message grows from its own bottom corner (see `arrive`).
+  originMine: { transformOrigin: "right bottom" },
+  originTheirs: { transformOrigin: "left bottom" },
+  // The stamp: quiet, the day a weight above the time ("Today 14:05"), with more room above it than below.
+  day: { textAlign: "center", fontSize: 12, lineHeight: 15, color: colors.faint, marginTop: 20, marginBottom: 10 },
+  dayName: { fontWeight: "600", color: colors.muted },
   line: { flexDirection: "row", marginTop: 2 },
   lineMine: { flexDirection: "row-reverse" },
-  groupStart: { marginTop: 12 },
+  groupStart: { marginTop: 10 },
   stack: { maxWidth: "76%", gap: 2 },
   stackMine: { alignItems: "flex-end" },
   stackTheirs: { alignItems: "flex-start" },
-  sender: { fontSize: 12, lineHeight: 16, color: colors.muted, marginLeft: 12, marginBottom: 1 },
+  // In line with the words in the bubbles under it.
+  sender: { fontSize: 12, lineHeight: 16, fontWeight: "500", color: colors.muted, marginLeft: 13, marginBottom: 2 },
   quote: { marginHorizontal: 6 },
-  bubble: { borderRadius: 18, borderCurve: "continuous", paddingHorizontal: 14, paddingVertical: 8 },
-  mine: { backgroundColor: colors.brand },
-  theirs: { backgroundColor: colors.input },
-  dim: { opacity: 0.6 },
+  // One line of 16pt words makes a 36pt bubble (7.5 + 21 + 7.5); the corners come from bubbleCorners.
+  bubble: { borderCurve: "continuous", paddingHorizontal: 13, paddingVertical: 7.5 },
+  mine: { backgroundColor: colors.bubbleMine[0], experimental_backgroundImage: `linear-gradient(to bottom, ${colors.bubbleMine[0]} 0%, ${colors.bubbleMine[1]} 100%)` },
+  theirs: { backgroundColor: colors.bubble },
+  dim: { opacity: 0.55 },
   failed: { backgroundColor: colors.dangerSoft },
-  text: { fontSize: 17, lineHeight: 22 },
+  text: { fontSize: 16, lineHeight: 21 },
   link: { textDecorationLine: "underline" },
-  footer: { fontSize: 11, lineHeight: 14, color: colors.faint, marginHorizontal: 6, marginTop: 2 },
+  footer: { fontSize: 11, lineHeight: 14, color: colors.faint, marginHorizontal: 5, marginTop: 3 },
   receipt: { fontWeight: "600" },
   failedFooter: { color: colors.red, fontWeight: "600" },
-  seen: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 3, paddingRight: 4, marginTop: 3 },
+  seen: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 3, paddingRight: 3, marginTop: 4 },
   seenText: { fontSize: 11, lineHeight: 14, fontWeight: "600", color: colors.faint, marginRight: 2 },
-  highlight: { position: "absolute", top: -3, bottom: -3, left: -8, right: -8, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: colors.brandSoft },
+  highlight: { position: "absolute", top: -3, bottom: -3, left: -8, right: -8, borderRadius: 14, borderCurve: "continuous", backgroundColor: colors.brandSoft },
   // A shared post with a picture: the photo bubble, with the shade along its bottom carrying the words.
   photo: { borderRadius: PHOTO_RADIUS, borderCurve: "continuous", overflow: "hidden", backgroundColor: colors.mediaBg },
   shade: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 12, paddingTop: 40, paddingBottom: 11, gap: 5, experimental_backgroundImage: `linear-gradient(to top, ${colors.mediaPill} 0%, ${colors.mediaScrim} 50%, transparent 100%)` },

@@ -145,7 +145,7 @@ export default function EventsScreen() {
       <View style={styles.body}>
         <Animated.View style={[styles.float, { transform: [{ translateY: floatShift }] }]}>
           <DiscoveryBar
-            tabs={<SlidingTabs sections={EVENT_SECTIONS} section={section} onSelect={select} scrollX={scrollX} pageWidth={width} tint={colors.accent} tintGradient={auroraGradient(colors.auroraGlow, 90)} labelColor={colors.text} dimColor={colors.muted} spread fontSize={16} />}
+            tabs={<SlidingTabs sections={EVENT_SECTIONS} section={section} onSelect={select} scrollX={scrollX} pageWidth={width} tint={colors.accent} tintGradient={auroraGradient(colors.auroraGlow, 90)} labelColor={colors.text} dimColor={colors.muted} fontSize={16} />}
             query={text}
             onQuery={setText}
             placeholder="Search events"

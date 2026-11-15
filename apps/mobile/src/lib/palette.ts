@@ -44,6 +44,13 @@ export type ThemeColors = {
    * to read over whatever scrolls under them, the glass (or the blur before iOS 26) doing the rest.
    */
   floatFill: string;
+  /**
+   * Chat bubbles. `bubbleMine` is my bubble's fill as two gradient stops, top to bottom: the brand blue deepening a touch
+   * towards the bottom, so white words read at the brand's own contrast or better everywhere on it. `bubble` is the
+   * other side's: a quiet neutral grey a step off the screen, without the blue cast of `input`.
+   */
+  bubbleMine: readonly [string, string];
+  bubble: string;
   /** Screen background. */
   bg: string;
   /** Cards and rows that sit on the screen. Bars use `bar`. */
@@ -145,6 +152,8 @@ export const lightColors: ThemeColors = {
   glass: "rgba(255,255,255,0.92)",
   glassEdge: "rgba(0,0,0,0.1)",
   floatFill: "rgba(255,255,255,0.42)",
+  bubbleMine: ["#166fe5", "#1262d0"],
+  bubble: "#ebebee",
   bg: "#ffffff",
   card: "#ffffff",
   bar: "#ffffff",
@@ -205,6 +214,8 @@ export const darkColors: ThemeColors = {
   glass: "rgba(22,22,24,0.92)",
   glassEdge: "rgba(255,255,255,0.14)",
   floatFill: "rgba(28,28,30,0.42)",
+  bubbleMine: ["#1877f2", "#1265d8"],
+  bubble: "#262628",
   bg: "#000000",
   card: "#1c1c1e",
   bar: "#000000",

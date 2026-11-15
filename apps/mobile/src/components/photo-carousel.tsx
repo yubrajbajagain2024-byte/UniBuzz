@@ -11,6 +11,7 @@ import { hapticSelect } from "@/lib/haptics";
 import { useSectionPager } from "@/lib/section-pager";
 import { Icon } from "@/components/icon";
 import { GlassIconButton } from "@/components/glass";
+import { clock } from "@/components/video-controls";
 
 const DOUBLE_TAP_MS = 260;
 /** How far a finger moves before the carousel decides whether a swipe is its photos' or the pager's. */
@@ -43,15 +44,6 @@ type PhotoCarouselProps = {
    */
   chrome?: "post" | "watch";
 };
-
-/** 125 → "2:05", 3725 → "1:02:05". */
-function clock(seconds: number): string {
-  const total = Math.max(0, Math.round(seconds));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = String(total % 60).padStart(2, "0");
-  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
-}
 
 /**
  * Swipeable photos and videos, one slide at a time, with a 1/3 counter and dots.
