@@ -1,4 +1,4 @@
-// Creates test users, sample posts, follows and Maya's classes for simulator runs (SUPABASE_ACCESS_TOKEN env). The test account ("me") and Leo follow each other, so they are friends.
+// Creates test users, sample posts, follows, Maya's classes, two chats and Leo's story for simulator runs (SUPABASE_ACCESS_TOKEN env). The test account ("me") and Leo follow each other, so they are friends.
 // Writes .sim-state.json (git-ignored); run sim-cleanup.mjs afterwards. STAGING_SUPABASE_REF seeds the staging project instead
 // (scripts/e2e-target.mjs); the state file remembers which project, so the cleanup goes to the same one.
 import fs from "node:fs";
@@ -79,5 +79,56 @@ const buzz = await admin.rpc("buzz_v2_create", {
 });
 if (buzz.error) throw buzz.error;
 const buzzId = buzz.data.id;
+// Chats and a story for the app's chat, keyboard and Home checks, written as the people themselves (row-level security
+// applies, as in the app): a direct chat between the test account and Maya long enough to scroll, with a reply, and a
+// group chat with Maya and Leo. sim-cleanup.mjs deletes the chats of the seeded accounts.
+const signedIn = async (u) => {
+  const c = createClient(`https://${ref}.supabase.co`, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const r = await c.auth.signInWithPassword({ email: u.email, password });
+  if (r.error) throw r.error;
+  return c;
+};
+const asMe = await signedIn(me);
+const asLeo = await signedIn(leo);
+const say = async (client, conversationId, senderId, content, replyTo) => {
+  const { data, error } = await client.from("messages").insert({ conversation_id: conversationId, sender_id: senderId, content, ...(replyTo ? { reply_to: { id: replyTo } } : {}) }).select("id").single();
+  if (error) throw error;
+  return data.id;
+};
+const direct = await asMe.rpc("get_or_create_direct_conversation", { p_other_user_id: other.id });
+if (direct.error) throw direct.error;
+const chatLines = [
+  [other, "Hey! Are you still looking for a roommate for spring?"],
+  [me, "Yes! Is the room near Sewell Park still free?"],
+  [other, "It is. Furnished, utilities included, $650 a month."],
+  [other, "Want to come see it this weekend?"],
+  [me, "Saturday morning works for me"],
+  [other, "Perfect. I'll send you the address"],
+  [me, "Do you have a parking spot?"],
+  [other, "One spot behind the house, it's yours if you want it"],
+  [me, "Great, that settles it"],
+  [other, "Also, the landlord wants a short reference from your last place"],
+  [me, "I can ask my current landlord today"],
+  [other, "Thanks! No rush"],
+  [me, "Is the lease 6 or 12 months?"],
+  [other, "Twelve, but you can sublet in summer"],
+  [me, "Sounds good. See you Saturday!"],
+];
+const directIds = [];
+for (const [who, line] of chatLines) directIds.push(await say(who === me ? asMe : asOther, direct.data, who.id, line));
+await say(asOther, direct.data, other.id, "Bring a photo ID for the landlord", directIds[4]);
+const group = await asMe.rpc("create_group_conversation", { p_name: "Study group (sim test)", p_member_ids: [other.id, leo.id] });
+if (group.error) throw group.error;
+await say(asMe, group.data, me.id, "Library room 3.04 at 6?");
+await say(asOther, group.data, other.id, "Works for me");
+await say(asLeo, group.data, leo.id, "I'll bring the practice exams");
+// Leo's story, for the story tray (he and the test account are friends): a photo in his own stories folder of the
+// uploads bucket, as the app uploads one (migration 60's rule); deleting the story (or his account) deletes the file.
+const storyPhoto = await (await fetch("https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&h=1920&fit=crop&q=80")).arrayBuffer();
+const storyPath = `stories/${leo.id}/sim-${stamp}.jpg`;
+const upload = await asLeo.storage.from("uploads").upload(storyPath, storyPhoto, { contentType: "image/jpeg" });
+if (upload.error) throw upload.error;
+const story = await asLeo.from("stories").insert({ author_id: leo.id, kind: "photo", image_url: `https://${ref}.supabase.co/storage/v1/object/public/uploads/${storyPath}`, image_meta: { width: 1080, height: 1920, blur: null }, audience: "friends" }).select("id").single();
+if (story.error) throw story.error;
 fs.writeFileSync(new URL(".sim-state.json", import.meta.url), JSON.stringify({ ref, me, other, extra: [leo], password, apartmentId: apt.id, roommateId: room.id, itemId: item.id, postId: post.id, carouselId: carousel.id, buzzId }, null, 2));
-console.log(JSON.stringify({ me: me.email, password, post: post.id, buzz: buzzId }));
+console.log(JSON.stringify({ me: me.email, password, post: post.id, buzz: buzzId, chat: direct.data, group: group.data }));
