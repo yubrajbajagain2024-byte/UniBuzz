@@ -68,6 +68,14 @@ export function scrollEdge(hex: string, edge: "top" | "bottom", solid: number): 
 }
 
 /** An iOS 26 sheet at a partial height: it floats inset from the screen's sides and bottom, its corners concentric with the phone's. */
+/**
+ * My chat bubble's fill (a message's words, a voice message, a call's row): the aurora's blue into its indigo, corner
+ * to corner (`bubbleMine`), on a flat blue where a platform draws no gradient.
+ */
+export function bubbleMineFill(stops: readonly [string, string]) {
+  return { backgroundColor: stops[0], experimental_backgroundImage: `linear-gradient(135deg, ${stops[0]} 0%, ${stops[1]} 100%)` } as const;
+}
+
 export const sheetShape = { marginHorizontal: 8, marginBottom: 8, borderRadius: 34, borderCurve: "continuous", overflow: "hidden" } as const;
 
 /**

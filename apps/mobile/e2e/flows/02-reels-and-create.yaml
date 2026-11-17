@@ -2,7 +2,7 @@
 appId: host.exp.Exponent
 ---
 - extendedWaitUntil:
-    visible: "Create"
+    visible: "Create, .*"
     timeout: 120000
 - swipe:
     start: "88%,10%"
@@ -38,14 +38,15 @@ appId: host.exp.Exponent
 - takeScreenshot: e2e/screenshots/13-reels
 - tapOn: "Orbit"
 - waitForAnimationToEnd
-# Create: the + opens the live camera straight away (POST | REEL | BUZZ | SNAP, Upload for the library).
-- tapOn: "Create"
+# Create, in the middle of the bottom bar, opens the live camera straight away on SNAP (BUZZ | SNAP | POST | REEL,
+# Upload for the library).
+- tapOn: "Create, .*"
 - extendedWaitUntil:
-    visible: "POST"
+    visible: "SNAP"
     timeout: 15000
 - assertVisible: "REEL"
 - assertVisible: "BUZZ"
-- assertVisible: "SNAP"
+- assertVisible: "POST"
 - assertVisible: "Upload"
 - takeScreenshot: e2e/screenshots/14-create-camera
 - tapOn: "Close the camera"

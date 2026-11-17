@@ -8,15 +8,16 @@ device builds and store releases.
 
 ```
 src/app/(tabs)/   index (Home: the story tray, then Orbit, Buzz, Reels), housing (Explore), messages,
-                  events (For you | All events), profile
+                  profile; the bar is icons only, Create in its middle (_layout.tsx)
 src/app/search.tsx  the search screen (people, topics, posts, what is popular): the magnifier beside the bell
-src/app/compose/  the create flow behind every "+": camera → edit → publish; listing, listing-form,
+src/app/compose/  the create flow behind Create and every "+": camera → edit → publish; listing, listing-form,
                   listing-preview for roommate posts and Marketplace items
 src/app/create/   per-kind entry points: post, reel, buzz, apartment, roommate, item
 src/app/…         buzz, messages, posts, reels, apartments, roommates, marketplace, profile, follows,
                   call, snap, stories, topics, settings, notifications, saved, find-people, events
-                  (an event, saved, interests, new, edit), organizations (page, new, edit, members),
-                  (auth)/forgot-password, reset-password (a recovery link that opens the app; Change password)
+                  (index: For you | All events, from Home's calendar; an event, saved, interests, new,
+                  edit), organizations (page, new, edit, members), (auth)/forgot-password,
+                  reset-password (a recovery link that opens the app; Change password)
 src/lib/          app-only helpers: calls.ts, home-scope.ts, stories-store.ts, event-saves-store.ts,
                   organization-follows-store.ts, campus-time-zone.ts, supabase.ts, dev-overrides.ts, …
 e2e/              Maestro flows (flows/*.yaml, run.sh), seed and lifecycle scripts
@@ -73,6 +74,16 @@ Why each exists: [docs/decisions.md](../../docs/decisions.md).
   `useAnimatedKeyboard` and a transform (`keyboardLift` in `src/components/messages/composer.tsx`),
   not a KeyboardAvoidingView, and needs no new native module, so an EAS update still reaches it.
 - Gesture Handler inside a React Native `Modal` needs its own `GestureHandlerRootView` in it.
+- Every video plays with its sound on and there is no mute or sound button (`VIDEO_MUTED` in
+  `src/lib/video-sound.ts`): keep one video playing at a time, paused when its screen is covered.
+- The viewer closes sideways only on a swipe to the right from a post's first photo (`swipeChoice` in
+  `src/lib/viewer-swipe.ts`); elsewhere a sideways swipe moves between the photos, resisting past the last.
+- The camera's beauty filters are for photos only: the camera records video itself, where the shader
+  cannot reach. The looks are numbers in `packages/shared/src/beauty.ts`, the shader and GL in
+  `src/lib/beauty-gl.ts`; expo-gl is optional, so check `BEAUTY_AVAILABLE` and never import it at a
+  module's top (an older build reading an update over the air does not have it).
+- A sticker is a message of one to three emoji (`jumboEmoji` in `packages/shared`): never a new
+  message kind, so every reader and rule keeps treating it as words.
 
 ## End-to-end checks
 

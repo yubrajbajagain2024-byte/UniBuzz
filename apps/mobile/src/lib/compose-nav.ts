@@ -7,11 +7,12 @@ type Router = ReturnType<typeof useRouter>;
 
 /**
  * Opens the create flow on its camera, starting a fresh post or reel. What every create button calls; `upload` (the
- * profile menu's Upload) has the camera open its library at once.
+ * profile menu's Upload) has the camera open its library at once. `snap` (the bar's Create) opens it on SNAP, its
+ * default, with a fresh post ready behind it should you move to POST or REEL.
  */
-export function openCompose(router: Router, mode: ComposeMode, opts: { upload?: boolean } = {}) {
+export function openCompose(router: Router, mode: ComposeMode | "snap", opts: { upload?: boolean } = {}) {
   dropUploads();
-  compose.start(mode);
+  compose.start(mode === "snap" ? "post" : mode);
   router.push({ pathname: "/compose", params: opts.upload ? { mode, upload: "1" } : { mode } } as never);
 }
 

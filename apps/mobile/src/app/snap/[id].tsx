@@ -3,13 +3,12 @@ import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, useWindowDime
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
-import { VideoView, useVideoPlayer, type VideoThumbnail } from "expo-video";
+import { VideoView, useVideoPlayer } from "expo-video";
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming, type SharedValue } from "react-native-reanimated";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SNAP_LIFETIME_DAYS, closeSnap, openSnap, reportSnapCapture, shortAge, snapErrorState, snapMediaUrl, type OpenedSnap } from "@apartment-book/shared";
 import { Avatar } from "@/components/avatar";
-import { BACKDROP_PIXELS, BlurredBackdrop } from "@/components/blurred-backdrop";
 import { GlassIconButton } from "@/components/glass";
 import { Icon, type IconName } from "@/components/icon";
 import { useReduceMotion } from "@/lib/accessibility";
@@ -210,14 +209,8 @@ export default function SnapViewerScreen() {
   return (
     <GestureHandlerRootView style={styles.fill} pointerEvents={gone ? "none" : "auto"}>
       <StatusBar style="light" />
-      <Animated.View style={[StyleSheet.absoluteFill, styles.black, backdrop]}>
-        {phase.phase === "ready" && phase.snap.kind === "image" ? (
-          <>
-            <Image source={phase.source} cachePolicy="memory" style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={40} transition={0} />
-            <View style={[StyleSheet.absoluteFill, styles.dim]} />
-          </>
-        ) : null}
-      </Animated.View>
+      {/* Pure black round the Snap, in both themes, TikTok's way: it sits whole in the middle, never cropped or stretched. */}
+      <Animated.View style={[StyleSheet.absoluteFill, styles.black, backdrop]} />
 
       <GestureDetector gesture={gesture}>
         <Animated.View style={[StyleSheet.absoluteFill, stage]} accessibilityLabel={snap ? `Snap from ${snap.sender.full_name}` : "Snap"} accessibilityHint="Tap to close. It disappears after you view it.">
@@ -228,7 +221,6 @@ export default function SnapViewerScreen() {
                 cachePolicy="memory"
                 style={StyleSheet.absoluteFill}
                 contentFit="contain"
-                contentPosition="top"
                 transition={150}
                 onLoad={() => setLoaded(true)}
                 onError={() => setPhase({ phase: "error", icon: "cloud-offline-outline", title: "Couldn't load this Snap", body: "Check your connection and try again.", retry: true })}
@@ -340,10 +332,8 @@ function SnapVideo({
   });
   const handlers = useRef({ onReady, onEnd, onError });
   handlers.current = { onReady, onEnd, onError };
-  // Its shape, from its own track, puts it whole at the top of the screen; a small frame of it, blurred, fills the rest
-  // (made in memory only, as the Snap itself is never kept).
+  // Its shape, from its own track, puts it whole in the middle of the screen, on black.
   const [aspect, setAspect] = useState<number | null>(null);
-  const [frame, setFrame] = useState<VideoThumbnail | null>(null);
   useEffect(() => {
     let alive = true;
     const shape = (size: { width: number; height: number } | undefined) => {
@@ -351,21 +341,14 @@ function SnapVideo({
     };
     shape(player.videoTrack?.size);
     const track = player.addListener("videoTrackChange", ({ videoTrack }) => shape(videoTrack?.size));
-    const loaded = player.addListener("sourceLoad", ({ duration: length }) => {
-      player
-        .generateThumbnailsAsync([Math.min(1, (length || 0) / 2)], { maxWidth: BACKDROP_PIXELS })
-        .then(([thumb]) => alive && thumb && setFrame(thumb))
-        .catch(() => {});
-    });
     return () => {
       alive = false;
       track.remove();
-      loaded.remove();
     };
   }, [player]);
   const { width, height } = useWindowDimensions();
   const across = aspect ? Math.min(width, height * aspect) : width;
-  const box = aspect ? { left: (width - across) / 2, top: 0, width: across, height: across / aspect } : { left: 0, top: 0, width, height };
+  const box = aspect ? { left: (width - across) / 2, top: (height - across / aspect) / 2, width: across, height: across / aspect } : { left: 0, top: 0, width, height };
   useEffect(() => {
     const subscriptions = [
       player.addListener("statusChange", ({ status }) => {
@@ -385,7 +368,6 @@ function SnapVideo({
   }, [player, duration, progress]);
   return (
     <>
-      <BlurredBackdrop small={frame} />
       <VideoView player={player} style={[{ position: "absolute" }, box]} contentFit="contain" nativeControls={false} allowsPictureInPicture={false} fullscreenOptions={{ enable: false }} />
     </>
   );
@@ -394,7 +376,6 @@ function SnapVideo({
 const useStyles = makeStyles((colors) => ({
   fill: { flex: 1, backgroundColor: "transparent" },
   black: { backgroundColor: colors.mediaBg },
-  dim: { backgroundColor: "rgba(0,0,0,0.55)" },
   center: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
   top: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 12, gap: 10 },
   track: { height: 3, borderRadius: 1.5, backgroundColor: "rgba(255,255,255,0.3)", overflow: "hidden", marginHorizontal: 2 },

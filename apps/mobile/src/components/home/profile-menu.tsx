@@ -15,7 +15,7 @@ import { useCreateMenu } from "./create-menu";
 
 /**
  * What your photo in Home's top bar opens, as UniVerse's account sheet: a card with your photo, name and @username that
- * opens your profile, then Upload (the create sheet: Post / Reel / Buzz / Snap), Saved, Settings and Community
+ * opens your profile, then Upload (the camera on POST, its library open), Saved, Settings and Community
  * Guidelines, and Log out on its own. A choice closes the sheet first and runs once it is gone (iOS presents nothing over
  * a modal that is still leaving), as the share sheet's do. Account status stays in Settings.
  */

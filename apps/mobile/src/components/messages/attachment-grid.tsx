@@ -1,10 +1,11 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { formatDuration, type UploadStatus } from "@/lib/message-attachments";
-import { radius, textStyle } from "@/lib/theme";
+import { textStyle } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { VideoPoster } from "./attachment-thumb";
 import { Icon } from "@/components/icon";
+import { GlassBackdrop } from "@/components/glass";
 
 /** One photo or video of a message, ready to draw: `uri` is a local file or a signed URL (null until signed). */
 export type GridMedia = {
@@ -24,11 +25,18 @@ export type GridMedia = {
 };
 
 const GAP = 2;
+/** The block's corner: the same as a shared post's and a Snap's in the chat. */
+const RADIUS = 18;
+/** The glass play button on a video, and the glass pill with its length. */
+const PLAY = 48;
+const PILL = 22;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 /**
  * A message's photos and videos as one rounded block, like X: one keeps its shape, two sit side by side, three are a
- * tall one and two squares, four or more a 2×2 grid whose last square says "+N". Tapping one opens it at that index.
+ * tall one and two squares, four or more a 2×2 grid whose last square says "+N". A hairline edge keeps a white photo
+ * from melting into a white screen; a video carries a glass play button and a glass pill with its length. Tapping one
+ * opens it at that index, full screen (a video with its sound on).
  */
 export function AttachmentGrid({ media, width, onOpen, onLongPress }: { media: GridMedia[]; width: number; onOpen: (index: number) => void; onLongPress?: () => void }) {
   const styles = useStyles();
@@ -38,7 +46,12 @@ export function AttachmentGrid({ media, width, onOpen, onLongPress }: { media: G
   if (count === 1) {
     const only = media[0];
     const ratio = only.width && only.height ? clamp(only.width / only.height, 0.65, 1.8) : only.kind === "video" ? 16 / 9 : 1;
-    return <View style={[styles.block, { width }]}>{tile(0, width, Math.round(width / ratio))}</View>;
+    return (
+      <View style={[styles.block, { width }]}>
+        {tile(0, width, Math.round(width / ratio))}
+        <Edge />
+      </View>
+    );
   }
   const half = Math.floor((width - GAP) / 2);
   if (count === 2) {
@@ -47,6 +60,7 @@ export function AttachmentGrid({ media, width, onOpen, onLongPress }: { media: G
       <View style={[styles.block, styles.row, { width: half * 2 + GAP }]}>
         {tile(0, half, h)}
         {tile(1, half, h)}
+        <Edge />
       </View>
     );
   }
@@ -58,6 +72,7 @@ export function AttachmentGrid({ media, width, onOpen, onLongPress }: { media: G
           {tile(1, half, half)}
           {tile(2, half, half)}
         </View>
+        <Edge />
       </View>
     );
   }
@@ -71,8 +86,15 @@ export function AttachmentGrid({ media, width, onOpen, onLongPress }: { media: G
         {tile(2, half, half)}
         {tile(3, half, half, count - 4)}
       </View>
+      <Edge />
     </View>
   );
+}
+
+/** The block's hairline edge, drawn over its pictures and following its rounded corners. */
+function Edge() {
+  const styles = useStyles();
+  return <View style={[styles.edge, { pointerEvents: "none" }]} />;
 }
 
 function Tile({
@@ -122,12 +144,15 @@ function Tile({
       {video && !busy && !item.missing ? (
         <View style={[styles.center, { pointerEvents: "none" }]}>
           <View style={styles.play}>
-            <Icon name="play" size={22} color={colors.onMedia} style={{ marginLeft: 3 }} />
+            <GlassBackdrop variant="media" radius={PLAY / 2} />
+            <Icon name="play" sf="play.fill" size={21} color={colors.onMedia} style={{ marginLeft: 3 }} />
           </View>
         </View>
       ) : null}
       {video && duration && !item.missing ? (
         <View style={[styles.duration, { pointerEvents: "none" }]}>
+          <GlassBackdrop variant="media" radius={PILL / 2} />
+          <Icon name="videocam" sf="video.fill" size={11} color={colors.onMedia} />
           {/* Over the picture: it grows with the text size only so far, or it would cover the tile. */}
           <Text style={styles.durationText} maxFontSizeMultiplier={1.4}>
             {duration}
@@ -151,7 +176,8 @@ function Tile({
 }
 
 const useStyles = makeStyles((colors) => ({
-  block: { borderRadius: radius.lg, borderCurve: "continuous", overflow: "hidden", gap: GAP },
+  block: { borderRadius: RADIUS, borderCurve: "continuous", overflow: "hidden", gap: GAP },
+  edge: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, borderRadius: RADIUS, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: colors.mediaEdge },
   row: { flexDirection: "row", gap: GAP },
   column: { gap: GAP },
   tile: { backgroundColor: colors.skeleton, overflow: "hidden" },
@@ -159,8 +185,8 @@ const useStyles = makeStyles((colors) => ({
   missing: { gap: 6, backgroundColor: colors.input },
   missingText: { fontSize: 12, fontWeight: "600", color: colors.faint },
   scrim: { backgroundColor: colors.mediaScrim },
-  play: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.mediaScrim, alignItems: "center", justifyContent: "center" },
-  duration: { position: "absolute", left: 6, bottom: 6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.mediaPill },
-  durationText: { color: colors.onMedia, fontSize: 11, fontWeight: "700" },
+  play: { width: PLAY, height: PLAY, borderRadius: PLAY / 2, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  duration: { position: "absolute", left: 8, bottom: 8, minHeight: PILL, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, borderRadius: PILL / 2, overflow: "hidden" },
+  durationText: { color: colors.onMedia, fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
   more: { color: colors.onMedia, ...textStyle.title2 },
 }));

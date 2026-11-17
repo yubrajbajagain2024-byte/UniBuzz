@@ -1,7 +1,7 @@
 # Signed-out tour: Home (For you | Buzz | Reels beside your photo, the Campus | Global toggle under them for anyone with a university while it is shown: opens on For you, the pager swipes between them), the
-# Notifications bell (signed out it asks to log in), Events (bottom tab: For you | All events over the campus's calendar), Explore (Housing | Roommate | Marketplace: opens on Housing,
+# Notifications bell (signed out it asks to log in), Events (the calendar in Home's top bar: For you | All events), Explore (Housing | Roommate | Marketplace: opens on Housing,
 # same pager), Messages (bottom tab: asks to log in), and the sign-in prompt on the Profile tab.
-# The bottom bar is Home, Explore, Messages, Events, Profile. Needs the seeded sample posts (node e2e/sim-seed.mjs).
+# The bottom bar is icons only: Home, Explore, Create, Messages, Profile. Needs the seeded sample posts (node e2e/sim-seed.mjs).
 appId: host.exp.Exponent
 ---
 - extendedWaitUntil:
@@ -18,7 +18,7 @@ appId: host.exp.Exponent
     commands:
       - tapOn: "Close"
 - extendedWaitUntil:
-    visible: "Create"
+    visible: "Create, .*"
     timeout: 60000
 # Expo Go's floating developer gear sits in the top-right corner, over the Notifications bell: drag it out of the way
 # (not present in real builds).
@@ -34,8 +34,8 @@ appId: host.exp.Exponent
 - takeScreenshot: e2e/screenshots/01-home-foryou
 # The top bar has two rows like X's: your photo in a gradient ring ("Your menu") opens your menu (signed out, log in),
 # the UniBuzz wordmark in the middle, the bell on the right; then the three labels, and under them the Campus | Global
-# toggle for anyone with a university (hidden for now: SCOPE_TOGGLE_SHOWN in src/lib/home-scope.ts). Orbit's floating
-# "+" ("Create") opens the camera (SNAP | POST | REEL | BUZZ). Signed out there is no campus to pick, so the toggle is not drawn either way.
+# toggle for anyone with a university (hidden for now: SCOPE_TOGGLE_SHOWN in src/lib/home-scope.ts). Create in the
+# middle of the bottom bar opens the camera on SNAP (BUZZ | SNAP | POST | REEL). Signed out there is no campus to pick, so the toggle is not drawn either way.
 - assertNotVisible: "Campus"
 - assertNotVisible: "Global"
 - takeScreenshot: e2e/screenshots/01-home-bar
@@ -63,7 +63,7 @@ appId: host.exp.Exponent
 - tapOn: "Orbit"
 - waitForAnimationToEnd
 - extendedWaitUntil:
-    visible: "Create"
+    visible: "Create, .*"
     timeout: 30000
 # Notifications: the bell in the top-right corner of Home's floating top bar opens the notifications screen; signed out it
 # asks to log in. "Notifications" is the bell's exact label (signed in it reads "Notifications, N unread").
@@ -79,15 +79,24 @@ appId: host.exp.Exponent
     duration: 400
 - waitForAnimationToEnd
 - extendedWaitUntil:
-    visible: "Create"
+    visible: "Create, .*"
     timeout: 30000
-# Events (the fourth tab): "Events", For you | All events, the search box and the date and category pills over the
-# campus's calendar (migration 61); signed out it still lists the campus's events.
-- tapOn: "Events.*"
+# Events (the calendar beside the magnifier in Home's top bar): Back, "Events", For you | All events, the search box and
+# the date and category pills over the campus's calendar (migration 61); signed out it still lists the campus's events.
+# It is a screen above the tabs, without the bottom bar: swipe back to Home before the next tab.
+- tapOn: "Events"
 - extendedWaitUntil:
     visible: "Search events"
     timeout: 30000
 - takeScreenshot: e2e/screenshots/07-events
+- swipe:
+    start: "2%,45%"
+    end: "90%,45%"
+    duration: 400
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "Create, .*"
+    timeout: 30000
 # Explore (housing.tsx): its own top bar ("Find", then Housing | Roommate | Marketplace, then the search box of the page on
 # screen, named "Search apartments", "Search roommate posts" or "Search marketplace", then the pills). The bottom tab opens on Housing (apartments); the "Roommate" label above the
 # pager slides to the other half and a flick to the right brings Housing back. The floating "+" follows the visible half.
@@ -114,10 +123,10 @@ appId: host.exp.Exponent
     visible: "Mattress & bedding"
     timeout: 30000
 - takeScreenshot: e2e/screenshots/03-marketplace
-# Messages: the third bottom tab (after Explore); signed out it asks to log in.
+# Messages: the bottom tab after Create; signed out it asks to log in.
 - tapOn: "Messages.*"
 - assertVisible: "Log in to see your messages"
-# Profile is the fifth bottom tab; signed out it shows the sign-in prompt.
+# Profile is the last bottom tab; signed out it shows the sign-in prompt.
 - tapOn: "Profile.*"
 - assertVisible: "Join UniBuzz"
 - takeScreenshot: e2e/screenshots/05-profile-signed-out

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type TextInputInstance } from "react-native";
-import Reanimated, { FadeIn, FadeOut, ZoomIn, ZoomOut } from "react-native-reanimated";
+import Reanimated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withTiming, ZoomIn, ZoomOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { SFSymbol } from "expo-symbols";
 import { MESSAGE_ATTACHMENT_LIMITS, type MessageReply } from "@apartment-book/shared";
 import { useActionSheet } from "@/components/action-sheet";
 import { GlassBackdrop, GlassIconButton } from "@/components/glass";
@@ -16,6 +17,7 @@ import { makeStyles, useAppTheme } from "@/lib/theme-provider";
 import { AttachmentStrip } from "./attachment-strip";
 import { CHAT_EDGE } from "./chat-header";
 import { ReplyQuote, type ReplyContext } from "./reply-quote";
+import { StickerSheet } from "./sticker-sheet";
 import { VOICE_AVAILABLE } from "@/lib/voice";
 
 // expo-audio is loaded only where this build has it.
@@ -38,8 +40,12 @@ const FADE = 16;
 /** Send pops in on a quick spring that settles without a wobble; the microphone it replaces just fades. */
 const SEND_IN = ZoomIn.springify().damping(17).stiffness(340).mass(0.6);
 const SEND_OUT = ZoomOut.duration(120);
-const MIC_IN = FadeIn.duration(160);
-const MIC_OUT = FadeOut.duration(100);
+const TOOLS_IN = FadeIn.duration(180);
+const TOOLS_OUT = FadeOut.duration(100);
+/** The tools at the capsule's end (stickers, photos, microphone): 32pt each, this far apart. */
+const TOOL_GAP = 2;
+/** How long the slot takes to grow or shrink between the tools and Send, the field following it. */
+const SLOT_MS = 200;
 
 /**
  * The bar keeps this much under its field above the home indicator (or the screen's edge), and, with the keyboard up,
@@ -104,12 +110,14 @@ function GlassPanel({ children, style }: { children: ReactNode; style?: object }
 }
 
 /**
- * The message bar, laid out like the Messages app's: "+" in a glass circle on the left (photo or video, camera, file),
- * then a see-through glass capsule holding the growing field and, at its end, the microphone (a voice message records
- * in the bar, where the build can) or, once something is typed or picked, the aurora Send, which springs in as the
- * microphone fades out (and back). Picked files wait on a glass panel above the capsule until they are sent with the
- * message; a message being answered shows there too, with its quote and an ✕. The bar floats over the chat; the chat
- * lifts it with the keyboard (see keyboardLift).
+ * The message bar: "+" in a glass circle on the left (photo or video, camera, file), then a see-through glass capsule
+ * holding the growing field and, at its end, three tools: stickers (a sheet of big emoji, each sent at once as a message
+ * of its own), photos and videos straight from the library, and the microphone (a voice message records in the bar,
+ * where the build can). Once something is typed or picked the tools fade and the aurora Send springs in, the slot
+ * gliding to its new width with the field (and back). Picked files wait on a glass panel above the capsule until they
+ * are sent with the message; a message being answered shows there too, with its quote and an ✕. The bar floats over
+ * the chat; the chat lifts it with the keyboard (see keyboardLift). Without `onAddItems` (an anonymous poster) there is
+ * no "+" and no photos; without `onSendVoice` no microphone; stickers are words, so they stay.
  */
 export function Composer({
   value,
@@ -119,6 +127,7 @@ export function Composer({
   onRemoveItem,
   onSend,
   onSendVoice,
+  onSendSticker,
   reply,
   onCancelReply,
   inputRef,
@@ -134,6 +143,8 @@ export function Composer({
   onSend: () => void;
   /** A voice message just recorded: sent at once. Without it there is no microphone. */
   onSendVoice?: (item: PendingAttachment) => void;
+  /** A sticker picked from the sheet: sent at once, as a message of its own. Without it there is no sticker tool. */
+  onSendSticker?: (sticker: string) => void;
   reply?: ComposerReply | null;
   onCancelReply?: () => void;
   /** The field, so the chat can bring the keyboard up (a swipe to reply). */
@@ -147,6 +158,7 @@ export function Composer({
   const reduceMotion = useReduceMotion();
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [stickers, setStickers] = useState(false);
   const remaining = MESSAGE_ATTACHMENT_LIMITS.maxItems - items.length;
   const canSend = value.trim().length > 0 || items.length > 0;
   const canRecord = Boolean(VoiceRecorder && onSendVoice) && !canSend;
@@ -156,6 +168,22 @@ export function Composer({
     settled.current = true;
   }, []);
   const animate = settled.current && !reduceMotion;
+  /** The tools at the capsule's end while nothing is typed or picked, in order; Send takes their place after. */
+  // The sticker tool keeps the outlined smiley in both themes: the SF faces draw filled on a dark capsule.
+  const tools: { key: string; icon: "happy-outline" | "image-outline" | "mic"; sf?: SFSymbol; size?: number; label: string; disabled?: boolean; onPress: () => void }[] = [
+    ...(onSendSticker ? [{ key: "stickers", icon: "happy-outline" as const, size: 19, label: "Stickers", onPress: openStickers }] : []),
+    ...(onAddItems ? [{ key: "photos", icon: "image-outline" as const, sf: "photo.on.rectangle" as SFSymbol, label: "Add photos or videos", disabled: busy, onPress: pickPhotos }] : []),
+    ...(canRecord ? [{ key: "mic", icon: "mic" as const, sf: "mic" as SFSymbol, label: "Record a voice message", onPress: record }] : []),
+  ];
+  const showSend = canSend || tools.length === 0;
+  const slotWidth = showSend ? CONTROL : tools.length * CONTROL + (tools.length - 1) * TOOL_GAP;
+  const slot = useSharedValue(slotWidth);
+  useEffect(() => {
+    slot.value = animate ? withTiming(slotWidth, { duration: SLOT_MS, easing: Easing.out(Easing.cubic) }) : slotWidth;
+    // `animate` only turns on once, after the first draw.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slotWidth, slot]);
+  const slotStyle = useAnimatedStyle(() => ({ width: slot.value }));
 
   async function add(pick: () => Promise<PickResult>) {
     setBusy(true);
@@ -168,6 +196,27 @@ export function Composer({
     } finally {
       setBusy(false);
     }
+  }
+
+  function openStickers() {
+    Keyboard.dismiss();
+    hapticTap();
+    setStickers(true);
+  }
+
+  /** Photos and videos straight from the library, as "+"'s first choice does. */
+  function pickPhotos() {
+    if (remaining <= 0) {
+      Alert.alert("That's the limit", ATTACHMENT_LIMIT_TEXT);
+      return;
+    }
+    void add(() => pickLibraryMedia(remaining));
+  }
+
+  function record() {
+    Keyboard.dismiss();
+    hapticTap();
+    setRecording(true);
   }
 
   function attach() {
@@ -242,26 +291,10 @@ export function Composer({
             style={styles.input}
             accessibilityLabel="Message"
           />
-          {/* One slot for both: the one leaving fades or shrinks away in place while the other comes in over it. */}
-          <View style={styles.controlSlot}>
-            {canRecord ? (
-              <Reanimated.View key="mic" entering={animate ? MIC_IN : undefined} exiting={animate ? MIC_OUT : undefined} style={styles.controlLayer}>
-                <Pressable
-                  onPress={() => {
-                    Keyboard.dismiss();
-                    hapticTap();
-                    setRecording(true);
-                  }}
-                  hitSlop={8}
-                  style={({ pressed }) => [styles.control, pressed && { opacity: 0.6 }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Record a voice message"
-                >
-                  <Icon name="mic" size={21} color={colors.muted} weight="medium" />
-                </Pressable>
-              </Reanimated.View>
-            ) : (
-              <Reanimated.View key="send" entering={animate ? SEND_IN : undefined} exiting={animate ? SEND_OUT : undefined} style={styles.controlLayer}>
+          {/* One slot for the tools and Send: the one leaving fades or shrinks away in place while the other comes in over it. */}
+          <Reanimated.View style={[styles.controlSlot, slotStyle]}>
+            {showSend ? (
+              <Reanimated.View key="send" entering={animate ? SEND_IN : undefined} exiting={animate ? SEND_OUT : undefined} style={styles.sendLayer}>
                 <Pressable
                   onPress={onSend}
                   disabled={!canSend}
@@ -274,10 +307,28 @@ export function Composer({
                   <Icon name="arrow-up" size={17} color={colors.onBrand} weight="bold" />
                 </Pressable>
               </Reanimated.View>
+            ) : (
+              <Reanimated.View key="tools" entering={animate ? TOOLS_IN : undefined} exiting={animate ? TOOLS_OUT : undefined} style={styles.toolsLayer}>
+                {tools.map((tool) => (
+                  <Pressable
+                    key={tool.key}
+                    onPress={tool.onPress}
+                    disabled={tool.disabled}
+                    hitSlop={{ top: 8, bottom: 8, left: 2, right: 2 }}
+                    style={({ pressed }) => [styles.control, (pressed || tool.disabled) && { opacity: 0.5 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={tool.label}
+                    accessibilityState={tool.disabled ? { disabled: true } : undefined}
+                  >
+                    <Icon name={tool.icon} sf={tool.sf} size={tool.size ?? 21} color={colors.muted} weight="medium" />
+                  </Pressable>
+                ))}
+              </Reanimated.View>
             )}
-          </View>
+          </Reanimated.View>
         </View>
       </View>
+      {onSendSticker ? <StickerSheet visible={stickers} onClose={() => setStickers(false)} onPick={onSendSticker} /> : null}
     </FloatingBar>
   );
 }
@@ -328,8 +379,10 @@ const useStyles = makeStyles((colors) => ({
     color: colors.text,
     textAlignVertical: "center",
   },
-  controlSlot: { width: CONTROL, height: CONTROL, marginRight: CONTROL_INSET, marginBottom: CONTROL_INSET },
-  controlLayer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
+  controlSlot: { height: CONTROL, marginRight: CONTROL_INSET, marginBottom: CONTROL_INSET },
+  // Both layers hold to the slot's right end, so Send lands where the microphone was.
+  sendLayer: { position: "absolute", top: 0, right: 0, width: CONTROL, height: CONTROL, alignItems: "center", justifyContent: "center" },
+  toolsLayer: { position: "absolute", top: 0, right: 0, bottom: 0, flexDirection: "row", gap: TOOL_GAP },
   control: { width: CONTROL, height: CONTROL, borderRadius: CONTROL / 2, alignItems: "center", justifyContent: "center" },
   notice: { alignItems: "center", gap: 4, paddingHorizontal: 24, paddingTop: 14, paddingBottom: 14 },
   noticeTitle: { fontSize: 15, fontWeight: "700", color: colors.text, textAlign: "center" },

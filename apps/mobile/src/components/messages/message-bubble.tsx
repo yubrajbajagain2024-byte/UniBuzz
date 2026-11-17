@@ -9,6 +9,7 @@ import {
   formatTimeOfDay,
   formatDayLabel,
   formatMessageTime,
+  jumboEmoji,
   replyOf,
   isStoryCard,
   sharedPostLabel,
@@ -25,6 +26,7 @@ import { CallRow } from "@/components/calls/call-row";
 import { useReduceMotion } from "@/lib/accessibility";
 import { openChatLink, sharedPostHref, type ChatMessage, type OutgoingFiles, type UploadStatus } from "@/lib/message-attachments";
 import { entryForPost, measureOrigin, openViewer } from "@/lib/reel-viewer";
+import { bubbleMineFill } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { AttachmentFileRow } from "./attachment-file-row";
 import { AttachmentGrid, type GridMedia } from "./attachment-grid";
@@ -139,6 +141,26 @@ function arrive(_values: EntryAnimationsValues): LayoutAnimation {
   };
 }
 
+/**
+ * A sticker (a message of one to three emoji alone, see jumboEmoji) comes in with more spring: it pops up from small, a
+ * touch past its size and back, as a sticker slapped on.
+ */
+const POP = { damping: 11, stiffness: 300, mass: 0.6 };
+function pop(_values: EntryAnimationsValues): LayoutAnimation {
+  "worklet";
+  return {
+    initialValues: { opacity: 0, transform: [{ translateY: 10 }, { scale: 0.4 }] },
+    animations: { opacity: withTiming(1, { duration: 120 }), transform: [{ translateY: withSpring(0, POP) }, { scale: withSpring(1, POP) }] },
+  };
+}
+
+/** The other side's face beside their messages: on the last of each run, level with its bottom. */
+const FACE = 28;
+const FACE_GAP = 8;
+/** A sticker's size: one emoji alone draws larger than two or three. */
+const STICKER_ONE = 56;
+const STICKER_FEW = 42;
+
 /** A bubble's corners: round, except on the sender's side where it meets the bubble above or below it in the same run. */
 const ROUND = 20;
 const JOINED = 6;
@@ -191,6 +213,13 @@ export type MessageRowProps = {
   onJumpTo: (messageId: string) => void;
   /** A tap on a sender's name in a group. */
   onPressSender: (userId: string) => void;
+  /**
+   * The face beside the other side's messages (shown on the last of a run): in a group the sender's own, in a
+   * one-to-one chat the header's (chatPeerFace: an anonymous poster's mask, a business's logo). None on mine.
+   */
+  face?: { name: string; url: string | null; anonymous: boolean } | null;
+  /** A tap on that face: the sender's profile, where there is one to open. */
+  onPressFace?: () => void;
 };
 
 /**
@@ -202,8 +231,10 @@ export type MessageRowProps = {
  * corners. Nothing under a bubble by default, as in Instagram: a tap on the words shows the
  * message's exact time there (a hold shows it in the menu), my newest message says where it stands ("Sent",
  * "Delivered"), and "Seen" with the readers' small photos sits under the last message they read. Every time is the
- * phone's own. No photos beside the bubbles: the chat's header says who you are talking to. A swipe to the right
- * answers it.
+ * phone's own. The other side's face sits beside the last message of each of their runs, level with its bottom, as in
+ * Instagram (`face`: in a one-to-one chat the header's, so an anonymous poster stays a mask and a business its logo). A
+ * message of one to three emoji alone is a sticker: drawn large, with no bubble, popping in as it arrives. A swipe to
+ * the right answers it.
  */
 export function MessageRow({
   message: m,
@@ -230,6 +261,8 @@ export function MessageRow({
   onReveal,
   onJumpTo,
   onPressSender,
+  face,
+  onPressFace,
 }: MessageRowProps) {
   const colors = useColors();
   const styles = useStyles();
@@ -243,6 +276,8 @@ export function MessageRow({
   const files = messageFiles(m);
   const voices = messageVoices(m, resolveMedia);
   const showText = Boolean(m.content) && !(m.image_url && m.content === WEBSITE_PHOTO_TEXT);
+  // A sticker: one to three emoji and nothing else (a failed one keeps its bubble, which says it was not sent).
+  const sticker = showText && !m.failed ? jumboEmoji(m.content) : 0;
   const actions = m.pending ? undefined : () => onActions(m);
   const retry = m.failed ? () => onActions(m) : undefined;
   const sender = m.sender;
@@ -264,7 +299,7 @@ export function MessageRow({
   const voiceCorners = bubbleCorners(mine, !reply && !firstInGroup, joinedBelow || showText);
 
   return (
-    <Reanimated.View entering={appear && !reduceMotion ? arrive : undefined} style={mine ? styles.originMine : styles.originTheirs}>
+    <Reanimated.View entering={appear && !reduceMotion ? (sticker ? pop : arrive) : undefined} style={mine ? styles.originMine : styles.originTheirs}>
       {stamp ? (
         <Text style={styles.day} accessibilityRole="header">
           <Text style={styles.dayName}>{formatDayLabel(m.created_at)}</Text> {formatTimeOfDay(m.created_at)}
@@ -272,6 +307,15 @@ export function MessageRow({
       ) : null}
       <Highlight active={highlighted}>
         <View style={[styles.line, mine && styles.lineMine, firstInGroup && !stamp && styles.groupStart]}>
+          {!mine && face !== undefined ? (
+            <View style={styles.faceSlot}>
+              {lastInGroup && face ? (
+                <Pressable onPress={onPressFace} disabled={!onPressFace} hitSlop={6} accessibilityRole={onPressFace ? "button" : undefined} accessibilityLabel={onPressFace ? `${face.name}'s profile` : undefined} accessibilityElementsHidden={!onPressFace} importantForAccessibility={onPressFace ? "auto" : "no-hide-descendants"}>
+                  <Avatar name={face.name} url={face.url} size={FACE} online={false} anonymous={face.anonymous} />
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
           <SwipeToReply enabled={!m.pending && !m.failed} onReply={() => onReply(m)} style={[styles.stack, mine ? styles.stackMine : styles.stackTheirs]}>
             {!mine && isGroup && firstInGroup ? (
               <Text style={styles.sender} numberOfLines={1} onPress={sender ? () => onPressSender(sender.id) : undefined} accessibilityRole={sender ? "button" : undefined}>
@@ -300,7 +344,13 @@ export function MessageRow({
                 <AttachmentFileRow key={v.key} attachment={v.attachment} onPress={() => onOpenFile(v.attachment as MessageAttachment)} onLongPress={actions} style={{ width: mediaWidth }} />
               ) : null,
             )}
-            {showText ? (
+            {sticker ? (
+              <Pressable onPress={reveal} onLongPress={actions} delayLongPress={350} accessibilityHint={reveal ? "Shows when it was sent" : undefined}>
+                <Text style={[styles.sticker, { fontSize: sticker === 1 ? STICKER_ONE : STICKER_FEW, lineHeight: Math.round((sticker === 1 ? STICKER_ONE : STICKER_FEW) * 1.18) }, m.pending && styles.dim]} maxFontSizeMultiplier={1.4} selectable={false}>
+                  {m.content.trim()}
+                </Text>
+              </Pressable>
+            ) : showText ? (
               <Pressable onPress={retry ?? reveal} onLongPress={actions} delayLongPress={350} accessibilityHint={m.failed ? "Not sent. Tap for options." : reveal ? "Shows when it was sent" : undefined}>
                 <View style={[styles.bubble, textCorners, m.failed ? styles.failed : mine ? styles.mine : styles.theirs, m.pending && styles.dim]}>
                   <Text style={[styles.text, { color: textColor }]} selectable={false}>
@@ -454,7 +504,9 @@ const useStyles = makeStyles((colors) => ({
   // The stamp: quiet, the day a weight above the time ("Today 14:05"), with more room above it than below.
   day: { textAlign: "center", fontSize: 12, lineHeight: 15, color: colors.faint, marginTop: 20, marginBottom: 10 },
   dayName: { fontWeight: "600", color: colors.muted },
-  line: { flexDirection: "row", marginTop: 2 },
+  // Bottom-aligned, so the other side's face sits level with the last message of their run.
+  line: { flexDirection: "row", alignItems: "flex-end", marginTop: 2 },
+  faceSlot: { width: FACE, marginRight: FACE_GAP, marginBottom: 1 },
   lineMine: { flexDirection: "row-reverse" },
   groupStart: { marginTop: 10 },
   stack: { maxWidth: "76%", gap: 2 },
@@ -465,11 +517,13 @@ const useStyles = makeStyles((colors) => ({
   quote: { marginHorizontal: 6 },
   // One line of 16pt words makes a 36pt bubble (7.5 + 21 + 7.5); the corners come from bubbleCorners.
   bubble: { borderCurve: "continuous", paddingHorizontal: 13, paddingVertical: 7.5 },
-  mine: { backgroundColor: colors.bubbleMine[0], experimental_backgroundImage: `linear-gradient(to bottom, ${colors.bubbleMine[0]} 0%, ${colors.bubbleMine[1]} 100%)` },
+  mine: bubbleMineFill(colors.bubbleMine),
   theirs: { backgroundColor: colors.bubble },
   dim: { opacity: 0.55 },
   failed: { backgroundColor: colors.dangerSoft },
   text: { fontSize: 16, lineHeight: 21 },
+  // A sticker: no bubble, a little room round it so it reads as an object, not a line of text.
+  sticker: { paddingHorizontal: 2, paddingVertical: 2, textAlign: "center", color: colors.text },
   link: { textDecorationLine: "underline" },
   footer: { fontSize: 11, lineHeight: 14, color: colors.faint, marginHorizontal: 5, marginTop: 3 },
   receipt: { fontWeight: "600" },

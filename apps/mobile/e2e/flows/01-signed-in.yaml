@@ -6,7 +6,7 @@ env:
   PASSWORD: ${PASSWORD}
 ---
 - extendedWaitUntil:
-    visible: "Create"
+    visible: "Create, .*"
     timeout: 120000
 - swipe:
     start: "88%,10%"
@@ -125,7 +125,7 @@ env:
 - tapOn: "Posts"
 - tapOn: "Home.*"
 - extendedWaitUntil:
-    visible: "Create|Not Now"
+    visible: "Create, .*|Not Now"
     timeout: 60000
 # iOS offers to save the password after a login: dismiss it.
 - runFlow:
@@ -253,7 +253,7 @@ env:
 - extendedWaitUntil:
     notVisible: "Search friends"
     timeout: 30000
-# Leo has it in your chat with him (Messages, the third bottom tab): the post as a card, labelled "View post: …" (a tap
+# Leo has it in your chat with him (Messages, the bottom tab after Create): the post as a card, labelled "View post: …" (a tap
 # opens the post), with the words as a bubble under it. The left-edge swipe pops the chat on iOS; Home is still on For you.
 - tapOn: "Messages.*"
 - extendedWaitUntil:

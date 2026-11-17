@@ -20,7 +20,7 @@ import { dropHanded, entryOf, loadViewerItems, peekHanded, posterAt, viewerItemF
 import { useReduceMotion } from "@/lib/accessibility";
 import { ViewerChromeContext, ViewerClockContext, ViewerClosingContext, ViewerPagerLockContext, ViewerZoomContext, type ViewerClocks } from "@/lib/viewer-chrome";
 import { returnPlayer } from "@/lib/video-handoff";
-import { videosMuted } from "@/lib/video-sound";
+import { VIDEO_MUTED } from "@/lib/video-sound";
 import { usePageSwipe, ViewerSwipeContext, type ViewerSwipe } from "@/lib/viewer-swipe";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -39,13 +39,13 @@ const ROW = 44;
 const MUTE_SIZE = 36;
 const MUTE_OFFSET = 10;
 /**
- * The room a page keeps at its bottom for the name, the words and the rail to sit above: as high as they sat over the
- * "Add comment…" bar the viewer used to have (the least it kept from the screen's bottom edge, then 58pt), so they did
- * not move when the bar went. Where the app's tab bar is drawn instead, they keep at least BAR_CLEAR over it (on a
- * phone with a home indicator the room above is already exactly that).
+ * The room a page keeps at its bottom for the words, the timeline and the rail to sit on (2026-11-16, TikTok's way, no
+ * empty band under the words): BAR_CLEAR over the app's tab bar where it is drawn; elsewhere the home indicator's own
+ * area (at least BOTTOM_MIN) and BOTTOM_ROOM over it. (It used to keep 58pt over the safe area, the height of the
+ * "Add comment…" bar the viewer once had.)
  */
 const BOTTOM_MIN = 12;
-const BOTTOM_ROOM = 58;
+const BOTTOM_ROOM = 16;
 const BAR_CLEAR = 4;
 /** The rail's inset from the screen's right edge here (ReelItem's railRight): a little nearer the edge than in the Reels tab. */
 const RAIL_RIGHT = 2;
@@ -389,8 +389,8 @@ export default function ReelViewerScreen() {
     [onOpenComments, handed, leave, router],
   );
 
-  // The top row: Back and the toggle, under the status bar. Both float over the page: its photos and videos start at the
-  // screen's top edge, never pushed down by the safe area (see photoLayout, placeVideo).
+  // The top row: Back and the toggle, under the status bar. Both float over the page: its photos and videos sit whole in
+  // the middle of the whole screen, on black, never pushed down by the safe area (see photoLayout, placeVideo).
   const rowTop = insets.top + TOP_GAP;
   const contentTop = rowTop + ROW;
   /**
@@ -412,9 +412,9 @@ export default function ReelViewerScreen() {
   });
   const tabMirror = useTabBarMirror(beneath.key);
   const tabBar = beneath.tabs ? tabMirror : null;
-  // The name and the rail sit this far up from the screen's bottom edge, where they always have (see BOTTOM_ROOM), and
-  // clear of the tab bar when it is drawn.
-  const barHeight = Math.max(Math.max(insets.bottom, BOTTOM_MIN) + BOTTOM_ROOM, tabBar ? tabBarInset(insets) + BAR_CLEAR : 0);
+  // The words, the timeline and the rail sit on this, up from the screen's bottom edge: just over the tab bar when it is
+  // drawn, just over the home indicator when it is not (see BOTTOM_ROOM).
+  const barHeight = tabBar ? tabBarInset(insets) + BAR_CLEAR : Math.max(insets.bottom, BOTTOM_MIN) + BOTTOM_ROOM;
 
   /*
    * The zoom: the page grows out of the picture that was tapped (its frame on screen, `origin`) to fill the screen, the
@@ -429,11 +429,10 @@ export default function ReelViewerScreen() {
   const [origins] = useState(() => handed?.origins ?? null);
   const fallback = useMemo<ViewerOrigin>(() => ({ x: screenW * 0.06, y: screenH * 0.06, width: screenW * 0.88, height: screenH * 0.88, radius: 28 }), [screenW, screenH]);
   /**
-   * The picture on the tapped page that grows out of the tapped one, in page points: a photo sits in its own shape (at
-   * the top, see photoLayout), so the page lines up on that photo; a video, on the whole of it, past the page's sides
-   * where it fills a tall screen (see wholeVideo): the feed shows a vertical video's full width, so the opening starts on
-   * that very picture, at its size, and only then opens up onto the screen's crop. It follows the page's slide, so
-   * closing lands on the photo or video showing then.
+   * The picture on the tapped page that grows out of the tapped one, in page points: a photo or a video sits whole in its
+   * own shape in the middle of the page (see photoLayout, wholeVideo), so the page lines up on that very picture, at its
+   * size, and opens up onto the black round it. It follows the page's slide, so closing lands on the photo or video
+   * showing then.
    */
   const startEntry = (startKey ? entries?.find((e) => e.key === startKey) : entries?.[startIndex]) ?? null;
   const startItem = startEntry?.item ?? null;
@@ -446,7 +445,7 @@ export default function ReelViewerScreen() {
   const focus = useMemo(() => {
     const m = startItem?.media[startSlide];
     if (startItem && m?.type === "video") {
-      const v = wholeVideo(aspectOf(m), screenW, screenH, true);
+      const v = wholeVideo(aspectOf(m), screenW, screenH);
       return { y: v.top + v.height / 2, width: v.width, height: v.height };
     }
     const aspect = m && m.type === "photo" ? aspectOf(m) : null;
@@ -644,7 +643,7 @@ export default function ReelViewerScreen() {
     if (borrowed && startSlide === borrowedSlide) {
       try {
         // With the sound as it is now: a sound change made while no page held it never reached it.
-        if (borrowed.muted !== videosMuted()) borrowed.muted = videosMuted();
+        if (borrowed.muted !== VIDEO_MUTED) borrowed.muted = VIDEO_MUTED;
         if (!borrowed.playing) borrowed.play();
       } catch {
         // Released by its row in the meantime: nothing to hand back.

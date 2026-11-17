@@ -3,7 +3,6 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View, typ
 import { useIsFocused, useRouter } from "expo-router";
 import { ADS_EVERY, interleaveAds, listForYou, reelFromFeedPost, videosFor, type FeedPostWithAuthor, type ForYouItem, type PostEngagement } from "@apartment-book/shared";
 import { CommentsSheet, type CommentsTarget } from "@/components/comments-sheet";
-import { Fab } from "@/components/feed-header";
 import { FEED_HEADER_PADDING } from "@/components/post-card";
 import { EmptyState, ErrorBanner, Loading, useAppearingCells } from "@/components/ui";
 import { AnimatedFlatList, listInset } from "@/lib/collapsing-header";
@@ -18,7 +17,6 @@ import { supabase } from "@/lib/supabase";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { useEngagement, usePostPreviews } from "@/lib/use-engagement";
 import { CaughtUp } from "./caught-up";
-import { useCreateMenu } from "./create-menu";
 import { InstaPost } from "./insta-post";
 import { StoriesTray } from "./stories-tray";
 import { SponsoredCard } from "@/components/ads/sponsored-card";
@@ -82,8 +80,8 @@ const ForYouRow = memo(function ForYouRow({
 
 /**
  * Home → Orbit, the landing page: posts and reels blended into one list (listForYou). Rows reuse the Instagram-style
- * post, so nothing here looks different from the Posts section. Anonymous Buzz threads stay on the Buzz page. The
- * floating "+" (Create) opens the create sheet: Post / Reel / Buzz / Snap, as the bottom bar's "+" did.
+ * post, so nothing here looks different from the Posts section. Anonymous Buzz threads stay on the Buzz page. Creating
+ * starts from Create in the middle of the bottom bar (see app/(tabs)/_layout.tsx), so the page has no floating "+".
  */
 export function ForYouSection({ active, topInset, onScroll }: { active: boolean; topInset: number; onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void }) {
   const { user, profile } = useSession();
@@ -203,7 +201,6 @@ export function ForYouSection({ active, topInset, onScroll }: { active: boolean;
   // The list starts under the floating bar and scrolls beneath it as the bar slides away.
   const inset = useMemo(() => listInset(topInset), [topInset]);
   const tabBar = useTabBarInset();
-  const create = useCreateMenu();
 
   // Coming back to For you keeps the list and the scroll position. It reloads only when something new was published
   // while another page was showing: a post or a reel by this person.
@@ -355,8 +352,6 @@ export function ForYouSection({ active, topInset, onScroll }: { active: boolean;
         viewabilityConfig={viewability}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshWithHaptic(refresh)} progressViewOffset={inset.progressViewOffset} />}
       />
-      {/* Inside the page, so it slides away with Orbit when the pager moves to Buzz or Reels. */}
-      <Fab label="Create" hint="A post, a reel, a Buzz thread or a Snap" onPress={create} />
       <CommentsSheet target={target} onClose={closeComments} onCountChange={(d) => commenting && setCommentDelta((prev) => ({ ...prev, [commenting.id]: (prev[commenting.id] ?? 0) + d }))} />
     </View>
   );

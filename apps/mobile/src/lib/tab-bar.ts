@@ -1,11 +1,13 @@
+import { createContext, useContext } from "react";
 import { useSafeAreaInsets, type EdgeInsets } from "react-native-safe-area-context";
 
 /**
  * The floating bottom bar: a rounded glass pill `TAB_BAR_SIDE` in from the screen's sides and `tabBarBottom(insets)` up
  * from its bottom edge, drawn over the tabs' content (see app/(tabs)/_layout.tsx). Lists and floating buttons on the
- * tabs keep `tabBarInset(insets)` clear under them, so nothing ends up hidden behind the bar.
+ * tabs keep `tabBarInset(insets)` clear under them, so nothing ends up hidden behind the bar. Icons only, with room
+ * around them for the capsule behind the tab on screen: moderate, neither a thin strip nor a slab.
  */
-export const TAB_BAR_HEIGHT = 66;
+export const TAB_BAR_HEIGHT = 60;
 export const TAB_BAR_SIDE = 14;
 
 /**
@@ -24,9 +26,16 @@ export function tabBarInset(insets: EdgeInsets): number {
   return tabBarBottom(insets) + TAB_BAR_HEIGHT;
 }
 
-/** `tabBarInset` for the screen this is rendered on. */
+/**
+ * False on a screen pushed over the tabs that draws a tab's page (Events, opened from Home's top bar): there is no bar
+ * under it, so its lists and floating button keep only the safe area clear, and nothing rides the bar's collapse.
+ */
+export const InTabsContext = createContext(true);
+
+/** `tabBarInset` for the screen this is rendered on: the bar's room on a tab, the safe area alone off the tabs. */
 export function useTabBarInset(): number {
-  return tabBarInset(useSafeAreaInsets());
+  const insets = useSafeAreaInsets();
+  return useContext(InTabsContext) ? tabBarInset(insets) : insets.bottom;
 }
 
 /**

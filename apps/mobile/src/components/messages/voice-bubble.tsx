@@ -6,6 +6,7 @@ import { Icon } from "@/components/icon";
 import { useReduceMotion } from "@/lib/accessibility";
 import { hapticSelect } from "@/lib/haptics";
 import { formatDuration } from "@/lib/message-attachments";
+import { bubbleMineFill } from "@/lib/theme";
 import { makeStyles, useAppTheme } from "@/lib/theme-provider";
 import { cycleVoiceRate, useVoiceRate, voiceBars, voiceRateLabel } from "@/lib/voice";
 import { playbackSession } from "@/lib/voice-audio";
@@ -138,7 +139,7 @@ export function VoiceBubble({
 const useStyles = makeStyles((colors) => ({
   // The chat's bubbles' fills and corner (message-bubble.tsx); `corners` tightens the ones that meet another bubble.
   bubble: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 20, borderCurve: "continuous", paddingLeft: 6, paddingRight: 10, paddingVertical: 6, width: 248 },
-  mine: { backgroundColor: colors.bubbleMine[0], experimental_backgroundImage: `linear-gradient(to bottom, ${colors.bubbleMine[0]} 0%, ${colors.bubbleMine[1]} 100%)` },
+  mine: bubbleMineFill(colors.bubbleMine),
   theirs: { backgroundColor: colors.bubble },
   play: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   wave: { flex: 1, height: 26, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

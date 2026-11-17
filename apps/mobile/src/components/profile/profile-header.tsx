@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import type { Ionicons } from "@expo/vector-icons";
-import { compactCount, type FollowStats, type ProfileWithUniversity } from "@apartment-book/shared";
+import { classYear, compactCount, type FollowStats, type ProfileWithUniversity } from "@apartment-book/shared";
 import { Avatar } from "@/components/avatar";
 import { auroraGradient, radius, space, textStyle } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
@@ -98,10 +98,10 @@ export function HeaderIconButton({ icon, label, onPress }: { icon: keyof typeof 
 /**
  * The top of a profile: the cover band (a soft gradient under the status bar), the round photo hanging over its bottom
  * edge (yours with a blue "+" to change it) with the buttons (`actions`) beside it, then in this order: the full name (on
- * your own tab, with a chevron: the account sheet), "@username" with a QR icon, the university in a small pill with the
- * major and class year beside it ("Computer Science · '28"), the bio, and a rounded card with Posts | Followers |
- * Following | Likes. A line with nothing to say is left out. `topInset` is the status bar's height, which the cover runs
- * under. The owner's chosen layout (2026-10-31): keep it as it is.
+ * your own tab, with a chevron: the account sheet), "@username" with a QR icon, the university in bold with the major and
+ * the class year under it ("Computer Science · ’28", no labels), the bio, and a rounded card with Posts | Followers |
+ * Following | Likes. A line with nothing to say is left out. `topInset` is the status bar's height, which the cover
+ * runs under. The owner's chosen layout (2026-10-31), its university, major and year restyled at his choice (2026-11-15).
  */
 export function ProfileHeader({
   profile,
@@ -134,8 +134,11 @@ export function ProfileHeader({
   const styles = useStyles();
   const colors = useColors();
   const handle = profileHandle(profile);
-  const school = profile.university?.name ?? null;
-  const study = [profile.program, profile.graduation_year ? `'${String(profile.graduation_year).slice(-2)}` : null].filter(Boolean).join(" · ");
+  const school = profile.university?.name?.trim() || null;
+  const major = profile.program?.trim() || null;
+  const year = classYear(profile.graduation_year);
+  // Read out as one line: "Texas State University, Computer Science, class of 2028".
+  const spoken = [school, major, year ? `class of ${profile.graduation_year}` : null].filter(Boolean).join(", ");
   // No fade-in: every profile tab draws its own copy of this header, and a copy appearing mid-swipe must match the others at once.
   const photo = <Avatar transition={0} name={profile.full_name} url={profile.avatar_url} size={AVATAR_PHOTO} userId={own ? undefined : profile.id} online={own ? false : undefined} />;
   const name = (
@@ -194,19 +197,18 @@ export function ProfileHeader({
           </View>
         ) : null}
 
-        {school || study ? (
-          <View style={styles.chipRow}>
+        {school || major || year ? (
+          <View style={styles.study} accessible accessibilityLabel={spoken}>
             {school ? (
-              <View style={styles.chip}>
-                <Icon name="school-outline" size={13} color={colors.muted} />
-                <Text style={styles.chipText} numberOfLines={1}>
-                  {school}
-                </Text>
-              </View>
+              <Text style={styles.school} numberOfLines={2}>
+                {school}
+              </Text>
             ) : null}
-            {study ? (
-              <Text style={styles.study} numberOfLines={2}>
-                {study}
+            {major || year ? (
+              <Text style={styles.studyLine} numberOfLines={2}>
+                {major}
+                {major && year ? <Text style={styles.studyDot}>{"  \u00b7  "}</Text> : null}
+                {year ? <Text style={styles.studyYear}>{year}</Text> : null}
               </Text>
             ) : null}
           </View>
@@ -274,12 +276,14 @@ const useStyles = makeStyles((colors) => ({
   // Right under the name: the handle, small and grey, with the QR button.
   handleRow: { marginTop: 2, flexDirection: "row", alignItems: "center", gap: 6, maxWidth: "100%" },
   handle: { fontSize: 14, color: colors.muted, flexShrink: 1 },
-  // The university in a soft pill, the major and class year beside it ("Computer Science · '28").
-  chipRow: { marginTop: 10, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: space.sm },
-  chip: { flexDirection: "row", alignItems: "center", gap: 5, height: 26, paddingHorizontal: 10, borderRadius: radius.pill, backgroundColor: colors.input, maxWidth: "100%" },
-  chipText: { fontSize: 13, fontWeight: "600", color: colors.muted, flexShrink: 1 },
-  study: { fontSize: 14, color: colors.text, flexShrink: 1 },
-  bio: { marginTop: 10, fontSize: 15, lineHeight: 20, color: colors.text },
+  // Under the handle: the university in bold, the major and the class year under it in grey (the year in the text
+  // colour, a quiet dot between them), then the bio.
+  study: { marginTop: 12, gap: 2 },
+  school: { fontSize: 17, lineHeight: 22, fontWeight: "700", color: colors.text },
+  studyLine: { fontSize: 15, lineHeight: 20, color: colors.muted },
+  studyDot: { color: colors.faint },
+  studyYear: { fontWeight: "600", color: colors.text },
+  bio: { marginTop: 10, fontSize: 15, lineHeight: 21, color: colors.text },
   // The card with the numbers: a soft panel with four columns.
   stats: { marginTop: 14, flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 4, borderRadius: 18, backgroundColor: colors.panel },
   stat: { flex: 1, alignItems: "center", gap: 1, paddingHorizontal: 2 },

@@ -26,7 +26,7 @@ const FEW_FOLLOWS = 3;
 const NO_CONTEXT: ForYouContext = {};
 
 /**
- * For you, the Events tab's first page: the campus's upcoming events in the order the ranking puts them for this person
+ * For you, the Events screen's first page: the campus's upcoming events in the order the ranking puts them for this person
  * (rankEvents in packages/shared: picked interests, what they keep saving and opening, the organizations they follow,
  * how soon, how many others saved it), narrowed by the bar's filters like the All page. Signed out, or with nothing
  * known yet, it is soonest-and-most-saved first. Until interests are picked it asks once, in a single line that opens

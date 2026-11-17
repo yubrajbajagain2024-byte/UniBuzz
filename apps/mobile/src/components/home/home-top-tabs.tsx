@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HOME_BRAND, HOME_TABS, type HomeSection } from "@apartment-book/shared";
 import { Avatar } from "@/components/avatar";
-import { HEADER_ACTION_SIZE, HeaderActions } from "@/components/header-actions";
+import { HEADER_ACTION_SIZE, HeaderActions, headerActionsWidth } from "@/components/header-actions";
 import { SlidingTabs } from "@/components/sliding-tabs";
 import { hapticTap } from "@/lib/haptics";
 import { SCOPE_TOGGLE_SHOWN, useHomeScope } from "@/lib/home-scope";
@@ -43,7 +43,8 @@ const SIDE = 44;
  * and the bell's inset from the edge), your photo at the left of the left one. The same width both sides keeps the
  * wordmark centred on the screen.
  */
-const SIDE_SLOT = 2 * HEADER_ACTION_SIZE + 4 + (SIDE - HEADER_ACTION_SIZE) / 2;
+// As wide as the right side's three buttons (the calendar, the magnifier, the bell), on both sides, so the wordmark stays centred.
+const SIDE_SLOT = headerActionsWidth(3) + (SIDE - HEADER_ACTION_SIZE) / 2;
 const LABEL_SIZE = 16;
 /** The toggle: each segment this wide, the sliding thumb inset by the pill's padding. */
 const SEGMENT = 108;
@@ -106,8 +107,9 @@ export function campusSegments(profile: { university_id: string | null; universi
 /**
  * Floating top bar of Home, X style, in three rows. Row 1: your photo in a gradient ring on the left, which opens your
  * menu (ProfileMenuSheet: your profile, Upload, Saved, Settings, Community Guidelines, Log out; signed out, log in); the
- * UniBuzz wordmark in the middle (it reads "Following" while that feed shows); on the right the magnifier (the search
- * screen) and the Notifications bell (it opens the notifications screen; its badge counts the unread). Row 2: the Home tabs (Orbit | Buzz | Reels) side by side in
+ * UniBuzz wordmark in the middle (it reads "Following" while that feed shows); on the right the calendar (the campus's
+ * Events, a screen of its own since the bottom bar became icons only), the magnifier (the search screen) and the
+ * Notifications bell (it opens the notifications screen; its badge counts the unread). Row 2: the Home tabs (Orbit | Buzz | Reels) side by side in
  * the middle of the row (SlidingTabs' TAB_GAP apart, as in every tab row) with X's sliding underline (violet, as wide as
  * the label), Buzz's lime mask hung just before its label while Buzz is near. No line under the bar: it is the screen's
  * own colour, so the tabs, the stories and the feed read as one seamless surface. Row 3: the Campus | Global toggle, a small
@@ -117,8 +119,8 @@ export function campusSegments(profile: { university_id: string | null; universi
  * is the pager's offset in points and `pageWidth` the width of one page: the underline slides, the labels crossfade (see
  * SlidingTabs) and the bar's solid background (colors.bar) fades out towards Reels with the finger, all
  * on the native driver. `overVideo` says when the text, icons and the toggle turn white and glassy for the video: Home
- * flips it halfway between Posts and Reels. Creating starts from the floating "+" at the bottom right (X's compose
- * button) and the menu's Upload; your photo keeps the left slot over the Reels video too. `section` is the section committed once the pager settles: what screen readers hear as selected
+ * flips it halfway between Posts and Reels. Creating starts from Create in the middle of the bottom bar and the menu's
+ * Upload; the calendar on the right opens Events; your photo keeps the left slot over the Reels video too. `section` is the section committed once the pager settles: what screen readers hear as selected
  * follows it. `translateY` slides the whole bar up out of the way as the page on screen scrolls down and back as soon as
  * it scrolls up, Instagram style (see useCollapsingHeader). Memoized: Home mounting a page ahead of time leaves it alone.
  */
@@ -221,7 +223,7 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
             </View>
           </View>
           <View style={[styles.sideSlot, styles.sideEnd]}>
-            <HeaderActions color={fg} iconStyle={overVideo ? styles.shadow : undefined} />
+            <HeaderActions events color={fg} iconStyle={overVideo ? styles.shadow : undefined} />
           </View>
         </View>
         <View style={styles.row}>

@@ -3,7 +3,7 @@
 appId: host.exp.Exponent
 ---
 - extendedWaitUntil:
-    visible: "Create"
+    visible: "Create, .*"
     timeout: 120000
 - swipe:
     start: "88%,10%"
@@ -50,7 +50,7 @@ appId: host.exp.Exponent
       - tapOn: "Close"
 - runFlow:
     when:
-      notVisible: "Create"
+      notVisible: "Create, .*"
     commands:
       - back
 # A words-only post, then a post with comments: "View all 2 comments" and the newest comment under the caption.

@@ -7,6 +7,8 @@ export * from "./share";
 export * from "./buzz";
 export * from "./trust-safety";
 export * from "./message-media";
+export * from "./stickers";
+export * from "./beauty";
 export * from "./message-replies";
 export * from "./calls";
 export * from "./snaps";
