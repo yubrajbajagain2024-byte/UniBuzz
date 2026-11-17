@@ -13,14 +13,20 @@ export const ViewerSwipeContext = createContext<ViewerSwipe | null>(null);
 
 /** How far a finger moves before a page decides what the swipe is for: sideways, or up and down (the next post). */
 const DECIDE = 10;
-/** A swipe that starts this close to the left edge always goes back, as the system's back swipe does, even mid-carousel. */
-const EDGE = 24;
-/** Let go past this share of the page's width, or flicked that way faster than this, a pull goes on back; otherwise the page springs home. */
+/**
+ * Let go past this share of the page's width, or flicked to the right faster than BACK_VELOCITY after at least
+ * BACK_FLICK_MIN points, a pull goes on back; otherwise the page springs home. The flick needs a little travel of its own,
+ * so a quick brush of the screen never closes the viewer.
+ */
 const BACK_SHARE = 0.3;
 const BACK_VELOCITY = 650;
+const BACK_FLICK_MIN = 40;
 /** A flick this fast moves a carousel on by one, however little it moved. */
 const FLICK = 300;
-/** The share of a pull past a carousel's first or last slide that shows, where there is nothing further (on the Reels tab). */
+/**
+ * The share of a pull that shows where there is nothing further: past a carousel's last slide (and its first, on the
+ * Reels tab), and a back pull turned round to the left. The edge resists, and the strip or page springs back on letting go.
+ */
 const RUBBER = 0.3;
 /**
  * How long after a swipe lets go a tap on the page still counts as part of it. The viewer is a modal screen, outside the
@@ -33,17 +39,21 @@ const HOME_SPRING = { damping: 26, stiffness: 320, mass: 1 };
 
 /**
  * What a sideways swipe on a page does: move its carousel to the next or previous slide ("slide"), pull the page back
- * towards where the viewer was opened from ("back"), or nothing (left to what is around the page). A carousel keeps every
- * swipe it can follow; one that has no slide left that way, a page without a carousel, and any swipe in from the left
- * edge go back. `dx` is the finger's sideways travel so far (positive: to the right), `startX` where it touched down,
- * `at` the carousel's position in slides (0 at the first), `count` its slides.
+ * towards where the viewer was opened from ("back"), or nothing (left to what is around the page). The viewer goes back
+ * only one way: a swipe to the right on a carousel's first slide, or on a page with one picture. Every other sideways
+ * swipe on a carousel moves it, past its last slide against the edge's resistance (it springs back), never closing the
+ * viewer, wherever the finger starts. `dx` is the finger's sideways travel so far (positive: to the right), `at` the
+ * carousel's position in slides (0 at the first), `count` its slides.
  */
-export function swipeChoice(dx: number, startX: number, at: number, count: number, canGoBack: boolean): "slide" | "back" | "none" {
+export function swipeChoice(dx: number, at: number, count: number, canGoBack: boolean): "slide" | "back" | "none" {
   "worklet";
-  if (dx > 0 && startX < EDGE && canGoBack) return "back";
-  if (count > 1 && (dx < 0 ? at < count - 1.01 : at > 0.01)) return "slide";
-  if (canGoBack) return "back";
-  return count > 1 ? "slide" : "none";
+  if (count > 1) {
+    // To the next slide, or back towards the first while the strip is past it: the carousel follows the finger.
+    if (dx < 0 || at > 0.01) return "slide";
+    // On the first slide, to the right: back, in the viewer; on the Reels tab, the first slide's edge resists.
+    return canGoBack ? "back" : "slide";
+  }
+  return dx > 0 && canGoBack ? "back" : "none";
 }
 
 /** A carousel's slides: how far along its strip is (points, 0 at the first slide, negative after) and what to do once it lands on one. */
@@ -51,9 +61,10 @@ export type PageSlides = { count: number; pos: SharedValue<number>; onLand: (ind
 
 /**
  * The sideways swipe on one of the viewer's pages, TikTok and iOS style. On a post with several photos or videos it moves
- * between them, following the finger; past the last one either way (or in from the left edge) it pulls the whole page
- * back towards the post it was opened from, following the finger too, and let go far enough or with a flick, it goes
- * back (see ViewerSwipe), otherwise the page springs home. Up and down is left to the pager between posts, and a tap or a
+ * between them, following the finger, the edge resisting past the last one; only a swipe to the right on the first one
+ * (or on a page with one picture) pulls the whole page back towards the post it was opened from, following the finger
+ * too, and let go far enough or with a flick to the right, it goes back (see ViewerSwipe), otherwise the page springs
+ * home (see swipeChoice). Up and down is left to the pager between posts, and a tap or a
  * double tap still reaches the page. Off the viewer (no ViewerSwipe) it only moves a carousel. `swipedJustNow` tells a tap
  * handler on the page that the touch it is about to act on was a swipe (or the tail of one): it should do nothing.
  * `locked` (above 0 while a photo on the page is zoomed, or its video's timeline is being scrubbed) leaves the touch to
@@ -104,7 +115,7 @@ export function usePageSwipe(width: number, slides: PageSlides | null, locked?: 
             return;
           }
           if (Math.abs(dx) <= DECIDE) return;
-          const choice = swipeChoice(dx, touchX.value, -strip.value / width, count, drag !== null);
+          const choice = swipeChoice(dx, -strip.value / width, count, drag !== null);
           if (choice === "none") {
             manager.fail();
             return;
@@ -127,7 +138,9 @@ export function usePageSwipe(width: number, slides: PageSlides | null, locked?: 
             const last = -(count - 1) * width;
             strip.value = x > 0 ? x * RUBBER : x < last ? last + (x - last) * RUBBER : x;
           } else if (mode.value === 2 && drag) {
-            drag.value = e.translationX - grab.value;
+            // A back pull goes to the right; turned round to the left, it only stretches against the edge.
+            const x = e.translationX - grab.value;
+            drag.value = x >= 0 ? x : x * RUBBER;
           }
         })
         .onEnd((e) => {
@@ -142,7 +155,7 @@ export function usePageSwipe(width: number, slides: PageSlides | null, locked?: 
             });
           } else if (mode.value === 2 && drag && close) {
             const pulled = drag.value;
-            const far = Math.abs(pulled) > width * BACK_SHARE || (Math.abs(e.velocityX) > BACK_VELOCITY && Math.sign(e.velocityX) === Math.sign(pulled));
+            const far = pulled > width * BACK_SHARE || (e.velocityX > BACK_VELOCITY && pulled > BACK_FLICK_MIN);
             if (far) close(e.velocityX);
             else drag.value = withSpring(0, { ...HOME_SPRING, velocity: e.velocityX });
           }

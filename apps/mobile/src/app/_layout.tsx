@@ -86,6 +86,8 @@ function ThemedStack() {
         <Stack.Screen name="find-people" options={{ title: "Search" }} />
         {/* The search screen (people, topics, posts, what is popular) draws its own bar; opened from the magnifier beside the bell. */}
         <Stack.Screen name="search" options={{ headerShown: false }} />
+        {/* Events draws its own top bar (Back, the big title, Saved, then For you | All events): opened from Home's calendar. */}
+        <Stack.Screen name="events/index" options={{ headerShown: false }} />
         <Stack.Screen name="events/[id]" options={{ title: "Event" }} />
         <Stack.Screen name="events/saved" options={{ title: "Saved events" }} />
         <Stack.Screen name="events/interests" options={{ title: "Interests", presentation: "modal" }} />

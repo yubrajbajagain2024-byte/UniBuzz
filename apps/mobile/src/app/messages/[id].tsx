@@ -45,7 +45,7 @@ import { CallBanner } from "@/components/calls/call-banner";
 import { useCalls } from "@/components/calls/call-provider";
 import { CALLS_PAUSED } from "@/lib/calls";
 import { AnonymityBar } from "@/components/messages/anonymity-bar";
-import { CHAT_EDGE, ChatHeader } from "@/components/messages/chat-header";
+import { CHAT_EDGE, ChatHeader, chatPeerFace } from "@/components/messages/chat-header";
 import { shareVideoThumbnail } from "@/components/messages/attachment-thumb";
 import { barRestingPad, Composer, ComposerNotice, keyboardLift, type ComposerReply } from "@/components/messages/composer";
 import { MediaViewer, type MediaViewerItem } from "@/components/messages/media-viewer";
@@ -731,6 +731,17 @@ function Chat({
     sendNew("", [item], replyTo);
   }
 
+  /**
+   * A sticker from the sheet: sent at once as a message of its own (one emoji, which the chat draws large), answering
+   * the quoted message if one is up. Whatever is typed in the field stays there for the next message.
+   */
+  function sendSticker(sticker: string) {
+    if (block !== "none") return;
+    if (replyTo) animateLayout();
+    setReplyTo(null);
+    sendNew(sticker, [], replyTo);
+  }
+
   /** A message of mine on screen at once (sending), then delivered: words, files or both, answering `answering` if any. */
   function sendNew(body: string, items: PendingAttachment[], answering: ChatMessage | null) {
     const me = membersById.get(userId) ?? { id: userId, full_name: "You", avatar_url: null };
@@ -1042,6 +1053,13 @@ function Chat({
 
   // Newest first: the list is inverted, so it opens at the bottom and stays there as the keyboard comes and goes.
   const data = useMemo(() => [...messages].reverse(), [messages]);
+  /**
+   * The face beside the other side's messages in a one-to-one chat: the header's, by the same rules (an anonymous
+   * poster's mask while hidden, a business's logo). In a group each sender's own. A tap opens the person's profile,
+   * never a hidden poster's or a business's staff member's.
+   */
+  const peerFace = useMemo(() => chatPeerFace(conversation), [conversation]);
+  const peerProfile = !isGroup && peerFace && !peerFace.anonymous && !peerFace.business ? (other?.id ?? null) : null;
   const renderItem = useCallback<ListRenderItem<ChatMessage>>(
     ({ item: m, index }) => {
       const i = messages.length - 1 - index;
@@ -1077,10 +1095,12 @@ function Chat({
           onReveal={revealTime}
           onJumpTo={jumpFromQuote}
           onPressSender={openProfile}
+          face={mine ? undefined : isGroup ? (m.sender ? { name: m.sender.full_name, url: m.sender.avatar_url, anonymous: false } : { name: "Someone", url: null, anonymous: true }) : peerFace}
+          onPressFace={mine ? undefined : isGroup ? (m.sender ? () => openProfile(m.sender!.id) : undefined) : peerProfile ? () => openProfile(peerProfile) : undefined}
         />
       );
     },
-    [messages, userId, isGroup, lastMine, receipt, seenAt, highlightId, revealedId, mediaWidth, resolveMedia, resolveReply, openMedia, openFile, openSnapViewer, openSnapActivity, onCall, onActions, startReply, revealTime, jumpFromQuote, openProfile],
+    [messages, userId, isGroup, lastMine, receipt, seenAt, highlightId, revealedId, mediaWidth, resolveMedia, resolveReply, openMedia, openFile, openSnapViewer, openSnapActivity, onCall, onActions, startReply, revealTime, jumpFromQuote, openProfile, peerFace, peerProfile],
   );
 
   const notice =
@@ -1148,6 +1168,7 @@ function Chat({
             onRemoveItem={removePicked}
             onSend={send}
             onSendVoice={hiddenPoster ? undefined : sendVoice}
+            onSendSticker={sendSticker}
             placeholder={hiddenPoster ? "Message anonymously" : undefined}
             reply={composerReply}
             onCancelReply={cancelReply}

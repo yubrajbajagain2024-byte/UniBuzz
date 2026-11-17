@@ -17,6 +17,12 @@ import { BuzzStage } from "@/components/compose/buzz-stage";
 import { DraftsSheet } from "@/components/compose/drafts-sheet";
 import { GallerySheet } from "@/components/compose/gallery-sheet";
 import { ModeSwitcher } from "@/components/compose/mode-switcher";
+import { BeautyRow } from "@/components/compose/beauty-row";
+import { BeautyPreview } from "@/components/compose/beauty-preview";
+import { BEAUTY_AVAILABLE, BEAUTY_LIVE } from "@/lib/beauty-gl";
+import { applyBeautyToPhoto } from "@/lib/beauty-photo";
+import { useBeautyChoice } from "@/lib/beauty-store";
+import { beautyFilter, beautyLook } from "@apartment-book/shared";
 import { GlassIconButton } from "@/components/glass";
 import { Icon, useBounceOn, type IconName } from "@/components/icon";
 import { Button } from "@/components/ui";
@@ -24,7 +30,7 @@ import { useReduceMotion } from "@/lib/accessibility";
 import { useDrafts, type Draft } from "@/lib/compose-drafts";
 import { clock, photoFromCamera, videoFromCamera, videoStill } from "@/lib/compose-media";
 import { REEL_MAX_SECONDS, compose, composeNoun, isListing, roomFor, useCompose, type ComposeMedia, type ListingMode } from "@/lib/compose-store";
-import { alertWithHaptic, hapticSoft } from "@/lib/haptics";
+import { alertWithHaptic, hapticSelect, hapticSoft } from "@/lib/haptics";
 import { openHomeSection } from "@/lib/home-section";
 import { useSession } from "@/lib/session";
 import { prepareSnap } from "@/lib/snap-capture";
@@ -38,12 +44,15 @@ import { useAppTheme } from "@/lib/theme-provider";
  */
 type CameraMode = "post" | "reel" | "buzz" | "snap" | ListingMode;
 
-/** Along the bottom, left to right: BUZZ at the far left, SNAP at the far right; the camera opens on POST. */
+/**
+ * Along the bottom, left to right: BUZZ, SNAP, POST, REEL. The bar's Create opens the camera on SNAP, in the middle of
+ * the screen with BUZZ on its left and POST and REEL on its right (the story tray's + and Upload open it on POST).
+ */
 const MODES: { value: CameraMode; label: string }[] = [
   { value: "buzz", label: "BUZZ" },
+  { value: "snap", label: "SNAP" },
   { value: "post", label: "POST" },
   { value: "reel", label: "REEL" },
-  { value: "snap", label: "SNAP" },
 ];
 /** Above the shutter for a Snap or a listing: a photo or a video. */
 const CAPTURE: { value: "photo" | "video"; label: string }[] = [
@@ -82,12 +91,14 @@ const SIMULATOR = Platform.OS === "ios" && !Device.isDevice;
 /**
  * Create, TikTok's way: the + opens straight onto the live camera, full screen. The picture fills a rounded stage with
  * the camera's switches down its right edge (flip, flash, timer), the capture choices above the shutter, and below the
- * stage the library's newest picture (the in-app gallery) at the bottom left, BUZZ | POST | REEL | SNAP, and the drafts.
+ * stage the library's newest picture (the in-app gallery) at the bottom left, BUZZ | SNAP | POST | REEL (the chosen one
+ * in the middle, the row gliding as it changes), and the drafts.
  * POST and REEL are one camera: the same stage, the same switches and the same row above the shutter (3m, 60s, 15s,
  * Photo), so moving between them only moves the choice in that row, and the camera never restarts. Tap the shutter
  * for a photo, or to start and stop a video; pinch to zoom, double-tap to flip, swipe sideways to change mode. A post's
  * or reel's shot goes to the editor at once; a Snap goes to Send To (app/snap). BUZZ turns the stage into an anonymous
- * text composer (components/compose/buzz-stage.tsx) while the camera pauses underneath; its X comes back to POST.
+ * text composer (components/compose/buzz-stage.tsx) while the camera pauses underneath; its X comes back to the mode
+ * the camera opened on (SNAP from the bar's Create, POST otherwise).
  * Minimal, as TikTok's: the switches are bare icons, and a change of flash, timer or lens is told in a passing pill
  * at the top, as the iPhone's camera does.
  *
@@ -136,6 +147,11 @@ export default function CameraScreen() {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [draftsOpen, setDraftsOpen] = useState(false);
   const [latest, setLatest] = useState<string | null>(null);
+  /** The beauty filter and its strength, remembered between visits; the row of thumbnails is open or not. */
+  const beauty = useBeautyChoice();
+  const [beautyOpen, setBeautyOpen] = useState(false);
+  /** Set when the filter's live picture could not start: the camera's own preview shows, and photos are still filtered. */
+  const [beautyPreviewOff, setBeautyPreviewOff] = useState(false);
   /** The passing pill at the top ("Flash On", "Timer 3s", "Front Camera"): a fresh id each time, so it fades in again. */
   const [notice, setNotice] = useState<{ id: number; text: string } | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -156,6 +172,8 @@ export default function CameraScreen() {
 
   const mode: CameraMode = extraMode ?? s.mode;
   const buzz = mode === "buzz";
+  /** Where BUZZ's X comes back to: SNAP when the camera opened on it (the bar's Create), else POST, as before. */
+  const home: CameraMode = params.mode === "snap" ? "snap" : "post";
   /** A roommate post or an item (Explore's +): one kind only, no modes to switch, and Skip for one without pictures. */
   const listing = isListing(s.mode);
   // Only this kind's drafts: a post's drafts belong to the Home +, a listing's to Explore's.
@@ -169,6 +187,17 @@ export default function CameraScreen() {
   const maxSeconds = shared && shot !== "photo" ? Number(shot) : mode === "snap" ? SNAP_LIMITS.maxVideoSeconds : LISTING_VIDEO_MAX;
   const cameraMode = HOLD_VIDEO && !listing ? "video" : video ? "video" : "picture";
   const canCapture = mode === "snap" || (video ? room.videos > 0 : room.photos > 0);
+  /**
+   * The beauty filters: offered wherever a photo is taken (POST, SNAP and a listing's photos; REEL is video only), and
+   * only in a build that has them. A video is recorded by the camera itself, which these filters cannot reach, so while
+   * a video is being shot the filter steps aside (the row says so) and nothing on screen is filtered.
+   */
+  const beautyOffered = BEAUTY_AVAILABLE && !buzz;
+  const beautyOn = beautyOffered && beauty.filter !== null && !video;
+  const beautyLookNow = useMemo(() => beautyLook(beautyOn ? beauty.filter : null, beauty.intensity), [beautyOn, beauty.filter, beauty.intensity]);
+  // The filter's own live picture covers the camera's preview; without it (Android for now, or a preview that would not
+  // start) the camera's own preview shows and the filter is put on as the photo is taken.
+  const beautyLive = beautyOn && BEAUTY_LIVE && !beautyPreviewOff;
   const micOff = micPermission !== null && !micPermission.granted;
 
   // A link straight to /compose?mode=reel starts in that mode (the + sets it before opening); `upload` (the profile
@@ -289,6 +318,21 @@ export default function CameraScreen() {
     [router],
   );
 
+  /**
+   * The photo with the chosen look on it, drawn by the same shader the live picture uses (lib/beauty-photo.ts). A phone
+   * that cannot draw it keeps the camera's own photo, with a word about it rather than a failed shot.
+   */
+  async function filtered(shot: { uri: string; width: number; height: number }) {
+    if (!beautyOn || !beauty.filter) return shot;
+    try {
+      return await applyBeautyToPhoto(shot, beautyLookNow);
+    } catch (e) {
+      console.warn("[beauty] the photo could not be filtered", e);
+      tell("Saved without the filter");
+      return shot;
+    }
+  }
+
   async function takePhoto() {
     if (!camera.current) return;
     setBusy(true);
@@ -296,8 +340,9 @@ export default function CameraScreen() {
     if (!reduceMotion) flashOverlay.value = withSequence(withTiming(0.85, { duration: 60 }), withTiming(0, { duration: 260 }));
     try {
       const shot = await camera.current.takePictureAsync({ quality: mode === "snap" ? 1 : 0.92, exif: false });
-      if (mode === "snap") await sendAsSnap({ uri: shot.uri, width: shot.width, height: shot.height, type: "image", mimeType: "image/jpeg" });
-      else took([photoFromCamera(shot)]);
+      const picture = await filtered(shot);
+      if (mode === "snap") await sendAsSnap({ uri: picture.uri, width: picture.width, height: picture.height, type: "image", mimeType: "image/jpeg" });
+      else took([photoFromCamera(picture)]);
     } catch (e) {
       alertWithHaptic("error", "Couldn't take the photo", e instanceof Error ? e.message : "Please try again.");
     } finally {
@@ -365,10 +410,10 @@ export default function CameraScreen() {
 
   function close() {
     if (recording) return;
-    // BUZZ's X comes back to the camera, on POST, without leaving the create flow.
+    // BUZZ's X comes back to the camera, on the mode it opened on, without leaving the create flow.
     if (buzz) {
       Keyboard.dismiss();
-      return switchMode("post");
+      return switchMode(home);
     }
     // Adding to a post (the editor's +): back to it with nothing new.
     if (adding) return openEditor();
@@ -484,6 +529,15 @@ export default function CameraScreen() {
     ),
   );
 
+  const modeSwipes = Gesture.Exclusive(
+    Gesture.Fling()
+      .direction(Directions.LEFT)
+      .onEnd(() => runOnJS(stepMode)(1)),
+    Gesture.Fling()
+      .direction(Directions.RIGHT)
+      .onEnd(() => runOnJS(stepMode)(-1)),
+  );
+
   const flashStyle = useAnimatedStyle(() => ({ opacity: flashOverlay.value }));
   const veilStyle = useAnimatedStyle(() => ({ opacity: veil.value }));
   const progressStyle = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` }));
@@ -532,6 +586,8 @@ export default function CameraScreen() {
         ) : (
           <View style={styles.dark} />
         )}
+        {/* The filter's own live picture, over the camera's preview: what is on screen is what the photo will be. */}
+        {cameraReady && beautyLive ? <BeautyPreview camera={camera.current} look={beautyLookNow} facing={facing} onError={() => setBeautyPreviewOff(true)} /> : null}
         {cameraReady ? <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.veil, veilStyle]} /> : null}
         {cameraReady && !buzz ? (
           <GestureDetector gesture={gestures}>
@@ -539,7 +595,7 @@ export default function CameraScreen() {
           </GestureDetector>
         ) : null}
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.flash, flashStyle]} />
-        {buzz ? <BuzzStage stageTop={stageTop} onLeave={() => switchMode("post")} onPosted={buzzPosted} /> : null}
+        {buzz ? <BuzzStage stageTop={stageTop} onLeave={() => switchMode(home)} onPosted={buzzPosted} /> : null}
 
         {recording ? (
           <View style={styles.progressTrack} pointerEvents="none">
@@ -583,6 +639,18 @@ export default function CameraScreen() {
           <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(180)} exiting={reduceMotion ? undefined : FadeOut.duration(120)} style={styles.rail} pointerEvents="box-none">
             <RailButton icon={flashIcon.icon} sf={flashIcon.sf} label={flashIcon.label} active={flash !== "off"} bounce={flashBounce} onPress={cycleFlash} />
             <RailButton icon="timer-outline" sf="timer" label={timer === 0 ? "Timer off" : `Timer ${timer} seconds`} active={timer > 0} bounce={timerBounce} badge={timer > 0 ? String(timer) : undefined} onPress={cycleTimer} />
+            {beautyOffered ? (
+              <RailButton
+                icon={beauty.filter ? "sparkles" : "sparkles-outline"}
+                sf="sparkles"
+                label={beauty.filter ? `Beauty filter on, ${beautyFilter(beauty.filter).name}` : "Beauty filters"}
+                active={beauty.filter !== null}
+                onPress={() => {
+                  hapticSelect();
+                  setBeautyOpen((open) => !open);
+                }}
+              />
+            ) : null}
           </Animated.View>
         ) : null}
 
@@ -601,6 +669,15 @@ export default function CameraScreen() {
                 <Icon name="mic-off" size={14} color="#fff" />
                 <Text style={styles.micNoteText}>No sound: allow the microphone</Text>
               </Pressable>
+            ) : null}
+            {beautyOffered && beautyOpen && !recording && countdown === null ? (
+              <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(180)} exiting={reduceMotion ? undefined : FadeOut.duration(140)} style={styles.beauty}>
+                {video ? (
+                  <Text style={styles.beautyNote}>Filters are for photos; a video records as it is.</Text>
+                ) : (
+                  <BeautyRow filter={beauty.filter} intensity={beauty.intensity} onFilter={beauty.setFilter} onIntensity={beauty.setIntensity} />
+                )}
+              </Animated.View>
             ) : null}
             {!recording && countdown === null ? (
               // POST and REEL keep the very same row (its choice glides between them); a Snap's or a listing's fades in.
@@ -646,15 +723,18 @@ export default function CameraScreen() {
             <View style={styles.library}>{latest && mode !== "snap" ? <Image source={{ uri: latest }} style={StyleSheet.absoluteFill} contentFit="cover" transition={160} /> : <Icon name="images-outline" size={20} color="#fff" />}</View>
           </Pressable>
         )}
-        <View style={styles.modes}>
-          {listing ? (
-            <Text style={styles.modeFixed}>{s.mode === "roommate" ? "ROOMMATE POST" : "SELL AN ITEM"}</Text>
-          ) : adding ? (
-            <Text style={styles.modeFixed}>{mode === "reel" ? "REEL" : "POST"}</Text>
-          ) : (
-            <ModeSwitcher options={MODES} value={mode} onChange={switchMode} disabled={recording || countdown !== null} slide={false} />
-          )}
-        </View>
+        {/* A swipe along the row changes mode too, as one across the stage does. */}
+        <GestureDetector gesture={modeSwipes}>
+          <View style={styles.modes}>
+            {listing ? (
+              <Text style={styles.modeFixed}>{s.mode === "roommate" ? "ROOMMATE POST" : "SELL AN ITEM"}</Text>
+            ) : adding ? (
+              <Text style={styles.modeFixed}>{mode === "reel" ? "REEL" : "POST"}</Text>
+            ) : (
+              <ModeSwitcher options={MODES} value={mode} onChange={switchMode} disabled={recording || countdown !== null} fade dot />
+            )}
+          </View>
+        </GestureDetector>
         {shownDrafts.length > 0 && !adding && !buzz ? (
           <Pressable onPress={() => setDraftsOpen(true)} disabled={recording} style={({ pressed }) => [styles.side, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel={`Drafts, ${shownDrafts.length}`} hitSlop={8}>
             <View style={styles.draftsIcon}>
@@ -838,8 +918,11 @@ const styles = StyleSheet.create({
   micNote: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, height: 28, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.5)" },
   micNoteText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   lengths: { height: 36, alignSelf: "stretch", justifyContent: "center" },
+  beauty: { alignSelf: "stretch", paddingBottom: 10 },
+  beautyNote: { color: "#fff", fontSize: 13, fontWeight: "600", textAlign: "center", paddingVertical: 22, textShadowColor: "rgba(0,0,0,0.5)", textShadowRadius: 4 },
   bar: { position: "absolute", left: 0, right: 0, flexDirection: "row", alignItems: "center", paddingHorizontal: 16 },
-  side: { width: 56, height: 44, alignItems: "center", justifyContent: "center" },
+  // 46 wide: room enough for the library and drafts, and for BUZZ | SNAP | POST | REEL between them with SNAP in the middle.
+  side: { width: 46, height: 44, alignItems: "center", justifyContent: "center" },
   library: { width: 38, height: 38, borderRadius: 10, borderCurve: "continuous", borderWidth: 2, borderColor: "rgba(255,255,255,0.92)", overflow: "hidden", alignItems: "center", justifyContent: "center", backgroundColor: "#2a2a30" },
   modes: { flex: 1, justifyContent: "center" },
   modeFixed: { color: "#fff", fontSize: 15, fontWeight: "700", letterSpacing: 0.6, textAlign: "center" },

@@ -28,10 +28,11 @@ const CAN_BLUR = (() => {
  * `media` is a control over photos and video (clear glass on a dark dimming layer, the same in both themes), and
  * `float` is a chat's floating header pill and message bar, see-through so the messages scroll under them as under
  * the Messages app's: regular glass over a thin wash on iOS 26, a system blur over the same wash on older iOS, the
- * translucent bar fill on Android. Everything else in the app is solid. Reduce Transparency, or no Liquid Glass,
- * leaves a fill.
+ * translucent bar fill on Android. `tabs` is the floating bottom bar's frosting: the same layers as `float` over a
+ * denser wash (colors.tabFill), so what scrolls under it shows softly while its icons stay clear. Everything else in the
+ * app is solid. Reduce Transparency, or no Liquid Glass, leaves a fill.
  */
-export type GlassVariant = "bar" | "media" | "float";
+export type GlassVariant = "bar" | "media" | "float" | "tabs";
 
 /** The layers behind a glass control, absolutely filling its parent: put it first, then the control's content. */
 export function GlassBackdrop({ variant = "bar", radius, interactive = false }: { variant?: GlassVariant; radius?: number; interactive?: boolean }) {
@@ -39,16 +40,19 @@ export function GlassBackdrop({ variant = "bar", radius, interactive = false }: 
   const reduce = useReduceTransparency();
   const glass = LIQUID_GLASS && !reduce;
   const shape: ViewStyle = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius, borderCurve: "continuous", overflow: "hidden" };
-  if (variant === "float") {
+  if (variant === "float" || variant === "tabs") {
     // See-through: a blur where the build has one (glass on iOS 26, the system material before it), a wash under it.
+    // Without one, the translucent bar fill; with Reduce Transparency the bottom bar turns solid, as the system's does.
     const blur = !reduce && (glass || CAN_BLUR);
+    const tabs = variant === "tabs";
+    const fill = blur ? (tabs ? colors.tabFill : colors.floatFill) : tabs && reduce ? colors.bar : colors.glass;
     return (
       <>
-        <View pointerEvents="none" style={[shape, { backgroundColor: blur ? colors.floatFill : colors.glass }]} />
+        <View pointerEvents="none" style={[shape, { backgroundColor: fill }]} />
         {glass ? (
           <GlassView pointerEvents="none" style={shape} glassEffectStyle="regular" isInteractive={interactive} colorScheme={isDark ? "dark" : "light"} />
         ) : blur ? (
-          <BlurView pointerEvents="none" style={shape} intensity={55} tint={isDark ? "systemThinMaterialDark" : "systemThinMaterialLight"} />
+          <BlurView pointerEvents="none" style={shape} intensity={tabs ? 80 : 55} tint={isDark ? "systemThinMaterialDark" : "systemThinMaterialLight"} />
         ) : null}
       </>
     );

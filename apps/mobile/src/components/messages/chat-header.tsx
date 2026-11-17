@@ -132,22 +132,37 @@ function TitleCapsule({ title, subtitle, activeNow, keepSubtitleRoom, onPress }:
   );
 }
 
+/** The face of the other side of a one-to-one chat: what its header shows, and what sits beside their messages. */
+export type ChatFace = { name: string; url: string | null; anonymous: boolean; business: boolean };
+
+/**
+ * Who a one-to-one chat is with, as a face, by the same rules everywhere in the chat: an anonymous poster's mask while
+ * they are hidden (never their photo), a business's logo (never the photo of whoever on its staff wrote), otherwise the
+ * other person. Null for a group, where each message carries its sender's own face.
+ */
+export function chatPeerFace(conversation: ConversationSummary): ChatFace | null {
+  if (conversation.type === "group") return null;
+  if (conversation.anonymous?.role === "asker" && conversation.anonymous.hidden) return { name: conversation.title, url: null, anonymous: true, business: false };
+  if (conversation.business) return { name: conversation.business.name, url: conversation.business.logo_url, anonymous: false, business: true };
+  const other = conversation.otherMembers[0];
+  return { name: other?.full_name ?? conversation.title, url: other?.avatar_url ?? null, anonymous: false, business: false };
+}
+
 /** Who the chat is with, as a photo: the other person's, a business's logo, an anonymous poster's mask, or a group's members. */
 function ChatPhoto({ conversation, activeNow, onPress }: { conversation: ConversationSummary; activeNow: boolean; onPress: () => void }) {
   const styles = useStyles();
   const { colors } = useAppTheme();
   const press = usePressScale(0.92, 0.9);
-  const other = conversation.otherMembers[0];
-  const photo =
-    conversation.anonymous?.role === "asker" && conversation.anonymous.hidden ? (
-      <Avatar name={conversation.title} size={PHOTO} anonymous />
-    ) : conversation.business ? (
-      <Avatar name={conversation.business.name} url={conversation.business.logo_url} size={PHOTO} online={false} />
-    ) : conversation.type === "group" ? (
-      <InboxAvatar conversation={conversation} size={PHOTO} />
-    ) : (
-      <Avatar name={other?.full_name ?? conversation.title} url={other?.avatar_url} size={PHOTO} online={activeNow} ringColor={colors.bg} />
-    );
+  const face = chatPeerFace(conversation);
+  const photo = !face ? (
+    <InboxAvatar conversation={conversation} size={PHOTO} />
+  ) : face.anonymous ? (
+    <Avatar name={face.name} size={PHOTO} anonymous />
+  ) : face.business ? (
+    <Avatar name={face.name} url={face.url} size={PHOTO} online={false} />
+  ) : (
+    <Avatar name={face.name} url={face.url} size={PHOTO} online={activeNow} ringColor={colors.bg} />
+  );
   return (
     <AnimatedPressable
       onPress={onPress}

@@ -45,9 +45,15 @@ export type ThemeColors = {
    */
   floatFill: string;
   /**
-   * Chat bubbles. `bubbleMine` is my bubble's fill as two gradient stops, top to bottom: the brand blue deepening a touch
-   * towards the bottom, so white words read at the brand's own contrast or better everywhere on it. `bubble` is the
-   * other side's: a quiet neutral grey a step off the screen, without the blue cast of `input`.
+   * The floating bottom bar's frosting (lib/tab-bar.ts): the wash under its glass (or the blur before iOS 26),
+   * see-through enough for what scrolls under it to show softly, dense enough for the icons to read over anything.
+   */
+  tabFill: string;
+  /**
+   * Chat bubbles. `bubbleMine` is my bubble's fill as two gradient stops, from its top left to its bottom right: the
+   * aurora's blue into its indigo, UniBuzz's own colours, so white words read at 4.5:1 or better everywhere on it in
+   * light (4.7 on the blue, 4.6 on the indigo) and 4.2 or better in dark. `bubble` is the other side's: a quiet neutral
+   * grey a step off the screen, without the blue cast of `input`.
    */
   bubbleMine: readonly [string, string];
   bubble: string;
@@ -125,6 +131,8 @@ export type ThemeColors = {
   mediaControlActive: string;
   /** Behind photos and videos while they load, and the Reels page. */
   mediaBg: string;
+  /** The hairline round a photo or video set on the page (a chat's), so a white picture keeps its edge on a white screen. */
+  mediaEdge: string;
   /** The dimmed screen behind sheets and dialogs. */
   backdrop: string;
   /** The little bar at the top of a sheet that says it can be pulled down: iOS's grabber grey. */
@@ -152,7 +160,8 @@ export const lightColors: ThemeColors = {
   glass: "rgba(255,255,255,0.92)",
   glassEdge: "rgba(0,0,0,0.1)",
   floatFill: "rgba(255,255,255,0.42)",
-  bubbleMine: ["#166fe5", "#1262d0"],
+  tabFill: "rgba(250,250,252,0.74)",
+  bubbleMine: ["#166fe5", "#5468ee"],
   bubble: "#ebebee",
   bg: "#ffffff",
   card: "#ffffff",
@@ -194,6 +203,7 @@ export const lightColors: ThemeColors = {
   mediaControlEdge: "rgba(255,255,255,0.24)",
   mediaControlActive: "rgba(255,255,255,0.28)",
   mediaBg: "#000000",
+  mediaEdge: "rgba(0,0,0,0.08)",
   backdrop: "rgba(0,0,0,0.25)",
   grabber: "#c7c7cc",
   shadow: "#000000",
@@ -214,7 +224,8 @@ export const darkColors: ThemeColors = {
   glass: "rgba(22,22,24,0.92)",
   glassEdge: "rgba(255,255,255,0.14)",
   floatFill: "rgba(28,28,30,0.42)",
-  bubbleMine: ["#1877f2", "#1265d8"],
+  tabFill: "rgba(30,30,33,0.74)",
+  bubbleMine: ["#1877f2", "#5468ee"],
   bubble: "#262628",
   bg: "#000000",
   card: "#1c1c1e",
@@ -256,6 +267,7 @@ export const darkColors: ThemeColors = {
   mediaControlEdge: "rgba(255,255,255,0.24)",
   mediaControlActive: "rgba(255,255,255,0.28)",
   mediaBg: "#000000",
+  mediaEdge: "rgba(255,255,255,0.1)",
   backdrop: "rgba(0,0,0,0.6)",
   grabber: "#5a5a5e",
   shadow: "#000000",

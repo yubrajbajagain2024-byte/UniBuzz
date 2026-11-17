@@ -17,7 +17,7 @@ import { DayHeader, EventsEmpty, iso, RowGap, type EventsPageProps } from "./eve
 type Row = { type: "day"; key: string; label: string } | { type: "event"; key: string; event: EventSummary };
 
 /**
- * All events, the Events tab's second page: everything the campus has coming, in time order, under one heading per
+ * All events, the Events screen's second page: everything the campus has coming, in time order, under one heading per
  * day on the campus's clock, a page at a time from the database (the bar's date pill, the event types picked in the filter sheet and the search narrow it).
  * The rows on screen stay while a new filter loads, so the page never blinks white.
  */

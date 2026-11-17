@@ -1,8 +1,9 @@
+import { useContext } from "react";
 import { useRouter } from "expo-router";
 import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSession } from "@/lib/session";
-import { collapsedRide, tabBarInset } from "@/lib/tab-bar";
+import { collapsedRide, InTabsContext, tabBarInset } from "@/lib/tab-bar";
 import { tabBarCollapse } from "@/lib/tab-bar-collapse";
 import { auroraGradient } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
@@ -14,12 +15,11 @@ const SIZE = 56;
 const RIGHT = 16;
 
 /**
- * The round floating "+" of a feed (Orbit's, Events'), at the bottom right above the bottom bar, X's compose button: the
- * one prominent action, an aurora disc with a soft shadow that dips under the finger (no haptic). When the bottom bar
- * collapses to its Home button (lib/tab-bar-collapse.ts) it becomes that button's twin on the UI thread: the same circle,
- * at the same height, as far in from the right edge as Home is from the left (collapsedRide). With `href`
- * it goes there (signed out, to log in); with `onPress` it does that instead (Orbit's opens the camera, which sends a
- * signed-out person to log in itself).
+ * The round floating "+" of a feed (Explore's new listing, Events' new event), at the bottom right above the bottom bar,
+ * X's compose button: the page's one prominent action, an aurora disc with a soft shadow that dips under the finger (no
+ * haptic). When the bottom bar collapses to the circle of the tab on screen (lib/tab-bar-collapse.ts) it becomes that
+ * circle's twin on the UI thread: the same size, at the same height, as far in from the right edge as the circle is from
+ * the left (collapsedRide). With `href` it goes there (signed out, to log in); with `onPress` it does that instead.
  */
 export function Fab({ label, hint, ...target }: { label: string; hint?: string } & ({ href: string } | { onPress: () => void })) {
   const styles = useStyles();
@@ -27,10 +27,12 @@ export function Fab({ label, hint, ...target }: { label: string; hint?: string }
   const router = useRouter();
   const { user } = useSession();
   const insets = useSafeAreaInsets();
-  const bottom = 20 + tabBarInset(insets);
+  // Off the tabs (Events, pushed from Home) there is no bar to sit above or to ride down beside.
+  const inTabs = useContext(InTabsContext);
+  const bottom = 20 + (inTabs ? tabBarInset(insets) : insets.bottom);
   const to = collapsedRide(insets, bottom, SIZE, RIGHT);
   const ride = useAnimatedStyle(() => {
-    const c = tabBarCollapse.value;
+    const c = inTabs ? tabBarCollapse.value : 0;
     return { transform: [{ translateX: c * to.x }, { translateY: c * to.y }, { scale: 1 + c * (to.scale - 1) }] };
   });
   const press = usePressScale(0.92, 1);

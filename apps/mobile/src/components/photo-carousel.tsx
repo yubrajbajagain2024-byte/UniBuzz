@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, FlatList, Pressable, StyleSheet, Text, View, type GestureResponderEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View, type GestureResponderEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Image } from "expo-image";
 import { useIsFocused } from "expo-router";
 import { VideoView, type VideoPlayer } from "expo-video";
 import { CAN_SHARE_PLAYERS, isLent, markDrawn, useLendablePlayer, useLendings } from "@/lib/video-handoff";
-import { setVideosMuted, useVideosMuted, VIDEO_AUDIO_MODE, videosMuted } from "@/lib/video-sound";
+import { VIDEO_AUDIO_MODE, VIDEO_MUTED } from "@/lib/video-sound";
 import type { FeedMedia } from "@apartment-book/shared";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { hapticSelect } from "@/lib/haptics";
 import { useSectionPager } from "@/lib/section-pager";
 import { Icon } from "@/components/icon";
-import { GlassIconButton } from "@/components/glass";
 import { clock } from "@/components/video-controls";
 
 const DOUBLE_TAP_MS = 260;
@@ -38,8 +37,8 @@ type PhotoCarouselProps = {
    */
   jump?: { index: number; time?: number } | null;
   /**
-   * "watch": a video feed's look (the Housing feed, YouTube style): the sound button at the top right, the time left at
-   * the bottom right, a thin progress line along the bottom edge, and the photo counter at the top left. "post" (default)
+   * "watch": a video feed's look (the Housing feed, YouTube style): the time left at the bottom right, a thin progress
+   * line along the bottom edge, and the photo counter at the top left (no sound button: videos play with their sound on). "post" (default)
    * is the look of a post's frame.
    */
   chrome?: "post" | "watch";
@@ -259,10 +258,9 @@ export function PhotoCarousel({ media, aspect = 4 / 5, onPress, onDoubleTap, act
 
 function VideoSlide({ media, index, width, height, playing, onPlayer, watch = false }: { media: Extract<FeedMedia, { type: "video" }>; index: number; width: number; height: number; playing: boolean; onPlayer: (index: number, player: VideoPlayer | null) => void; watch?: boolean }) {
   const colors = useColors();
-  const styles = useStyles();
   const player = useLendablePlayer(media.playbackUrl, (p) => {
     p.loop = true;
-    p.muted = videosMuted();
+    p.muted = VIDEO_MUTED;
     p.audioMixingMode = VIDEO_AUDIO_MODE;
     // The watch look's time left and progress line: four reports a second is smooth enough for a thin line.
     if (watch) p.timeUpdateEventInterval = 0.25;
@@ -277,10 +275,9 @@ function VideoSlide({ media, index, width, height, playing, onPlayer, watch = fa
     onPlayer(index, player);
     return () => onPlayer(index, null);
   }, [onPlayer, index, player]);
-  const muted = useVideosMuted();
   const [hasFrame, setHasFrame] = useState(false);
-  // Only on the screen on show: a tab or screen left behind (they stay mounted) never plays on unseen, which with one
-  // sound switch for every video could be heard.
+  // Only on the screen on show: a tab or screen left behind (they stay mounted) never plays on unseen, where its sound
+  // (always on) would be heard over what is on screen.
   const onScreen = useIsFocused();
   const shouldPlay = playing && onScreen;
   // While the full-screen viewer plays this player on, it is the viewer's to run; back here, this slide takes charge again.
@@ -291,18 +288,10 @@ function VideoSlide({ media, index, width, height, playing, onPlayer, watch = fa
     if (!shouldPlay) player.pause();
     else if (!player.playing) player.play();
   }, [shouldPlay, player, lendings]);
-  // The sound follows the one switch even while lent: the viewer sets the same, so the two never disagree, and a lent
-  // player no page of the viewer holds (it went past) still hears a change.
+  // Sound on, always (see VIDEO_MUTED): a player that comes back from somewhere else muted is put right.
   useEffect(() => {
-    if (player.muted !== muted) player.muted = muted;
-  }, [muted, player]);
-  // The sound button goes quietly as the video goes full screen (before the viewer's zoom covers it) and comes back
-  // the same way once the video is back here, rather than vanishing under the zoom and popping back after it.
-  const away = isLent(player);
-  const control = useRef(new Animated.Value(away ? 0 : 1)).current;
-  useEffect(() => {
-    Animated.timing(control, { toValue: away ? 0 : 1, duration: away ? 120 : 220, useNativeDriver: true }).start();
-  }, [away, control]);
+    if (player.muted !== VIDEO_MUTED) player.muted = VIDEO_MUTED;
+  }, [player]);
   return (
     <View style={{ width, height, backgroundColor: colors.mediaBg }}>
       <VideoView
@@ -318,9 +307,6 @@ function VideoSlide({ media, index, width, height, playing, onPlayer, watch = fa
       />
       {/* Poster stays on top until the first video frame is painted, so the slide is never a black box. */}
       {media.poster && !hasFrame ? <Image source={{ uri: media.poster }} style={StyleSheet.absoluteFill} contentFit="cover" pointerEvents="none" /> : null}
-      <Animated.View style={[watch ? styles.muteTop : styles.mute, { opacity: control }]} pointerEvents={away ? "none" : "box-none"}>
-        <GlassIconButton icon={muted ? "volume-mute" : "volume-high"} label={muted ? "Unmute" : "Mute"} onPress={() => setVideosMuted(!muted)} variant="media" size={32} iconSize={15} haptic="select" />
-      </Animated.View>
       {watch ? <WatchTimeline duration={media.durationSeconds ?? (player.duration > 0 ? player.duration : null)} time={shouldPlay || time > 0 ? time : 0} /> : null}
     </View>
   );
@@ -352,11 +338,9 @@ const useStyles = makeStyles((colors) => ({
   dotActive: { width: 18, backgroundColor: colors.onMedia },
   videoBadge: { position: "absolute", top: 10, left: 10, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.mediaPill, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   videoBadgeText: { color: colors.onMedia, fontSize: 12, fontWeight: "700" },
-  mute: { position: "absolute", right: 10, bottom: 28 },
   // The watch look.
   counterLeft: { right: undefined, left: 10 },
   dotsWatch: { bottom: 12 },
-  muteTop: { position: "absolute", right: 10, top: 10 },
   timePill: { position: "absolute", right: 10, bottom: 12, backgroundColor: colors.mediaPill, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   timeText: { color: colors.onMedia, fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
   track: { position: "absolute", left: 0, right: 0, bottom: 0, height: 3, backgroundColor: "rgba(255,255,255,0.28)" },

@@ -19,10 +19,10 @@ State University. Sign-up is limited to the email domains on the `universities` 
 (`txstate.edu` today), checked by the form and by a `before insert` trigger on `auth.users`.
 
 - **Social network first.** Lead with people, posts, Stories, Orbit, Buzz, Reels and messages. The
-  bar is Home, Explore, Messages, Events, Profile (search is the magnifier beside the bell). Events
-  is the campus's calendar: the university's feeds and verified organizations. Housing, roommates
-  and the Marketplace are supporting tools on the Explore tab; they must not set the app's
-  identity, navigation or wording outside Explore.
+  app's bar is icons only (Home, Explore, Create, Messages, Profile); the calendar and magnifier by
+  the bell open Events (a website tab) and search. Events is the campus's calendar: the university's
+  feeds and verified organizations. Housing, roommates and the Marketplace are supporting tools on
+  the Explore tab; they must not set the app's identity, navigation or wording outside Explore.
 - **Calls stay hidden for the launch:** keep their code and records; only the owner turns them on.
 - **Three surfaces, one Supabase project:** UniBuzz for students (Next.js website and Expo app);
   UniBuzz Business at `/business` (its own host once `NEXT_PUBLIC_BUSINESS_SITE_URL` is set), where

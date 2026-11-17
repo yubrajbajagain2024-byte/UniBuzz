@@ -119,25 +119,50 @@ sign in with `apartmentbook://dev-login?email=…&password=…` once that dialog
 
 ## Home and the tabs
 
-The bottom bar is Home, Explore, Messages, Events, Profile: five tabs (Profile is your own photo
-in a circle, ringed while the tab is on screen; the person icon signed out). There is no "+" in the bar, and none at the
-top of Home: creating starts from the floating "+" at the bottom right of For you (X's compose button; Buzz has its pen in
-the same place) and the menu under your photo (Upload), which open the camera (Post / Reel / Buzz / Snap). It floats over the content as a rounded
-glass pill, low like Instagram's: just above the home indicator (12pt into the home-indicator inset, 22pt up from the screen's edge on a
-Face ID iPhone; 10pt up where there is no indicator) (`src/app/(tabs)/_layout.tsx`, its size and place in `src/lib/tab-bar.ts`): on iOS 26 real liquid glass, with what scrolls
-under it blurred through, elsewhere a translucent fill; the tab on screen sits in a soft aurora capsule with its icon filled. When you tap
-another tab the capsule glides there from the old one, never blinking or fading: its leading edge moves a beat ahead of its trailing edge,
-so it stretches a touch in flight and settles as it lands. The new tab's symbol bounces once (silently: no haptic), the tab you left returns
-to its plain look with no bounce, and the tabs make room for the capsule, GroupMe style, on a critically damped spring
-(`src/components/floating-tab-bar.tsx`, on Reanimated); every tab's list and floating button keeps `tabBarInset` clear
-under it. (FloatingTabBar can still hold an action in the middle, `action`, which the capsule passes behind but never
-stops on; the app's bar has none.) The bar collapses like Reddit's (iOS 26's tab bar minimising), by the speed of the
-scroll: reading at any pace keeps the whole bar, and only a deliberate flick down a page of Home (For you, Buzz), Explore
-or Events (Messages and your Profile always keep the whole bar), at 700 points a second or more over at least 32 points
+The bottom bar is five icons and no labels: Home, Explore, Create, Messages, Profile (screen readers still hear each
+place, counting Create: "Home, tab, 1 of 5", "Create, 3 of 5", "Messages, tab, 4 of 5, 3 new"). It floats over the
+content as a frosted glass pill, 60pt tall, 14pt in from the screen's sides and low, just above the home indicator
+(12pt into the home-indicator inset, 22pt up from the screen's edge on a Face ID iPhone; 10pt up where there is no
+indicator) (`src/app/(tabs)/_layout.tsx`, its size and place in `src/lib/tab-bar.ts`): on iOS 26 real liquid glass, the
+system's blur before it, over a see-through wash (`tabFill`), so what scrolls under it shows softly, with a hairline
+edge and a soft shadow that lifts it off a white page. Its five places are equal, Create exactly in the middle. Each
+icon is the outlined SF Symbol at rest, in the muted grey, and filled in the text colour on the tab on screen, which
+sits on a capsule washed with the aurora (cyan into violet, faint; 6pt in from the bar's top and bottom, 2pt from its
+ends). Tapping a tab glides the capsule there, its leading edge a beat ahead of its trailing one so it stretches a touch
+in flight and settles, and bounces the new symbol once (silently: no haptic) (`src/components/floating-tab-bar.tsx`, on
+Reanimated; at once with Reduce Motion). Profile is your own photo in a circle (22pt), ringed with the aurora while the
+tab is on screen (the person icon signed out); the unread count is the system's plain red badge. Create (`action`) is a
+plain plus inside a thin aurora ring, 36pt across and nothing filled, so the glass shows through; it opens the
+camera on SNAP (BUZZ | SNAP | POST | REEL; signed out, the login screen) and never becomes the tab on screen; your
+circle in the story tray and Upload in the menu under your photo open it on POST, where a story is shared, and Buzz
+keeps its pen at the bottom right.
+
+**The camera's beauty filters** (2026-11-17, `src/lib/beauty-gl.ts`, `src/components/compose/`, the looks themselves in
+`packages/shared/src/beauty.ts`): the sparkles on the camera's right rail opens a row of round thumbnails along the
+bottom, TikTok's way: None, **Natural Glow**, **Warm Beauty** and **Bright Radiance**, the one in use in a white ring
+with its name under the row, and a slider above it for how strong it is (0 to 100, 65 to start). Each thumbnail is a
+disc of the colours its look lends, so nothing has to load. Tapping the one in use turns it off; the choice and its
+strength are kept on the device (`lib/beauty-store.ts`) and are there next time. Every look smooths skin with an
+edge-keeping blur (thirty-two samples in four rings, each counted less the further its colour is from the pixel's), laid
+on in full only where the colour is a skin tone of any shade and keeping a fifth of the skin's own texture, so blemishes
+and pores even out while eyes, lips, hair and the edge of the face stay sharp; then the light and colour each look is
+named for. Nothing about a face is detected, reshaped or stored. On iOS the live picture is the filtered one (a GL view
+over the camera's preview, fed the camera's own frames), so what is on screen is what the photo will be; the photo is
+drawn through the very same shader as it is taken (`lib/beauty-photo.ts`). On Android, and if the live picture cannot
+start, the camera's own preview shows and the filter still goes on the photo. **Photos only**: the camera records video
+itself, where these filters cannot reach, so on REEL (and while a video is being shot) the row says so and nothing is
+filtered. A build made before expo-gl was added (the testers' current one) shows no sparkles at all. For you has no floating "+" of its own, and Home's top bar has none. Events and
+search are not tabs: the calendar and the magnifier beside the bell in Home's top bar open Events
+(`src/app/events/index.tsx`, a screen with Back above the tabs) and search. Every tab's list and floating button keeps
+`tabBarInset` clear under it (`useTabBarInset` gives a screen off the tabs, like Events, just the safe area). The bar
+collapses like Reddit's (iOS 26's tab bar minimising), by the speed of the scroll: reading at any pace keeps the whole
+bar, and only a deliberate flick down a page of Home (For you, Buzz) or Explore (Messages and your Profile always keep
+the whole bar), at 700 points a second or more over at least 32 points
 (`createScrollCollapse` in `packages/shared/src/scroll-collapse.ts`, from each scroll event's native timestamp, tuned by
 `TAB_BAR_SCROLL` in `src/lib/tab-bar-collapse.ts`; first values, to be tuned on a phone), narrows it to a circle at the
-bottom left holding just that tab's icon, the other tabs fading as it goes, and the "+" (or Buzz's pen) becomes its twin at the
-bottom right (the same circle at the same height, as far in from the right edge as the circle is from the left). Once
+bottom left holding just that tab's icon, the other icons (Create included) and the capsule fading as it goes, and a page's floating "+"
+(or Buzz's pen) becomes its twin at the bottom right (the same circle at the same height, as far in from the right edge
+as the circle is from the left). Once
 the page scrolls back 24 points (at any speed; smaller turns are ignored), or reaches its top, the whole bar returns the same
 way, springing on the UI thread (at once with Reduce Motion). A bounce past a list's end is not a scroll back, and once
 the bar has come back a new flick has to wait a quarter of a second, so one gesture never flickers it. A tap on the
@@ -195,24 +220,26 @@ from, still exactly where it was (the feed keeps its scroll position and its vid
 followed the viewer to the photo on screen, `emitPostSlide`): from the page it opened on, the feed's own picture takes
 over as it lands; from any other (a later reel), it fades into that picture on the way (`CROSS_FADE`), as Instagram's
 does, and Back does the same. Only a viewer opened from a link, with no post behind it, sends the page sliding on out and
-fading. Let go sooner and it springs back. A post's photos keep their own sideways swipes: only past its first or last photo, or from the left edge,
-does a swipe pull the page back. The viewer is a modal screen, outside the view in which the gesture library cancels React
+fading. Let go sooner (under 30% of the width, or a flick of under 40 points) and it springs back. Only a swipe to the
+right on a post's first photo, or on a page with one picture, pulls the page back (`swipeChoice` in
+`src/lib/viewer-swipe.ts`, 2026-11-16); every other sideways swipe on a post's photos moves between them, wherever it
+starts (the left edge too), and past the last one the edge resists (about a third of the pull shows) and the photo
+springs back: the viewer never closes from there, and a back pull turned round to the left only stretches. The viewer is a modal screen, outside the view in which the gesture library cancels React
 Native's touches, so the page's taps check `swipedJustNow` themselves: a touch that ended a swipe never pauses, likes or
 opens anything. Feed and viewer videos skip Live Text on a paused frame (`allowsVideoFrameAnalysis={false}`): its button
 would sit over the play control, and its scan was what crashed Expo Go in the simulator. Screens opened from the viewer (a profile, a chat) come up as cards over it. Pictures are laid out
-TikTok style (`src/components/home/reel-item.tsx`), edge to edge from the screen's very top: nothing is pushed down by
-the safe area, and the status bar and the top row float over every picture on a soft shade (gone while the page zooms).
-A vertical video fills the screen (`placeVideo`), trimmed a little at the sides on a phone taller than 9:16; a square or
-landscape one stays whole, as wide as a 9:16 canvas, at the top (in the middle on the Reels tab, where Home's bar covers
-the top). A photo is never stretched or cropped (`photoLayout`): whole, as wide as the screen (or as tall, for one taller
-than it), from the top edge. Whatever of the screen a picture leaves shows a blurred, dimmed copy of the same picture,
-never black or a flat colour (`BlurredBackdrop` in `src/components/blurred-backdrop.tsx`: loaded only 48 pixels wide,
-then blurred and stretched, since a blur on a full-size photo barely shows once scaled to the screen). A video uploaded
-without its size takes its poster's shape once that loads. The chat's photo and video viewer
-(`src/components/messages/media-viewer.tsx`) and a Snap's (`src/app/snap/[id].tsx`) lay out the same way, a video's
-shape and blurred frame read from its own player; the chat's videos have the app's own controls instead of the system's
-(a tap shows or hides them, and they fade a moment after it plays): play or pause in the middle, the sound switch, and the
-same timeline with the time gone and the time left, as in Photos, plus the hold for 2×; with VoiceOver on they never fade
+TikTok style (`src/components/home/reel-item.tsx`, since 2026-11-15): every photo and video, vertical ones included, is
+shown whole in its own shape, never cropped, stretched or distorted, as big as the screen allows (as wide as it, or as
+tall for a picture taller than the screen's shape) and centred on it (`photoLayout`, `placeVideo`, one `fitWhole`), and
+whatever of the screen it leaves is pure black (`colors.mediaBg`, black in both themes), on the Reels tab and in the
+viewer alike: a 9:16 video on a taller phone has black above and below it rather than its sides trimmed. Nothing is
+pushed down by the safe area: the status bar and the top row float over the page on a soft shade (gone while it zooms).
+A video uploaded without its size takes its poster's shape once that loads. The chat's photo and video viewer
+(`src/components/messages/media-viewer.tsx`) and a Snap's (`src/app/snap/[id].tsx`) lay out the same way, whole and
+centred on black, a video's shape read from its own player; the chat's videos play with their sound on, always (there is no sound
+switch: the phone's volume buttons rule it), with the app's own controls instead of the system's (a tap shows or hides
+them, and they fade a moment after it plays): play or pause in the middle and the same timeline with the time gone and
+the time left, as in Photos, plus the hold for 2×; the close button and the counter are clear glass; with VoiceOver on they never fade
 (`useScreenReader` in `src/lib/accessibility.ts`), and faded ones leave the accessibility tree as they leave touch.
 Stories have their own layout (`src/app/stories/[id].tsx`, `storyFrame` in
 `packages/shared/src/stories.ts`): on a tall phone a rounded 9:16 card under the status bar with the reply pill, the heart
@@ -220,7 +247,14 @@ and the paper plane (or, on your own, Activity, Send and Delete) on black below 
 miss never moves the story on; on a short screen the story fills it and the bar floats over a deeper shade. Holding a
 story fades every control away. Over every page, one top row with Back at the left and the
 Campus | Global toggle in the middle (for reels and For you, while the toggle is shown); the creator's name, the words and the heart, comments, share,
-save and "…" rail sit at the bottom (as on the Reels page, the rail a little nearer the right edge: `railRight`), over a
+save and "…" rail sit at the bottom (as on the Reels page, the rail a little nearer the right edge: `railRight`). The
+words (the name, the title and caption, a link) sit right on what is under them, TikTok's way (2026-11-16): their last
+line 10pt over the bottom inset on a photo and just over the timeline's touch band on a video (`WORDS_GAP`,
+`WORDS_OVER_TIMELINE` in `src/components/home/reel-item.tsx`), gliding between the two when a post's slides change kind,
+growing upward with however many lines they have, in their own column beside the rail, which keeps its place
+(`OVERLAY_PAD`); the viewer's bottom inset is the tab bar's room and 4pt where the bar is drawn, else the home indicator's
+area and 16pt (`BOTTOM_ROOM` in `src/app/reels/[id].tsx`; it once kept the 58pt of a comment bar the viewer no longer
+has). All of it over a
 video's shades (gradients only, as Instagram's: a blur under the words was re-drawn every frame the video played or the
 page zoomed, and dropped frames). Opened over the tabs, the viewer keeps the app's tab bar in view under them: it draws a copy of the
 tabs' own bar in the same place (`TabBarMirror` in `src/components/floating-tab-bar.tsx`); the tab it was opened from
@@ -230,8 +264,8 @@ as the feeds (send to friends, or "Share to…" the system share sheet with the 
 posted reels, `/apartments/<id>` or `/roommates/<id>` for listing tours); the viewer mounts its own `ShareSheetProvider`,
 since iOS presents a sheet from the screen on top and the root layout's one cannot appear over this modal screen. The
 rail's buttons, the words, the top row and the status bar are white on every page (a crisp dark edge on the rail's
-strokes keeps it readable on a white wall). A tap pauses a video: a play button appears in the middle with the sound
-button just above it, both fading away again the moment it plays (the sound button keeps it paused). Every video plays at
+strokes keeps it readable on a white wall). A tap pauses a video: a play button appears in the middle, fading away again
+the moment it plays; there is no sound button (every video plays with its sound on). Every video plays at
 1×; pressed and held while it plays it runs at 2× until the finger lifts (or a scroll takes the touch), Instagram's way,
 with a glass "2×" pill under the top row while the words and the rail step aside (and leave the accessibility tree),
 VoiceOver hearing "Double speed" (`BOOST_RATE`, `HOLD_MS` in `src/components/video-controls.tsx`). Along its bottom, under the words, a thin timeline shows how far it has played (it
@@ -259,14 +293,15 @@ little softer than the feed's own (expo-image filters trilinearly) and shimmerin
 and blurred. Its edges sit on whole pixels and the page inside is placed from them (`onPixel`), so the picture never
 twitches against its frame, and it fades out over the feed's own in the last 50ms, as it covers its last few pixels, so
 the crisp one has taken over by the time it stops. The viewer leaves two frames later: the copy of the screen
-react-native-screens keeps up while a modal goes is then see-through, never a frozen frame that skips ahead. The feed's
-sound button fades away as its video goes full screen and back once it returns, and the status bar takes the viewer's
-style only once the page covers most of the screen. Sound is one switch for every feed video, the Reels tab and the viewer
-(`src/lib/video-sound.ts`, muted to start), so a video keeps its sound exactly as it was in both directions; so that it is
-never heard twice, For you and Posts play one video at a time (the first row on screen that has one) and a carousel's
-videos play only while their screen is the one on show; every
-player mixes with other audio while muted (`audioMixingMode` "auto"; expo-video's native default stops the person's music
-for a muted video scrolling past). Each loop of a short clip still holds about 0.15–0.5s: expo-video loops an HLS stream by
+react-native-screens keeps up while a modal goes is then see-through, never a frozen frame that skips ahead. The status
+bar takes the viewer's style only once the page covers most of the screen. Every video plays with its sound on, with no
+mute or sound button anywhere (`VIDEO_MUTED` in `src/lib/video-sound.ts`, 2026-11-16; the phone's volume buttons rule
+it): feed videos, the Reels tab, the viewer, sponsored reels, chats, Stories and Snaps (the Snap camera's preview keeps
+its own sound switch for the sender), so a video handed between the feed and the viewer keeps its sound both ways; so
+that two are never heard at once, For you and Posts play one video at a time (the first row on screen that has one), the
+Reels tab and the viewer only the page on screen, and a carousel's videos only while their screen is the one on show,
+every video pausing as its screen is covered or the app goes to the background (`audioMixingMode` "auto": a muted
+preview, such as a chat thumbnail's, leaves the person's music playing). Each loop of a short clip still holds about 0.15–0.5s: expo-video loops an HLS stream by
 seeking back to its start, and neither a seek just before the end nor buffering changes help (measured); seamless loops
 need progressive MP4 renditions with `useCaching`, or a native looper in a development build. Elsewhere (Android cannot
 show one player in
@@ -349,8 +384,9 @@ top kept as the owner chose it (2026-10-31): the cover band with Find friends an
 the legal pages, Log out) as round buttons over it; your photo in its aurora ring with a "+" to change it, Share profile
 (a sheet with the profile's QR code and Share) and Edit profile beside it; your full name (the account sheet, Log out),
 @username (made from your name at sign-up, changed in Settings → Account & Profile → Edit profile, which Edit profile
-opens too) with a QR icon, the university in a small pill with the major and class year beside it ("Computer Science ·
-'28", from Settings → Account & Profile → Major & class year), the bio, and the
+opens too) with a QR icon; then, with no labels (2026-11-15, the owner's pick of three), the university in bold (17pt)
+with the major and class year under it in grey, "Computer Science · ’28" (the year in the text colour; major and year
+from Settings → Account & Profile → Major & class year; what is missing drops out); the bio; and the
 card with Posts | Followers | Following | Likes (every like on your posts, reels and listings); then the tabs
 Posts | Classes | Reels | Saved | Liked | Listings as icons (the open one filled, with an underline as wide as the tab
 and a small mark of who can see that section: a lock for Only me, two people for Friends, a globe for
@@ -429,18 +465,31 @@ overlapping, as in the inbox). The capsule and the photo open the chat's details
 join the right side only while calls are on. Nothing solid sits behind the bar: the messages scroll under it and are dimmed and
 blurred into the screen's colour (iOS 26's scroll edge effect, `scrollEdge` in `src/lib/theme.ts` over a `ProgressiveBlur` held
 at full strength behind the bar), nearly solid behind the controls and fading out 20 points below them, so the name and the
-clock always read. The bubbles (`message-bubble.tsx`) have no photos beside them and, as in Instagram, no times under them: a small centred stamp
+clock always read. The other side's face sits beside the last message of each of their runs, level with its bottom, as in
+Instagram's DMs: in a group each sender's own (a tap opens their profile), in a one-to-one chat the header's
+(`chatPeerFace` in `chat-header.tsx`: an anonymous poster's mask while hidden, a business's logo, never a staff member's
+photo). The bubbles (`message-bubble.tsx`) have, as in Instagram, no times under them: a small centred stamp
 ("**Today** 14:05", "**Yesterday** 09:30", "**Mon, 3 Mar** 10:15", the day a weight above the time, in the phone's own time zone) sits above the first message of each day and
 above any message that comes after half an hour's quiet; a tap on a message's words shows its exact time under it until the next tap
 (a hold shows it as the menu's title, for photos, voice messages and the like too); your newest message says "Sending…", "Sent" or
 "Delivered" under it; and "Seen", with the readers' small photos, sits under the last message they read. A group shows the sender's
-name above a run of theirs. The words are 16-point, in blue bubbles (yours, the brand blue deepening a touch towards the bottom,
-`bubbleMine`) or neutral grey ones (`bubble`), 36 points tall for one line, with 20-point corners; a run of messages from one
+name above a run of theirs. The words are 16-point, in UniBuzz's own colours: yours on the aurora, its blue into its
+indigo corner to corner (`bubbleMine`, `bubbleMineFill` in `src/lib/theme.ts`, white words at 4.5:1 or better), theirs on
+a neutral grey (`bubble`), 36 points tall for one line, with 20-point corners; a run of messages from one
 person reads as one stack, its bubbles 2 points apart and their corners on the sender's side tightened to 6 points where they
 meet (a voice message or a call row too). A message that arrives, or that you send, rises a little and grows from its own bottom
-corner on a spring. The message bar (`composer.tsx`) floats too, the same fade over the messages above it: "+" in a 44pt glass
+corner on a spring. A message of one to three emoji and nothing else is a sticker (`jumboEmoji` in
+`packages/shared/src/stickers.ts`): drawn large with no bubble (56 points for one, 42 for two or three), popping in from small
+with a little bounce; typed or picked from the sticker sheet, it is the same message, so the website, the inbox, reports
+and every rule treat it as words. A message's photos and videos sit in one block with 18-point corners and a hairline
+edge (a white photo keeps its edge on a white screen), a video with a glass play button and a glass pill with its
+length. The message bar (`composer.tsx`) floats too, the same fade over the messages above it: "+" in a 44pt glass
 circle (photo or video, camera, file), a fully rounded 44pt see-through glass capsule holding the 16pt field (it grows to about six
-lines, then scrolls) and, at its end, a 32pt microphone or, once something is typed or picked, the aurora Send, which springs in as the microphone fades out; the voice recorder
+lines, then scrolls) and, at its end, three 32pt tools: stickers (`sticker-sheet.tsx`: reactions, campus life and moods, the
+ones you sent lately first, kept on the phone; a tap sends one at once and leaves what you typed in the field), photos and
+videos straight from the library, and the microphone; once something is typed or picked the tools fade and the aurora Send
+springs in, the slot gliding to its new width with the field. An anonymous poster's bar has stickers but no "+", photos or
+microphone (they send words only). The voice recorder
 that stands in for it while you record keeps the same sizes; picked files and the message being answered sit on glass panels above it. With the
 keyboard down the bar keeps the home-indicator space; with it up the bar rides on the keyboard, 8 points above it, and the
 messages rise with it as one piece, the newest just above the bar and never under it. Both are lifted frame by frame on the
@@ -579,7 +628,9 @@ the grid is the newest posts and reels, the suggestions the newest people, and t
 
 ## Events
 
-The fourth tab (`src/app/(tabs)/events.tsx`) is the campus's calendar: the big "Events" title with Saved at its right,
+The calendar beside the magnifier in Home's top bar opens Events (`src/app/events/index.tsx`), the campus's calendar,
+as a screen of its own above the tabs (Back returns to Home; no bottom bar there): Back and the big "Events" title with
+Saved at its right,
 For you | All events above a pager, with Explore's three levels (DiscoveryBar: the labels, one search field with the
 filter button, one row of chips, all sliding up under the title as a page scrolls), and the floating "+" to publish.
 The quick filters narrow both pages with a tap: Today, This week, Weekend (`eventDateRange` in packages/shared, on the
@@ -692,8 +743,8 @@ feel native:
 - **The Aurora.** UniBuzz's signature is a gradient, cyan → sky blue → periwinkle → violet (`aurora`,
   `auroraGlow` and `auroraWash` in `src/lib/palette.ts`, drawn with `auroraGradient` from `src/lib/theme.ts`). It is used
   sparingly: primary buttons (the compact ones that repeat down a list stay solid blue), the send buttons, the floating
-  "+", the active tab's underline in Home, Explore, Messages and on a profile, the selected segment, the soft capsule
-  behind the active tab in the bottom bar, and the rings around your photo in the Home bar, on the Profile tab and on a
+  "+", the active tab's underline in Home, Explore, Messages and on a profile, the selected segment, and the rings
+  around your photo in the Home bar, on the Profile tab and on a
   profile page. Under white words the stops are deep enough that a label keeps 4.5:1 across the middle where it sits;
   rings and underlines use a brighter version on black. The solid brand blue is the aurora's blue stop (#166fe5 in
   light, 4.7:1 on white), for links, icons and active chips. A roommate post's screen wears it most fully, and still
@@ -721,7 +772,7 @@ feel native:
   fields above the keyboard. Menus stay the system's own action sheet.
 - **Glass only where it does a job.** The tab bar and the controls over photos and video (Back over a reel, the Campus |
   Global toggle over a reel, Back and the menu over a profile cover) are Liquid Glass on iOS 26
-  (`src/components/glass.tsx`). Everything else is solid, including the floating Create button and the Mark all as read
+  (`src/components/glass.tsx`). Everything else is solid, including the floating "+" buttons and the Mark all as read
   pill. Reduce Transparency swaps every glass surface for a solid fill.
 - **Scrolling.** The For you, Buzz, Housing and Roommate feeds draw each row through a memoised component with stable
   handlers, so a scroll only redraws the rows whose content changed, and they keep about four screens of rows mounted

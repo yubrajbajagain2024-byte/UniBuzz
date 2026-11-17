@@ -6,7 +6,7 @@ import { adCtaLabel, muxPlaybackUrl, muxPosterUrl, type FeedAd } from "@apartmen
 import { Avatar } from "@/components/avatar";
 import { Icon } from "@/components/icon";
 import { safeBusinessImage } from "@/lib/safe-media";
-import { setVideosMuted, useVideosMuted, VIDEO_AUDIO_MODE, videosMuted } from "@/lib/video-sound";
+import { VIDEO_AUDIO_MODE, VIDEO_MUTED } from "@/lib/video-sound";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { adPicture, useAdActions } from "./sponsored-card";
 
@@ -16,21 +16,17 @@ function adVideo(ad: FeedAd) {
   return v && v.type === "video" && v.playback_id ? v : null;
 }
 
-/** The ad's video, looping with the app's one sound switch, playing only while its page is the one on screen. */
+/** The ad's video, looping with its sound on like every video (see VIDEO_MUTED), playing only while its page is the one on screen. */
 function AdVideo({ playbackId, playing }: { playbackId: string; playing: boolean }) {
-  const muted = useVideosMuted();
   const player = useVideoPlayer({ uri: muxPlaybackUrl(playbackId) }, (p) => {
     p.loop = true;
-    p.muted = videosMuted();
+    p.muted = VIDEO_MUTED;
     p.audioMixingMode = VIDEO_AUDIO_MODE;
   });
   useEffect(() => {
     if (playing) player.play();
     else player.pause();
   }, [playing, player]);
-  useEffect(() => {
-    if (player.muted !== muted) player.muted = muted;
-  }, [muted, player]);
   return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsVideoFrameAnalysis={false} />;
 }
 
@@ -43,7 +39,6 @@ function AdVideo({ playbackId, playing }: { playbackId: string; playing: boolean
 export function SponsoredReel({ ad, width, height, topInset, bottomInset, playing, near }: { ad: FeedAd; width: number; height: number; topInset: number; bottomInset: number; playing: boolean; near: boolean }) {
   const styles = useStyles();
   const colors = useColors();
-  const muted = useVideosMuted();
   const { gone, act, menu, openProfile } = useAdActions(ad, "reels");
   const video = adVideo(ad);
   const poster = video ? safeBusinessImage(video.poster_url ?? muxPosterUrl(video.playback_id!)) : adPicture(ad);
@@ -59,11 +54,6 @@ export function SponsoredReel({ ad, width, height, topInset, bottomInset, playin
           {poster ? <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} contentFit="cover" transition={0} /> : null}
           {video && near ? <AdVideo playbackId={video.playback_id!} playing={playing} /> : null}
           <View style={styles.shade} pointerEvents="none" />
-          {video ? (
-            <Pressable onPress={() => setVideosMuted(!muted)} hitSlop={10} accessibilityRole="button" accessibilityLabel={muted ? "Turn sound on" : "Turn sound off"} style={[styles.sound, { top: topInset + 12 }]}>
-              <Icon name={muted ? "volume-mute" : "volume-high"} size={18} color="#ffffff" />
-            </Pressable>
-          ) : null}
           <View style={[styles.bottom, { bottom: bottomInset + 16 }]}>
             <View style={styles.header}>
               <Pressable onPress={openProfile} accessibilityRole="link" accessibilityLabel={`${ad.business_name}'s profile`}>
@@ -104,7 +94,6 @@ const useStyles = makeStyles((colors) => ({
   centered: { alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
   gone: { color: colors.onMedia, fontSize: 14, textAlign: "center", lineHeight: 20 },
   shade: { position: "absolute", left: 0, right: 0, bottom: 0, height: "45%", experimental_backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.25) 55%, transparent 100%)" },
-  sound: { position: "absolute", right: 14, width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
   bottom: { position: "absolute", left: 14, right: 14, gap: 8 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
   name: { color: "#ffffff", fontWeight: "700", fontSize: 15, flexShrink: 1 },

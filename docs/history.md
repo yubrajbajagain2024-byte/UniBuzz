@@ -57,6 +57,10 @@ open work is in [status.md](status.md).
 - **2026-11-02:** migration 62 (story actions) reaches production on its own (04:32 UTC). PR #60 merges:
   CampConnect Admin (`apps/admin`, from `step-admin`) is on `main` with its Analytics and Business sections
   (migration 63, not on production) and the rest of `step-admin` outside its migration files.
+- **2026-11-15:** PR #112 merges `chat-redesign` (21:51 UTC): the app's Apple-style chat, tab labels side by side in
+  every tab row, Home without dividers, photo zoom in the full-screen viewer, the video timeline and 2× hold, and the
+  chat's message bar riding the keyboard (no migration; the website and CampConnect Admin deploy with only docs changed).
+  The app reaches testers only with an EAS update.
 
 ## The AI documentation
 
@@ -276,3 +280,7 @@ its file in `branches/`.
   and its PGlite suite, the console's limitation note U1. PR #53. Deleted after the merge.
 - `admin-sections` (Yubraj, 2026-11-03): the admin app's nine sections and their pages, migration 65 and its
   suite. PR #95. Deleted after the merge.
+- `chat-redesign` (Sunil, 2026-11-06 to 2026-11-15): the app's Apple-style chat and tab rows (first brief), then photo
+  zoom in the full-screen viewer, the video timeline and 2× hold, the chat's keyboard lift and Home without dividers
+  (second brief); signed-in checks on staging with the seed's new chats and story. PR #112. Still on GitHub as of
+  2026-11-15 (to delete).

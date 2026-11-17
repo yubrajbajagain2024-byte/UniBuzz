@@ -4,7 +4,7 @@ import { EmptyState } from "@/components/ui";
 import { space, textStyle } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 
-/** What the Events tab hands each of its pages: the bar's filters, the campus and its clock, the list's place under the floating bar. */
+/** What the Events screen hands each of its pages: the bar's filters, the campus and its clock, the list's place under the floating bar. */
 export type EventsPageProps = {
   active: boolean;
   topInset: number;
