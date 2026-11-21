@@ -29,6 +29,11 @@ supabase/.env
 # turborepo
 .turbo/
 
+# Stubs `npx expo start` writes at the repo root when it is run from here instead of apps/mobile
+# (apps/mobile/CLAUDE.md): they belong to no workspace and must never be committed.
+/tsconfig.json
+/.expo/
+
 # The staging release rehearsal's state: test accounts and their passwords (supabase/tests/staging/release-rehearsal.mjs)
 supabase/tests/staging/.rehearsal.json
 # The staging ad-delivery run's kept accounts and their passwords (supabase/tests/staging/ad-delivery.mjs --keep)
