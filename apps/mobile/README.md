@@ -230,8 +230,11 @@ opens anything. Feed and viewer videos skip Live Text on a paused frame (`allows
 would sit over the play control, and its scan was what crashed Expo Go in the simulator. Screens opened from the viewer (a profile, a chat) come up as cards over it. Pictures are laid out
 TikTok style (`src/components/home/reel-item.tsx`, since 2026-11-15): every photo and video, vertical ones included, is
 shown whole in its own shape, never cropped, stretched or distorted, as big as the screen allows (as wide as it, or as
-tall for a picture taller than the screen's shape) and centred on it (`photoLayout`, `placeVideo`, one `fitWhole`), and
-whatever of the screen it leaves is pure black (`colors.mediaBg`, black in both themes), on the Reels tab and in the
+tall for a picture taller than the screen's shape), centred across the screen and, down it, centred between the top row
+and the dots and words at the bottom rather than in the bare screen (`mediaRoom`, `photoLayout`, `placeVideo`, one
+`fitWhole`, 2026-11-21), TikTok's way: the black it leaves is mostly under it, where those words are, and every picture
+of a post is raised by the same amount so they do not shuffle as they are swiped. Whatever of the screen it leaves is
+pure black (`colors.mediaBg`, black in both themes), on the Reels tab and in the
 viewer alike: a 9:16 video on a taller phone has black above and below it rather than its sides trimmed. Nothing is
 pushed down by the safe area: the status bar and the top row float over the page on a soft shade (gone while it zooms).
 A video uploaded without its size takes its poster's shape once that loads. The chat's photo and video viewer
@@ -273,7 +276,8 @@ glides between the player's reports on the UI thread) and drags sideways to fast
 finger, the video holds on the frame under it (expo-video's scrubbing mode, loose seeks while it moves and an exact one as
 it lets go) with the time over the line, and a tap on it jumps (`VideoTimeline`; VoiceOver hears it as adjustable, five
 seconds a step). A post with several
-photos or videos swipes sideways on its page, with dots just under the top row, over the picture on a small dark pill, and opens on the one that was showing in the feed; a video plays while its page and slide are on screen, and a double tap on a video likes. A photo zooms instead, as in Photos
+photos or videos swipes sideways on its page, with dots on a small dark pill just above the words at the bottom (TikTok's
+place, 2026-11-21; they rise with the words over a video's timeline and as a caption is opened), and opens on the one that was showing in the feed; a video plays while its page and slide are on screen, and a double tap on a video likes. A photo zooms instead, as in Photos
 (`src/components/zoomable.tsx`, on the UI thread): pinch around the fingers, double tap to zoom in on that point (until the
 photo fills the screen, 2× to 3×) or back out, and, zoomed, one finger pans with momentum, its edges rubber-banding; past
 4× or below its own size a pinch gives a little and springs back. While a photo is zoomed the words, the rail and the shades

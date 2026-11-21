@@ -10,7 +10,7 @@ import { getFeedPost, getPostEngagement, isSaved, listReels, REELS_PAGE_SIZE, ty
 import { campusSegments, ScopeToggle, type ScopeSegment } from "@/components/home/home-top-tabs";
 import { ReelCommentsSheet } from "@/components/home/reel-comments-sheet";
 import { ShareSheetProvider } from "@/components/share-sheet";
-import { aspectOf, photoLayout, ReelItem, wholeVideo } from "@/components/home/reel-item";
+import { aspectOf, mediaRoom, photoLayout, ReelItem, wholeVideo } from "@/components/home/reel-item";
 import { markReelsStale } from "@/components/home/reels-section";
 import { hapticTap } from "@/lib/haptics";
 import { SCOPE_TOGGLE_SHOWN, useHomeScope } from "@/lib/home-scope";
@@ -445,14 +445,14 @@ export default function ReelViewerScreen() {
   const focus = useMemo(() => {
     const m = startItem?.media[startSlide];
     if (startItem && m?.type === "video") {
-      const v = wholeVideo(aspectOf(m), screenW, screenH);
+      const v = wholeVideo(aspectOf(m), screenW, screenH, mediaRoom(contentTop, barHeight));
       return { y: v.top + v.height / 2, width: v.width, height: v.height };
     }
     const aspect = m && m.type === "photo" ? aspectOf(m) : null;
     if (!startItem || aspect === null) return { y: screenH / 2, width: screenW, height: screenH };
-    const place = photoLayout(aspect, screenW, screenH);
+    const place = photoLayout(aspect, screenW, screenH, mediaRoom(contentTop, barHeight));
     return { y: place.top + place.height / 2, width: place.width, height: place.height };
-  }, [startItem, startSlide, screenW, screenH]);
+  }, [startItem, startSlide, screenW, screenH, contentTop, barHeight]);
   // The post the viewer was opened from keeps its feed row on the same photo as the page (it is hidden behind it), so a
   // swipe back uncovers that photo, and the page lands on it.
   useEffect(() => {

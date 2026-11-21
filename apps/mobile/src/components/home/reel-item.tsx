@@ -73,10 +73,10 @@ const WORDS_OVER_TIMELINE = TIMELINE_TOUCH + 2;
 /** How long the words take to settle on their new line when the slide on show turns from a photo to a video or back. */
 const WORDS_GLIDE_MS = 220;
 /**
- * A carousel's dots sit this far under the row drawn over a page's top (Back, the toggle), over the picture, on a dark
- * pill DOTS_PAD bigger than them all round, as iOS draws its page dots over a photo, so they show on a white one too.
+ * A carousel's dots sit this far above the words at the page's bottom, TikTok's way, on a dark pill DOTS_PAD bigger than
+ * them all round, as iOS draws its page dots over a photo, so they show on a white one too.
  */
-const DOTS_TOP = 8;
+const DOTS_GAP = 10;
 const DOT_SIZE = 6;
 const DOTS_PAD = 5;
 
@@ -242,6 +242,10 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
   /** The slide on screen, for a post with several photos or videos. */
   const [slide, setSlide] = useState(() => Math.max(0, Math.min(media.length - 1, initialSlide)));
   const slideIsVideo = media[slide]?.type === "video";
+  // Where the pictures sit between the top row and the words (see mediaRoom): the slides and the zoom's heart use it.
+  const room = useMemo(() => mediaRoom(contentTop, bottomInset), [contentTop, bottomInset]);
+  /** How tall the words are right now: the dots ride above them, so they move together as a caption opens or closes. */
+  const [wordsHeight, setWordsHeight] = useState(0);
   // The words' line: just over the timeline on a video, right on the bottom inset on a photo, gliding between the two
   // when a post's slides change kind (on the UI thread; at once with Reduce Motion), never jumping.
   const reduceMotion = useReduceMotion();
@@ -714,7 +718,7 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
   /** The photo on its page, when that is what is on screen. */
   // The big heart a double tap flashes: in the middle of the photo or video on screen (the screen, for one that fills it).
   const shown = media[slide];
-  const heartBox = shown ? frame(shown.type === "photo" ? photoLayout(aspectAt(slide), width, height) : placeVideo(aspectAt(slide), width, height)) : { left: 0, top: 0, width, height };
+  const heartBox = shown ? frame(shown.type === "photo" ? photoLayout(aspectAt(slide), width, height, room) : placeVideo(aspectAt(slide), width, height, room)) : { left: 0, top: 0, width, height };
   /** Plays while its page (and slide) is on screen, unless paused by a tap or held still under the timeline's finger. */
   const playNow = playing && (closing || (!userPaused && !scrubbing));
   /** The slide's video player and its length, for its timeline (once the player has registered). */
@@ -730,11 +734,11 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
     <View style={{ width, height, overflow: chrome ? "visible" : "hidden", backgroundColor: colors.mediaBg }}>
       {single ? (
         <>
-          <VideoSlide uri={single.playbackUrl} poster={poster} aspect={aspectOf(single)} width={width} height={height} mounted={near} playing={playNow} topInset={topInset} bottomInset={bottomInset} index={0} startAt={startFrom} borrowed={lentPlayer} onStarted={started} onClock={onClock} onShown={firstShown} standIn={standIn} boost={boosted} onPlayer={onPlayer} />
+          <VideoSlide uri={single.playbackUrl} poster={poster} aspect={aspectOf(single)} width={width} height={height} mounted={near} playing={playNow} topInset={topInset} bottomInset={bottomInset} room={room} index={0} startAt={startFrom} borrowed={lentPlayer} onStarted={started} onClock={onClock} onShown={firstShown} standIn={standIn} boost={boosted} onPlayer={onPlayer} />
           <Pressable style={StyleSheet.absoluteFill} onPress={onVideoTap} onLongPress={holdStart} onPressOut={holdEnd} delayLongPress={HOLD_MS} accessibilityRole="button" accessibilityLabel={userPaused ? "Play" : "Pause"} accessibilityHint="Press and hold to play at double speed" />
         </>
       ) : (
-        <SlideStrip media={media} aspects={aspects} pos={stripPos} settled={settled} shown={slide} width={width} height={height} topInset={topInset} bottomInset={bottomInset} near={near} playing={playNow} onAspect={onAspect} onTap={onVideoTap} onHoldStart={holdStart} onHoldEnd={holdEnd} boost={boosted} onPlayer={onPlayer} goTo={goTo} startAt={startFrom} borrowed={lentPlayer} startSlide={firstSlide} onStarted={started} onClock={onClock} onShown={firstShown} standIn={standIn} />
+        <SlideStrip media={media} aspects={aspects} pos={stripPos} settled={settled} shown={slide} width={width} height={height} topInset={topInset} bottomInset={bottomInset} room={room} near={near} playing={playNow} onAspect={onAspect} onTap={onVideoTap} onHoldStart={holdStart} onHoldEnd={holdEnd} boost={boosted} onPlayer={onPlayer} goTo={goTo} startAt={startFrom} borrowed={lentPlayer} startSlide={firstSlide} onStarted={started} onClock={onClock} onShown={firstShown} standIn={standIn} />
       )}
       <Animated.View pointerEvents="none" style={[styles.heartBox, heartBox, styles.bigHeart, { opacity: bigHeart, transform: [{ scale: bigHeart.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }]}>
         <Icon name="heart" size={110} color={colors.onMedia} />
@@ -743,21 +747,22 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
       <Reanimated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, chromeStyle]}>
       {/* Stepped aside, the words and the rail leave the accessibility tree too, as they leave touch. */}
       <Reanimated.View pointerEvents={hushed ? "none" : "box-none"} accessibilityElementsHidden={hushed} importantForAccessibility={hushed ? "no-hide-descendants" : "auto"} style={[StyleSheet.absoluteFill, quietStyle]}>
-      {/* Several photos or videos: where you are, just under the top row, over the picture (which starts above it). */}
+      {/* Several photos or videos: where you are, just above the words at the bottom, TikTok's way, and rising with them
+          over a video's timeline (wordsStyle). */}
       {media.length > 1 ? (
-        <View pointerEvents="none" style={[styles.dots, { top: contentTop + DOTS_TOP - DOTS_PAD }]} accessibilityLabel={`${slide + 1} of ${media.length}`}>
+        <Reanimated.View pointerEvents="none" style={[styles.dots, { bottom: bottomInset + WORDS_GAP + wordsHeight + DOTS_GAP - DOTS_PAD }, wordsStyle]} accessibilityLabel={`${slide + 1} of ${media.length}`}>
           <View style={styles.dotsRow}>
             {media.map((_, i) => (
               <View key={i} style={[styles.dot, i === slide && styles.dotOn]} />
             ))}
           </View>
-        </View>
+        </Reanimated.View>
       ) : null}
 
       {/* The words and the rail side by side, the words in their own column so they never run under a button: the rail
           keeps its place (OVERLAY_PAD), the words sit on their own line under it (WORDS_GAP, wordsLift). */}
       <View style={[styles.overlay, { paddingBottom: WORDS_GAP + bottomInset, paddingRight: railRight }]} pointerEvents="box-none">
-        <Reanimated.View style={[styles.info, wordsStyle]} pointerEvents="box-none">
+        <Reanimated.View style={[styles.info, wordsStyle]} onLayout={(e) => setWordsHeight(e.nativeEvent.layout.height)} pointerEvents="box-none">
           {buzz ? (
             // Who wrote it, as the Buzz card says it: the thread's alias (Buzz's own mark, an emoji in a dashed ring of its
             // colour, and "Anon Comet"), "You" on your own, and nothing that leads anywhere.
@@ -933,37 +938,64 @@ export type Placement = { left: number; top: number; width: number; height: numb
 const frame = (p: Placement) => ({ left: p.left, top: p.top, width: p.width, height: p.height });
 
 /**
- * A picture's place on a page of the given size: whole and in its own shape, never cropped, stretched or distorted, as
- * big as the page allows (as wide as it, or as tall as it where the picture is the taller shape) and centred on it, the
- * rest of the page pure black (see MediaFrame), as TikTok shows a photo. An unknown shape (an upload that did not record
- * it, still loading) fits whole on the page until it is known.
+ * The room the page's own furniture takes at its top (the row with Back) and its bottom (the dots and the words), which
+ * a picture is placed between rather than in the bare page: see mediaRoom and fitWhole.
  */
-function fitWhole(aspect: number | null, pageW: number, pageH: number): Placement {
+export type MediaRoom = { top: number; bottom: number };
+
+/**
+ * What the dots and the words take at the page's bottom, over the bottom inset: the dots' row, the name, a line of
+ * caption and the gaps between them. A constant, not the words' real height, so a caption opened or closed never moves
+ * the picture.
+ */
+const MEDIA_BOTTOM_ROOM = 84;
+
+/** The room round the picture on a page whose top row ends at `contentTop` and whose furniture sits on `bottomInset`. */
+export function mediaRoom(contentTop: number, bottomInset: number): MediaRoom {
+  return { top: contentTop, bottom: bottomInset + MEDIA_BOTTOM_ROOM };
+}
+
+/**
+ * A picture's place on a page of the given size: whole and in its own shape, never cropped, stretched or distorted, as
+ * big as the page allows (as wide as it, or as tall as it where the picture is the taller shape), the rest of the page
+ * pure black (see MediaFrame), as TikTok shows a photo. An unknown shape (an upload that did not record it, still
+ * loading) fits whole on the page until it is known.
+ *
+ * Across the page it is centred. Down it, it sits where TikTok puts it: centred between the row at the top and the dots
+ * and words at the bottom (`room`) rather than in the bare page, so the black it leaves is mostly under it, where those
+ * words are, instead of split evenly above and below. Every picture is raised by the same amount, whatever its shape,
+ * so the pictures of one post do not shuffle as they are swiped; a picture tall enough to reach a page edge is held
+ * inside it. Without `room` (anywhere that has no such furniture) it is simply centred.
+ */
+function fitWhole(aspect: number | null, pageW: number, pageH: number, room?: MediaRoom): Placement {
   if (aspect === null || !(aspect > 0)) return { left: 0, top: 0, width: pageW, height: pageH, fit: "contain" };
   const width = Math.min(pageW, pageH * aspect);
   const height = width / aspect;
-  return { left: (pageW - width) / 2, top: (pageH - height) / 2, width, height, fit: "contain" };
+  const middle = (pageH - height) / 2;
+  const lift = room ? (room.bottom - room.top) / 2 : 0;
+  const top = Math.min(Math.max(middle - lift, 0), Math.max(pageH - height, 0));
+  return { left: (pageW - width) / 2, top, width, height, fit: "contain" };
 }
 
 /** Where a photo sits on its page (see fitWhole). */
-export function photoLayout(aspect: number | null, pageW: number, pageH: number): Placement {
-  return fitWhole(aspect, pageW, pageH);
+export function photoLayout(aspect: number | null, pageW: number, pageH: number, room?: MediaRoom): Placement {
+  return fitWhole(aspect, pageW, pageH, room);
 }
 
 /**
  * Where a video sits on its page, a vertical one included (see fitWhole): on a phone taller than 9:16 a 9:16 video is as
  * wide as the screen with black above and below it, never trimmed at its sides; on the Reels tab and in the viewer alike.
  */
-export function placeVideo(aspect: number | null, pageW: number, pageH: number): Placement {
-  return fitWhole(aspect, pageW, pageH);
+export function placeVideo(aspect: number | null, pageW: number, pageH: number, room?: MediaRoom): Placement {
+  return fitWhole(aspect, pageW, pageH, room);
 }
 
 /**
  * The whole of a video as drawn on its page: its place, since nothing of it runs past the page any more (see placeVideo).
  * The viewer's zoom opens and closes on it.
  */
-export function wholeVideo(aspect: number | null, pageW: number, pageH: number): Placement {
-  return placeVideo(aspect, pageW, pageH);
+export function wholeVideo(aspect: number | null, pageW: number, pageH: number, room?: MediaRoom): Placement {
+  return placeVideo(aspect, pageW, pageH, room);
 }
 
 /**
@@ -1015,12 +1047,12 @@ type VideoHandover = {
  * exist at a time) or its poster. A video uploaded without its size takes the shape of its poster (a frame of it) once
  * that loads, so it is placed like any other.
  */
-function VideoSlide({ uri, poster, aspect: recorded, width, height, mounted, playing, topInset, bottomInset, ...handover }: { uri: string; poster: string; aspect: number | null; width: number; height: number; mounted: boolean; playing: boolean; topInset: number; bottomInset: number } & VideoHandover) {
+function VideoSlide({ uri, poster, aspect: recorded, width, height, mounted, playing, topInset, bottomInset, room, ...handover }: { uri: string; poster: string; aspect: number | null; width: number; height: number; mounted: boolean; playing: boolean; topInset: number; bottomInset: number; room: MediaRoom } & VideoHandover) {
   const styles = useStyles();
   const [measured, setMeasured] = useState<number | null>(null);
   const aspect = recorded ?? measured;
   const measure = recorded === null && measured === null ? (e: ImageLoadEventData) => (e.source.width > 0 && e.source.height > 0 ? setMeasured(e.source.width / e.source.height) : undefined) : undefined;
-  const whole = wholeVideo(aspect, width, height);
+  const whole = wholeVideo(aspect, width, height, room);
   // The video's very first frame as its still (the poster is a frame a second in): when the player takes over, the
   // picture does not jump back.
   const first = poster ? posterAt(poster, 0) : "";
@@ -1184,9 +1216,9 @@ function goOnFrom(player: VideoPlayer, seconds: number, done: () => void): () =>
  * shows at once, in the photo's own place; a photo uploaded without its size reports its shape once loaded (`onAspect`)
  * and takes its place from then on. It zooms (see Zoomable) while it is the slide on show (`active`).
  */
-function PhotoSlide({ uri, blur, aspect, width, height, topInset, bottomInset, onAspect, onShown, standIn, active = true }: { uri: string; blur: string | null; aspect: number | null; width: number; height: number; topInset: number; bottomInset: number; onAspect: (aspect: number) => void; onShown?: () => void; standIn?: string; active?: boolean }) {
+function PhotoSlide({ uri, blur, aspect, width, height, topInset, bottomInset, room, onAspect, onShown, standIn, active = true }: { uri: string; blur: string | null; aspect: number | null; width: number; height: number; topInset: number; bottomInset: number; room: MediaRoom; onAspect: (aspect: number) => void; onShown?: () => void; standIn?: string; active?: boolean }) {
   const styles = useStyles();
-  const place = photoLayout(aspect, width, height);
+  const place = photoLayout(aspect, width, height, room);
   const pictures = useContext(PicturesContext);
   const zoom = useContext(PhotoZoomContext);
   // Closing, the viewer shrinks the page back into the feed's own picture: a zoomed photo settles back to rest first.
@@ -1229,7 +1261,7 @@ const ADJUST = [{ name: "increment" }, { name: "decrement" }] as const;
  * are its zoom's) and holds (a video runs at 2× while held, `boost` on the slide settled on); VoiceOver reads the slide
  * showing, and a swipe up or down on it moves to the next or the previous one.
  */
-function SlideStrip({ media, aspects, pos, settled, shown, width, height, topInset, bottomInset, near, playing, onAspect, onTap, onHoldStart, onHoldEnd, boost, onPlayer, goTo, startAt, borrowed, startSlide, onStarted, onClock, onShown, standIn }: { media: FeedMedia[]; aspects: Record<number, number>; pos: SharedValue<number>; settled: number; shown: number; width: number; height: number; topInset: number; bottomInset: number; near: boolean; playing: boolean; onAspect: (index: number, aspect: number) => void; onTap: () => void; onHoldStart: () => void; onHoldEnd: () => void; boost: boolean; onPlayer: (index: number, player: VideoPlayer | null) => void; goTo: (index: number) => void; startAt?: number; borrowed?: VideoPlayer; startSlide: number; onStarted: () => void; onClock: (index: number, read: (() => number) | null) => void; onShown?: () => void; standIn?: string }) {
+function SlideStrip({ media, aspects, pos, settled, shown, width, height, topInset, bottomInset, room, near, playing, onAspect, onTap, onHoldStart, onHoldEnd, boost, onPlayer, goTo, startAt, borrowed, startSlide, onStarted, onClock, onShown, standIn }: { media: FeedMedia[]; aspects: Record<number, number>; pos: SharedValue<number>; settled: number; shown: number; width: number; height: number; topInset: number; bottomInset: number; room: MediaRoom; near: boolean; playing: boolean; onAspect: (index: number, aspect: number) => void; onTap: () => void; onHoldStart: () => void; onHoldEnd: () => void; boost: boolean; onPlayer: (index: number, player: VideoPlayer | null) => void; goTo: (index: number) => void; startAt?: number; borrowed?: VideoPlayer; startSlide: number; onStarted: () => void; onClock: (index: number, read: (() => number) | null) => void; onShown?: () => void; standIn?: string }) {
   const styles = useStyles();
   const stripStyle = useAnimatedStyle(() => ({ transform: [{ translateX: pos.value }] }));
   return (
@@ -1253,9 +1285,9 @@ function SlideStrip({ media, aspects, pos, settled, shown, width, height, topIns
           >
             <SlideClip settled={i === settled}>
               {item.type === "photo" ? (
-                <PhotoSlide uri={item.url} blur={item.blur} aspect={aspectOf(item) ?? aspects[i] ?? null} width={width} height={height} topInset={topInset} bottomInset={bottomInset} onAspect={(a) => onAspect(i, a)} onShown={i === startSlide ? onShown : undefined} standIn={i === 0 ? standIn : undefined} active={i === settled} />
+                <PhotoSlide uri={item.url} blur={item.blur} aspect={aspectOf(item) ?? aspects[i] ?? null} width={width} height={height} room={room} topInset={topInset} bottomInset={bottomInset} onAspect={(a) => onAspect(i, a)} onShown={i === startSlide ? onShown : undefined} standIn={i === 0 ? standIn : undefined} active={i === settled} />
               ) : (
-                <VideoSlide uri={item.playbackUrl} poster={item.poster ?? ""} aspect={aspectOf(item)} width={width} height={height} mounted={close} playing={playing && i === settled} topInset={topInset} bottomInset={bottomInset} index={i} startAt={i === startSlide ? startAt : undefined} borrowed={i === startSlide ? borrowed : undefined} onStarted={onStarted} onClock={onClock} onShown={i === startSlide ? onShown : undefined} standIn={i === 0 ? standIn : undefined} boost={boost && i === settled} onPlayer={onPlayer} />
+                <VideoSlide uri={item.playbackUrl} poster={item.poster ?? ""} aspect={aspectOf(item)} width={width} height={height} room={room} mounted={close} playing={playing && i === settled} topInset={topInset} bottomInset={bottomInset} index={i} startAt={i === startSlide ? startAt : undefined} borrowed={i === startSlide ? borrowed : undefined} onStarted={onStarted} onClock={onClock} onShown={i === startSlide ? onShown : undefined} standIn={i === 0 ? standIn : undefined} boost={boost && i === settled} onPlayer={onPlayer} />
               )}
             </SlideClip>
           </Pressable>
