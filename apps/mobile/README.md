@@ -219,12 +219,14 @@ fading away; let go past about a third of the way, or with a flick, and it carri
 from, still exactly where it was (the feed keeps its scroll position and its video plays on, and a carousel post's row has
 followed the viewer to the photo on screen, `emitPostSlide`): from the page it opened on, the feed's own picture takes
 over as it lands; from any other (a later reel), it fades into that picture on the way (`CROSS_FADE`), as Instagram's
-does, and Back does the same. Only a viewer opened from a link, with no post behind it, sends the page sliding on out and
-fading. Let go sooner (under 30% of the width, or a flick of under 40 points) and it springs back. Only a swipe to the
-right on a post's first photo, or on a page with one picture, pulls the page back (`swipeChoice` in
-`src/lib/viewer-swipe.ts`, 2026-11-16); every other sideways swipe on a post's photos moves between them, wherever it
-starts (the left edge too), and past the last one the edge resists (about a third of the pull shows) and the photo
-springs back: the viewer never closes from there, and a back pull turned round to the left only stretches. The viewer is a modal screen, outside the view in which the gesture library cancels React
+does. Only a viewer opened from a link, with no post behind it, sends the page sliding on out and
+fading. Let go sooner (under 30% of the width, or a flick of under 40 points) and it springs back. The page has no Back button (2026-11-21, the owner's choice): it is left by a swipe to
+the right begun at the screen's left edge (within 24pt of it, as elsewhere in iOS), wherever the post's photos stand, or
+by a swipe to the right on its first photo or on a page with one picture (`swipeChoice` in
+`src/lib/viewer-swipe.ts`); Android's own back button and, over the tabs, tapping the tab it was opened from leave too.
+Every other sideways swipe moves between a post's photos, and past the last one the edge resists (about a third of the
+pull shows) and the photo springs back: the viewer never closes from there, and a back pull turned round to the left
+only stretches. The viewer is a modal screen, outside the view in which the gesture library cancels React
 Native's touches, so the page's taps check `swipedJustNow` themselves: a touch that ended a swipe never pauses, likes or
 opens anything. Feed and viewer videos skip Live Text on a paused frame (`allowsVideoFrameAnalysis={false}`): its button
 would sit over the play control, and its scan was what crashed Expo Go in the simulator. Screens opened from the viewer (a profile, a chat) come up as cards over it. Pictures are laid out

@@ -27,7 +27,6 @@ import { supabase } from "@/lib/supabase";
 import { auroraGradient, textStyle } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { Icon } from "@/components/icon";
-import { GlassIconButton } from "@/components/glass";
 import { FloatingTabBar, useTabBarMirror } from "@/components/floating-tab-bar";
 import { tabBarInset } from "@/lib/tab-bar";
 
@@ -970,11 +969,10 @@ export default function ReelViewerScreen() {
     <View style={styles.root} onLayout={(e) => setHeight(Math.round(e.nativeEvent.layout.height))}>
       {body}
 
-      {/* One row floating over the picture: Back at the left, the toggle in the middle; touches between them go through to the page. */}
+      {/* One row floating over the picture, holding the toggle; there is no Back button (2026-11-21, the owner's choice):
+          a swipe to the right from the screen's left edge leaves, as it does elsewhere in iOS (see swipeChoice). */}
       <Animated.View pointerEvents="box-none" style={[styles.top, { paddingTop: rowTop }, chromeStyle]}>
         <View pointerEvents="box-none" style={styles.row}>
-          {/* Back on clear glass over the picture, as the system draws its bar buttons over media. */}
-          <GlassIconButton icon="chevron-back" label="Back" onPress={leave} variant="media" size={40} iconSize={19} haptic={false} hitSlop={8} style={styles.back} />
           {SCOPE_TOGGLE_SHOWN && scoped && segments.length > 1 ? <ScopeToggle segments={segments} value={chosen} onChange={choose} overVideo shadow={styles.shadow} /> : null}
         </View>
       </Animated.View>
@@ -1072,9 +1070,8 @@ const useStyles = makeStyles((colors) => ({
   stateButton: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.brand, experimental_backgroundImage: auroraGradient(colors.aurora), borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12, marginTop: 12 },
   stateButtonText: { color: colors.onBrand, fontSize: 15, fontWeight: "700" },
   top: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10 },
-  // The toggle is centred on the screen; Back keeps to the left edge, level with it.
+  // The toggle is centred on the screen.
   row: { height: ROW, alignItems: "center", justifyContent: "center" },
-  back: { position: "absolute", left: 12, top: (ROW - 40) / 2 },
   shadow: { textShadowColor: colors.mediaScrim, textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
   foot: { position: "absolute", left: 0, right: 0, alignItems: "center" },
   retry: { backgroundColor: colors.mediaPill, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },

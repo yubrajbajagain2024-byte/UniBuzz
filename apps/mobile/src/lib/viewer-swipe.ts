@@ -14,6 +14,12 @@ export const ViewerSwipeContext = createContext<ViewerSwipe | null>(null);
 /** How far a finger moves before a page decides what the swipe is for: sideways, or up and down (the next post). */
 const DECIDE = 10;
 /**
+ * A swipe to the right that starts this close to the screen's left edge leaves the viewer, wherever the carousel stands,
+ * as the system's own back swipe does. It is the way out now that the page has no Back button (2026-11-21): a swipe
+ * begun further in still only moves between a post's pictures, so nothing closes by accident mid-carousel.
+ */
+const EDGE = 24;
+/**
  * Let go past this share of the page's width, or flicked to the right faster than BACK_VELOCITY after at least
  * BACK_FLICK_MIN points, a pull goes on back; otherwise the page springs home. The flick needs a little travel of its own,
  * so a quick brush of the screen never closes the viewer.
@@ -40,17 +46,19 @@ const HOME_SPRING = { damping: 26, stiffness: 320, mass: 1 };
 /**
  * What a sideways swipe on a page does: move its carousel to the next or previous slide ("slide"), pull the page back
  * towards where the viewer was opened from ("back"), or nothing (left to what is around the page). The viewer goes back
- * only one way: a swipe to the right on a carousel's first slide, or on a page with one picture. Every other sideways
- * swipe on a carousel moves it, past its last slide against the edge's resistance (it springs back), never closing the
- * viewer, wherever the finger starts. `dx` is the finger's sideways travel so far (positive: to the right), `at` the
- * carousel's position in slides (0 at the first), `count` its slides.
+ * two ways: a swipe to the right begun at the screen's left edge (see EDGE), wherever the carousel stands, and a swipe
+ * to the right on a carousel's first picture or on a page with only one. Every other sideways swipe on a carousel moves
+ * it, past its last picture against the edge's resistance (it springs back), never closing the viewer. `dx` is the
+ * finger's sideways travel so far (positive: to the right), `startX` where it touched down, `at` the carousel's
+ * position in pictures (0 at the first), `count` how many it has.
  */
-export function swipeChoice(dx: number, at: number, count: number, canGoBack: boolean): "slide" | "back" | "none" {
+export function swipeChoice(dx: number, startX: number, at: number, count: number, canGoBack: boolean): "slide" | "back" | "none" {
   "worklet";
+  if (dx > 0 && startX < EDGE && canGoBack) return "back";
   if (count > 1) {
-    // To the next slide, or back towards the first while the strip is past it: the carousel follows the finger.
+    // To the next picture, or back towards the first while the strip is past it: the carousel follows the finger.
     if (dx < 0 || at > 0.01) return "slide";
-    // On the first slide, to the right: back, in the viewer; on the Reels tab, the first slide's edge resists.
+    // On the first picture, to the right: back, in the viewer; on the Reels tab, the first picture's edge resists.
     return canGoBack ? "back" : "slide";
   }
   return dx > 0 && canGoBack ? "back" : "none";
@@ -115,7 +123,7 @@ export function usePageSwipe(width: number, slides: PageSlides | null, locked?: 
             return;
           }
           if (Math.abs(dx) <= DECIDE) return;
-          const choice = swipeChoice(dx, -strip.value / width, count, drag !== null);
+          const choice = swipeChoice(dx, touchX.value, -strip.value / width, count, drag !== null);
           if (choice === "none") {
             manager.fail();
             return;

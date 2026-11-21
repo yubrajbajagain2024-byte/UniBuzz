@@ -76,8 +76,9 @@ Why each exists: [docs/decisions.md](../../docs/decisions.md).
 - Gesture Handler inside a React Native `Modal` needs its own `GestureHandlerRootView` in it.
 - Every video plays with its sound on and there is no mute or sound button (`VIDEO_MUTED` in
   `src/lib/video-sound.ts`): keep one video playing at a time, paused when its screen is covered.
-- The viewer closes sideways only on a swipe to the right from a post's first photo (`swipeChoice` in
-  `src/lib/viewer-swipe.ts`); elsewhere a sideways swipe moves between the photos, resisting past the last.
+- The full-screen viewer has no Back button: it is left by a swipe to the right from the screen's
+  left edge, or one on a post's first photo (`swipeChoice` in `src/lib/viewer-swipe.ts`). Elsewhere a
+  sideways swipe moves between the photos, resisting past the last. Keep a way out of every page.
 - The camera's beauty filters are for photos only: the camera records video itself, where the shader
   cannot reach. The looks are numbers in `packages/shared/src/beauty.ts`, the shader and GL in
   `src/lib/beauty-gl.ts`; expo-gl is optional, so check `BEAUTY_AVAILABLE` and never import it at a
