@@ -61,14 +61,21 @@ const TOP_SHADE_MIN = 170;
 const TOP_SHADE_EXTRA = 96;
 /** Tall enough to sit under the whole rail (like, comments, save, share, "…") with room to fade in above the like. */
 const SHADE_HEIGHT = 540;
-/** The rail's bottom padding: the "…" centre 46pt above the bottom inset, Instagram's geometry. */
-const OVERLAY_PAD = 31;
+/**
+ * The rail's bottom padding: the "…" centre 46pt above the bottom inset, Instagram's geometry. Exported with the
+ * numbers below so anything else drawn over full-screen media lays its overlay out exactly as a post's (the stories
+ * viewer does, src/app/stories/[id].tsx): one home for the geometry, so the two can never drift apart.
+ */
+export const OVERLAY_PAD = 31;
+/** The rail's column: its width, and the room between two of its buttons. */
+export const RAIL_WIDTH = 60;
+export const RAIL_GAP = 21;
 /**
  * The words (the name, the title and caption, the link) sit right on what is under them, TikTok's way: their last line
  * WORDS_GAP above the bottom inset on a photo, just over the timeline's touch band on a video (so a tap on the words
  * never lands on the timeline), and they grow upward from there, however many lines they have.
  */
-const WORDS_GAP = 10;
+export const WORDS_GAP = 10;
 const WORDS_OVER_TIMELINE = TIMELINE_TOUCH + 2;
 /** How long the words take to settle on their new line when the slide on show turns from a photo to a video or back. */
 const WORDS_GLIDE_MS = 220;
@@ -900,7 +907,11 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
  * One of the rail's buttons: its icon and its count white over the picture, with a crisp shadow; `tint` colours an icon
  * that is on (the red heart).
  */
-function RailButton({ icon, sf, label, tint, onPress, a11y, selected, small, scale, disabled }: { icon: keyof typeof Ionicons.glyphMap; sf?: SFSymbol; label?: string; tint?: string; onPress: () => void; a11y: string; selected?: boolean; small?: boolean; scale?: Animated.Value; disabled?: boolean }) {
+/**
+ * One button of the rail down the right of a full-screen page: the glyph, a word or a count under it, and the bounce a
+ * symbol gives when it turns on. Exported so the stories viewer draws the same rail (see OVERLAY_PAD).
+ */
+export function RailButton({ icon, sf, label, tint, onPress, a11y, selected, small, scale, disabled }: { icon: keyof typeof Ionicons.glyphMap; sf?: SFSymbol; label?: string; tint?: string; onPress: () => void; a11y: string; selected?: boolean; small?: boolean; scale?: Animated.Value; disabled?: boolean }) {
   const colors = useColors();
   const styles = useStyles();
   // A heart or a bookmark that turns on bounces like the system's symbols.
@@ -1350,7 +1361,7 @@ const useStyles = makeStyles((colors) => {
     // Hashtags and mentions in an opened caption: bold white over the picture.
     tag: { fontWeight: "700" },
     // Lifted from the words' line to its own: its bottom stays OVERLAY_PAD over the bottom inset.
-    rail: { width: 60, alignItems: "center", gap: 21, marginBottom: OVERLAY_PAD - WORDS_GAP },
+    rail: { width: RAIL_WIDTH, alignItems: "center", gap: RAIL_GAP, marginBottom: OVERLAY_PAD - WORDS_GAP },
     railButton: { alignItems: "center", gap: 3, minWidth: 48 },
     // The unseen copy of the description that tells whether its one line was cut.
     measure: { position: "absolute", left: 0, right: 0, opacity: 0 },

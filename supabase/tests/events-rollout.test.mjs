@@ -27,7 +27,7 @@ const REST = [
 // 62 (story actions) and 66 (calls paused) go to production on their own too (story-actions-rollout.test.mjs,
 // calls-paused.test.mjs); they are not part of this rehearsal.
 // 67 (admin authority) goes to production on its own (admin-authority.test.mjs); left out until it is live.
-const AHEAD = ["20261114000000_story_actions.sql", "20261118000000_calls_paused.sql", "20261119000000_admin_authority.sql"];
+const AHEAD = ["20261114000000_story_actions.sql", "20261118000000_calls_paused.sql", "20261119000000_admin_authority.sql", "20261120000000_story_self_like.sql"];
 const check = (cond, message) => { if (!cond) throw new Error(message); };
 
 const { db, mk, as, asAnon, asService } = await boot({ live: true, skip: [...REST, EVENTS, ...AHEAD] });

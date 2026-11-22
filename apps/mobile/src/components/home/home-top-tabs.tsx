@@ -74,8 +74,11 @@ export function useOverVideo(store: OverVideoStore): boolean {
   return useSyncExternalStore(store.subscribe, store.get, store.get);
 }
 
-/** How solid the bar's background is on each page: fully on Stories and Buzz, gone over the Orbit feed. */
-const SOLID = APP_HOME_TABS.map((s) => (s.value === "foryou" ? 0 : 1));
+/**
+ * How solid the bar's background is on each page: fully on Buzz, gone over Stories and Orbit, whose pictures run the
+ * whole height of the screen and are meant to be seen behind the tabs (the owner's brief, 2026-11-21).
+ */
+const SOLID = APP_HOME_TABS.map((s) => (s.value === "foryou" || s.value === "stories" ? 0 : 1));
 /** The Following choice opens the Posts page, so it is offered only while Posts has a tab (it has none: see HIDDEN_HOME_SECTIONS). */
 const POSTS_SHOWN = APP_HOME_TABS.some((s) => s.value === "posts");
 

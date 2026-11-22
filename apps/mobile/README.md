@@ -189,9 +189,14 @@ Its three pages, **Stories | Orbit | Buzz**, sit side by side in a pager (`src/l
 Reels are sections without a tab in the app — `HIDDEN_HOME_SECTIONS` keeps Posts out of the website's row too, and Orbit
 carries both their feeds — while their data, their post features and their addresses stay, Posts' Following filter on the
 website's `/?tab=posts`): swipe left or right to move between them, or tap a label in the floating top bar. **Stories**
-(`src/components/home/stories-section.tsx`) is a page of rings, three to a row, where the row across the top of the feed
-used to be: "Your story" first with its + , then everyone whose stories you may see, the unseen in the aurora ring and
-the seen in a quiet grey one, a first name under each; a tap opens them full screen and swipes on through the page.
+(`src/components/home/stories-section.tsx`) plays the stories themselves, where the row across the top of the feed used
+to be: no rings and nothing to tap open, just everyone's stories in turn, from the moment the tab is on screen. It
+draws `StoryPlayer` (below), the very player the full-screen viewer draws, and the picture runs the whole height and
+width of the screen — behind the status bar, behind the Stories | Orbit | Buzz tabs and down to the bottom bar — with
+only the story's own bars pinned above those tabs (`barsTop`) and the shades to hold the white labels on a bright
+frame. The floating bottom bar's room is its bottom inset, so the reply pill sits just above the bar and the bar stays
+in view; there is no Close, since this is a page of Home rather than a screen over it. Past the last story of the last
+person it moves on to Orbit.
 **Buzz** is unchanged. A post with several photos takes the sideways swipes first, TikTok's way:
 from its last photo the next swipe on goes to the next section, from its first the next swipe back to the one before,
 so a carousel never keeps the finger (`src/lib/section-pager.ts`; Explore's three pages do the same; it never moves to
@@ -267,15 +272,34 @@ switch: the phone's volume buttons rule it), with the app's own controls instead
 them, and they fade a moment after it plays): play or pause in the middle and the same timeline with the time gone and
 the time left, as in Photos, plus the hold for 2×; the close button and the counter are clear glass; with VoiceOver on they never fade
 (`useScreenReader` in `src/lib/accessibility.ts`), and faded ones leave the accessibility tree as they leave touch.
-Stories are laid out the same way since 2026-11-21 (`src/app/stories/[id].tsx`): the picture edge to edge on pure
-black, whole and in its own shape, and everything else floating over it on soft shades — the bars for each of that
-person's stories along the very top, the name and "⋯" under them, and the reply pill, the heart and the paper plane (or,
-on your own, Activity, Send and Delete) just above the home indicator. The tap zones (the left third back, the rest on)
-stop above that bar, so a near miss never moves the story on, and holding a story fades every control away so the
-picture is seen whole. It used to sit in a rounded 9:16 card with the actions on black below it (`storyFrame`, now
-gone), which cropped anything that was not 9:16. A sideways swipe turns from one person to the next like a cube
-(`CubeFace` in the same file): each page hinges on the edge it shares with the page coming on, a quarter turn over a
-whole page, darkening as it turns away, all from the pager's offset on the UI thread. Over every page, one top row with Back at the left and the
+Stories are a post's page with story timing on top since 2026-11-21 (`StoryPlayer` in
+`src/components/stories/story-player.tsx`, drawn both by Home's Stories tab and by the full-screen viewer at
+`src/app/stories/[id].tsx`, which adds only the pull down to close and the Close button): the picture edge to
+edge on pure black, whole and in its own shape, and the overlay laid out exactly as Orbit lays a post out — the name
+and, under it, how long ago and who it went to at the bottom left; the rail down the right (someone else's: the heart,
+Share and "⋯"; your own: Activity, Send and Delete), drawn by Orbit's own `RailButton` with its `OVERLAY_PAD`,
+`WORDS_GAP`, `RAIL_WIDTH` and `RAIL_GAP` imported from `src/components/home/reel-item.tsx`, so the two can never drift
+apart. What stays a story's own sits over that: the bars for each of that person's stories across the very top, filling
+as it plays, Close at the top right (only where there is something to close), the creator's photo with a "+" at the top
+of the rail until they are followed (TikTok's, a tap follows and it fades away), and the reply pill under the name (it
+alone rides the keyboard; the rail steps aside while a reply is typed). The rail is the same shape on either story:
+the heart, Share, then "⋯". Your own adds the eye and its view count under Share, which opens the list of who has seen
+it, and its "⋯" holds Delete; you may like your own story like anyone else's (migration 68 — until that is live the
+database refuses it and the heart goes back with the reason). Someone else's keeps Report, Mute and Block behind "⋯".
+
+**The axes are TikTok's** (2026-11-21): a tap moves within one person — the left third back, the rest on, and neither
+leaves at the ends — a swipe **up** goes to the next person and down to the one before, and the sideways axis is left
+alone, so on Home it is the pager of sections and a swipe there moves between Stories, Orbit and Buzz. The clock
+running out moves on by itself: to this person's next story, and past their last to the next person. The tap zones
+stop above the reply pill, so a near miss never moves the story on, and holding a story fades every control away so the
+picture is seen whole. Unlike a post on Orbit, a story is drawn to the frame rather than fitted whole: it is shot for
+the phone, and nothing would be behind the tabs if it were letterboxed. It used to sit in a rounded 9:16 card with Instagram's chrome — the name on top, the actions in
+a row on black below (`storyFrame`, now gone) — which cropped anything that was not 9:16. People moved from the
+sideways axis to the vertical one on 2026-11-21, and the cube that turned between them (`CubeFace`) went with it: the
+pager is now a plain vertical `ScrollView`, not a list, drawing only the page on screen and the two beside it (a list
+inside Home's own pager would be a nested VirtualizedList), and a horizontal drag simply passes through it to whatever
+is around — Home's sections on the tab, nothing in the viewer. The viewer is therefore left by a pull **to the right** rather than
+down, as the app's other full-screen viewer is, with Close still at the top right. Over every page, one top row with Back at the left and the
 Campus | Global toggle in the middle (for reels and For you, while the toggle is shown); the creator's name, the words and the heart, comments, share,
 save and "…" rail sit at the bottom (as on the Reels page, the rail a little nearer the right edge: `railRight`). The
 words (the name, the title and caption, a link) sit right on what is under them, TikTok's way (2026-11-16): their last

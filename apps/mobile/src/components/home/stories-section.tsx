@@ -1,78 +1,72 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
-import { STORY_RING, STORY_RING_GAP, type StoryGroup } from "@apartment-book/shared";
-import { Avatar } from "@/components/avatar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon } from "@/components/icon";
-import { AnimatedFlatList, listInset } from "@/lib/collapsing-header";
-import { refreshWithHaptic } from "@/lib/haptics";
+import { StoryPlayer } from "@/components/stories/story-player";
+import { openHomeSection } from "@/lib/home-section";
 import { useSession } from "@/lib/session";
-import { handStories, refreshStories, useStories } from "@/lib/stories-store";
+import { refreshStories, useStories } from "@/lib/stories-store";
 import { useTabBarInset } from "@/lib/tab-bar";
 import { auroraGradient, textStyle } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { useCreateMenu } from "./create-menu";
 
-/** Three rings to a row on every phone: the ring is what is left of the row once the gutters and the gaps are taken. */
-const COLUMNS = 3;
-const GUTTER = 16;
-const GAP = 12;
-/** A ring no bigger than this, however wide the phone: on a large one the rings sit in from the edges instead of growing. */
-const RING_MAX = 112;
-
-/** One row of the grid, by the person whose stories it is. */
-type Cell = { key: string; group: StoryGroup | null };
+/** The bars sit this far under the status bar, with Home's tab labels just below them (HOME_TOP_BAR_HEIGHT's TOP_GAP). */
+const BARS_TOP = 2;
 
 /**
- * Home → Stories, the page left of Orbit (the owner's sketch, 2026-11-21): everyone whose stories this person may see,
- * as a page of rings rather than the row that used to sit across the top of the feed. "Your story" comes first (your
- * photo with a + to share one; once you have one, your own ring, which opens it), then the unseen in the aurora ring,
- * the seen in a quiet grey one, a first name under each. A tap opens them full screen (app/stories), swiping on from
- * there through the rest of the page, as the row's taps did. Only what the database lets this person see is ever here
- * (migration 58's rules). Signed out there is nothing to show but the invitation to log in.
+ * Home → Stories, the page left of Orbit (the owner's brief, 2026-11-21): the stories themselves, playing, rather than
+ * a row or a grid of rings to tap. Whoever's stories this person may see are the pages of one player (StoryPlayer,
+ * components/stories/story-player.tsx), the very one the full-screen viewer draws: each story edge to edge on black
+ * and whole, a bar for each along the very top filling as it plays, the name at the bottom left and the rail down the
+ * right as on a post, and the reply pill just above the floating bottom bar (`bottomInset`), which stays in view here
+ * — this is a page of Home, not a screen over it, so there is no Close.
+ *
+ * The first story starts as soon as the tab is on screen and they play on by themselves; a tap on the right goes to
+ * the next, on the left back; a sideways swipe turns to the next person like a cube, and one past the last person is
+ * handed to Home's pager, so Orbit is a swipe away as it is from any page. Past the last story of the last person the
+ * page moves on to Orbit of its own accord, which is what lies beyond the stories. Only what the database lets this
+ * person see is ever here (migration 58's rules). Signed out there is nothing but the invitation to log in.
  */
-export function StoriesSection({ active, topInset, onScroll }: { active: boolean; topInset: number; onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void }) {
-  const { user, profile } = useSession();
+export function StoriesSection({ active, topInset, height }: { active: boolean; topInset: number; height: number }) {
+  const { user, loading: sessionLoading } = useSession();
   const router = useRouter();
   const create = useCreateMenu();
   const colors = useColors();
   const styles = useStyles();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const tabBar = useTabBarInset();
   const groups = useStories(user?.id ?? null, active);
-  const [refreshing, setRefreshing] = useState(false);
-  const inset = useMemo(() => listInset(topInset), [topInset]);
+  const userId = user?.id ?? null;
 
-  const mine = groups.find((g) => g.mine) ?? null;
-  const others = useMemo(() => groups.filter((g) => !g.mine), [groups]);
-  // Your own ring first, whether or not you have a story: its cell is the one that shares one.
-  const cells = useMemo<Cell[]>(() => [{ key: "mine", group: mine }, ...others.map((g) => ({ key: g.author.id, group: g }))], [mine, others]);
-
-  const ring = Math.min(RING_MAX, Math.floor((width - GUTTER * 2 - GAP * (COLUMNS - 1)) / COLUMNS));
-  const photo = ring - 2 * (STORY_RING + STORY_RING_GAP);
-
-  const open = useCallback(
-    (group: StoryGroup) => {
-      const list = mine ? [mine, ...others] : others;
-      const index = list.indexOf(group);
-      handStories(list, index < 0 ? 0 : index);
-      router.push({ pathname: "/stories/[id]", params: { id: group.author.id } });
-    },
-    [mine, others, router],
-  );
-
-  const refresh = useCallback(() => {
-    if (!user) return;
-    setRefreshing(true);
-    void refreshStories(user.id).finally(() => setRefreshing(false));
-  }, [user]);
-  // A pull that came back while the page was left behind never leaves the spinner turning.
+  // Loaded once the store has answered for this person: until then, neither the stories nor "nobody has shared one".
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
-    if (!active) setRefreshing(false);
-  }, [active]);
+    if (!userId || !active) return;
+    let stale = false;
+    void refreshStories(userId).finally(() => {
+      if (!stale) setLoaded(true);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [userId, active]);
 
-  const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
+  /** Past the last story of the last person: on to Orbit, the page beside this one. */
+  const onDone = useCallback(() => openHomeSection("foryou"), []);
+  // A new person's stories (or one whose stories ran out) rebuild the player rather than leaving it on a stale page.
+  const key = useMemo(() => groups.map((g) => g.author.id).join("|"), [groups]);
 
+  // The session is read from the phone at startup: until it has answered, nobody is asked to log in.
+  if (sessionLoading) {
+    return (
+      <View style={[styles.screen, styles.centered]}>
+        <ActivityIndicator color={colors.onMedia} size="large" />
+      </View>
+    );
+  }
   if (!user) {
     return (
       <View style={[styles.screen, styles.centered, { paddingTop: topInset }]}>
@@ -85,80 +79,40 @@ export function StoriesSection({ active, topInset, onScroll }: { active: boolean
       </View>
     );
   }
-
-  return (
-    <View style={styles.screen}>
-      <AnimatedFlatList
-        data={cells}
-        keyExtractor={(c: Cell) => c.key}
-        numColumns={COLUMNS}
-        {...inset.list}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={{ paddingTop: inset.paddingTop + 12, paddingBottom: 32 + tabBar, paddingHorizontal: GUTTER, gap: 18 }}
-        accessibilityLabel="Stories"
-        renderItem={({ item }: { item: Cell }) => {
-          const g = item.group;
-          const isMine = item.key === "mine";
-          const label = isMine ? (g ? `Your story, ${g.stories.length} ${g.stories.length === 1 ? "story" : "stories"}` : "Your story") : `${g!.author.full_name}'s story${g!.seen ? ", seen" : ""}`;
-          const lit = isMine ? Boolean(g) : !g!.seen;
-          return (
-            <Pressable
-              onPress={() => (g ? open(g) : create())}
-              style={({ pressed }) => [styles.cell, { width: ring }, pressed && styles.pressed]}
-              accessibilityRole="button"
-              accessibilityLabel={label}
-              accessibilityHint={isMine && !g ? "Share a photo or video that disappears after 24 hours" : undefined}
-            >
-              <View style={[styles.ring, { width: ring, height: ring, borderRadius: ring / 2 }, lit ? { backgroundColor: colors.brand, experimental_backgroundImage: auroraGradient(colors.aurora, 135) } : isMine ? styles.ringNone : styles.ringSeen]}>
-                <View style={[styles.ringGap, { width: ring - 2 * STORY_RING, height: ring - 2 * STORY_RING, borderRadius: (ring - 2 * STORY_RING) / 2 }]}>
-                  <Avatar name={isMine ? profile?.full_name : g!.author.full_name} url={isMine ? (profile?.avatar_url ?? null) : g!.author.avatar_url} size={photo} online={false} />
-                </View>
-                {/* The + to share: on its own once you have stories (a tap on the photo opens them), on the whole ring when you have none. */}
-                {isMine ? (
-                  <Pressable onPress={create} hitSlop={6} accessibilityRole="button" accessibilityLabel="Add to your story" style={[styles.plus, { borderColor: colors.bg }]}>
-                    <Icon name="add" size={16} color="#fff" weight="bold" />
-                  </Pressable>
-                ) : null}
-              </View>
-              <Text style={[styles.name, !isMine && g!.seen && styles.nameSeen]} numberOfLines={1}>
-                {isMine ? "Your story" : firstName(g!.author.full_name)}
-              </Text>
+  if (groups.length === 0) {
+    return (
+      <View style={[styles.screen, styles.centered, { paddingTop: topInset }]}>
+        {loaded ? (
+          <>
+            <Icon name="camera-outline" size={48} color={colors.onMediaMuted} />
+            <Text style={styles.stateTitle}>No stories yet</Text>
+            <Text style={styles.stateBody}>Photos and videos your campus shares for a day play here. Share the first one.</Text>
+            <Pressable onPress={() => create()} style={styles.stateButton} accessibilityRole="button">
+              <Icon name="add" size={18} color={colors.onBrand} />
+              <Text style={styles.stateButtonText}>Add to your story</Text>
             </Pressable>
-          );
-        }}
-        ListFooterComponent={
-          others.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.stateBody}>Nobody has shared a story yet. Share one and it shows here for a day.</Text>
-            </View>
-          ) : undefined
-        }
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshWithHaptic(refresh)} progressViewOffset={inset.progressViewOffset} />}
-      />
+          </>
+        ) : (
+          <ActivityIndicator color={colors.onMedia} size="large" />
+        )}
+      </View>
+    );
+  }
+  if (height <= 0) return <View style={styles.screen} />;
+  return (
+    <View style={{ width, height, backgroundColor: colors.mediaBg }}>
+      {/* The bars are pinned above Home's tabs, right under the status bar; the story itself runs on behind both. */}
+      <StoryPlayer key={key} groups={groups} start={0} width={width} height={height} barsTop={insets.top + BARS_TOP} bottomInset={tabBar} active={active} onDone={onDone} />
     </View>
   );
 }
 
+/** The page is black in both themes: it is nothing but pictures and video. */
 const useStyles = makeStyles((colors) => ({
-  screen: { flex: 1, backgroundColor: colors.bg },
+  screen: { flex: 1, backgroundColor: colors.mediaBg },
   centered: { alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 8 },
-  // The rings sit from the row's start, so a short last row lines up under the one above it.
-  row: { gap: GAP, justifyContent: "flex-start" },
-  cell: { alignItems: "center", gap: 8 },
-  pressed: { opacity: 0.75 },
-  ring: { alignItems: "center", justifyContent: "center" },
-  ringSeen: { backgroundColor: colors.border },
-  ringNone: { backgroundColor: "transparent" },
-  // The gap between the ring and the photo, in the page's own colour.
-  ringGap: { backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" },
-  plus: { position: "absolute", right: 2, bottom: 2, width: 26, height: 26, borderRadius: 13, borderWidth: 2.5, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" },
-  name: { fontSize: 13, fontWeight: "600", color: colors.text, textAlign: "center" },
-  nameSeen: { color: colors.muted, fontWeight: "500" },
-  empty: { paddingTop: 20, paddingHorizontal: 16 },
-  stateTitle: { ...textStyle.title3, color: colors.text, textAlign: "center", marginTop: 6 },
-  stateBody: { color: colors.muted, fontSize: 14, textAlign: "center", lineHeight: 20 },
-  stateButton: { backgroundColor: colors.brand, experimental_backgroundImage: auroraGradient(colors.aurora), borderRadius: 999, paddingHorizontal: 22, paddingVertical: 12, marginTop: 12 },
+  stateTitle: { ...textStyle.title3, color: colors.onMedia, textAlign: "center", marginTop: 6 },
+  stateBody: { color: colors.onMediaMuted, fontSize: 14, textAlign: "center", lineHeight: 20 },
+  stateButton: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.brand, experimental_backgroundImage: auroraGradient(colors.aurora), borderRadius: 999, paddingHorizontal: 22, paddingVertical: 12, marginTop: 12 },
   stateButtonText: { color: colors.onBrand, fontSize: 15, fontWeight: "700" },
 }));

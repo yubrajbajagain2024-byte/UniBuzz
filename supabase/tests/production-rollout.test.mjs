@@ -14,8 +14,8 @@ import { catalog, diffCatalogs, isBuzz, BUZZ_DATA_SQL, DATA_HELPER_SQL, DROP_DAT
 
 // Migrations that go to production on their own, as 58 to 62 and 66 did, are left out here until they are live, so the
 // database starts in production's state as it is. 66 (calls paused) went live on 2026-11-05; 67 (admin authority,
-// admin-authority.test.mjs) waits.
-const AHEAD = ["20261119000000_admin_authority.sql"];
+// admin-authority.test.mjs) and 68 (liking your own story, story-self-like.test.mjs) wait.
+const AHEAD = ["20261119000000_admin_authority.sql", "20261120000000_story_self_like.sql"];
 const PENDING = [
   "20261103000300_discover.sql",
   "20261104000100_discover_audience.sql",
