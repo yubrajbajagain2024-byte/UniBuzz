@@ -103,24 +103,13 @@ export function storyAudienceNote(audience: PostAudience): string | null {
   return audience === "campus" ? "Campus" : audience === "friends" ? "Friends" : audience === "selected" ? "Selected people" : null;
 }
 
-/** The viewer's action bar: a 44-point row (the reply pill, the heart, the paper plane) with 8 points above and below. */
-export const STORY_ACTION_BAR = 60;
-/** How much of a whole 9:16 picture a screen must leave room for, beside the bar, for the story to sit in a card. */
-const FRAME_MIN = 0.94;
-
 /**
- * Where the viewer puts a story on a screen `width` × `height` with these safe-area insets. On a tall phone, as iOS's own
- * viewers and Instagram's do, the story is a rounded 9:16 card from just under the status bar, and the action bar sits
- * below it on black: the actions never lie over the picture (always legible), and a tap that misses one never lands on
- * the story. A shorter screen (an iPhone SE) has no room for that: the story fills the screen (`framed` false, from the
- * top edge) and the bar floats over a deeper shade. The card is never taller than 9:16 nor than the room above the bar.
+ * The viewer's action bar: a 44-point row (the reply pill, the heart, the paper plane) with 8 points above and below.
+ * It floats over the picture, and the viewer's tap zones stop above it, so a tap that misses a control never moves the
+ * story on. (Until 2026-11-21 a tall phone put the story in a 9:16 card with this bar below it on black, `storyFrame`;
+ * the owner asked for the picture edge to edge instead, whole and on black, as Orbit draws a post.)
  */
-export function storyFrame(width: number, height: number, insetTop: number, insetBottom: number): { framed: boolean; top: number; height: number } {
-  const whole = (width * 16) / 9;
-  const room = height - insetTop - insetBottom - STORY_ACTION_BAR;
-  if (room >= whole * FRAME_MIN) return { framed: true, top: insetTop, height: Math.min(whole, room) };
-  return { framed: false, top: 0, height };
-}
+export const STORY_ACTION_BAR = 60;
 
 /**
  * What a heart's requests came to: `value` is what the database now holds, `attempted` the heart the last request tried

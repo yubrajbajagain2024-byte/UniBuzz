@@ -1,5 +1,9 @@
 # Look-only tour of the Instagram-style Posts feed. It never likes, saves, comments or deletes, so it is safe whoever is signed in.
 # Needs the seeded sample posts (node e2e/sim-seed.mjs).
+#
+# NOT RUNNABLE as it stands: it taps a "Posts" tab, and Posts has had no tab in the app since HIDDEN_HOME_SECTIONS
+# (the section keeps its feed, its data and the website's /?tab=posts). Kept for the card feed it checks
+# (src/components/home/posts-section.tsx), which nothing mounts now that Orbit is the full-screen feed.
 appId: host.exp.Exponent
 ---
 - extendedWaitUntil:

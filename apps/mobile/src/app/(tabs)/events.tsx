@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Pressable, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
-import { useRouter } from "expo-router";
+import { useIsFocused, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DEFAULT_EVENT_FILTERS, EVENT_SECTIONS, eventActiveChips, eventFilterCount, eventQuickFilters, type EventFilterChoice, type EventSection } from "@apartment-book/shared";
 import { DISCOVERY_BAR_HEIGHT, DiscoveryBar } from "@/components/discovery-bar";
@@ -12,7 +12,6 @@ import { Icon } from "@/components/icon";
 import { SlidingTabs } from "@/components/sliding-tabs";
 import { useCampusTimeZone } from "@/lib/campus-time-zone";
 import { useCollapsingHeader } from "@/lib/collapsing-header";
-import { InTabsContext } from "@/lib/tab-bar";
 import { useCollapseOnScroll } from "@/lib/tab-bar-collapse";
 import { useSession } from "@/lib/session";
 import { auroraGradient, space, textStyle } from "@/lib/theme";
@@ -24,9 +23,9 @@ const TITLE_ROW = 52;
 const FLOAT = DISCOVERY_BAR_HEIGHT;
 
 /**
- * Events, the campus's calendar: a screen of its own, opened from the calendar beside the magnifier in Home's top bar
- * (it was the bar's fourth tab until the bar became Home, Explore, Create, Messages, Profile), with Back before its big
- * title. Laid out like Explore: the big "Events" title with Saved at its right, then the same three
+ * Events, the bottom bar's second tab (the owner's sketch, 2026-11-21: Home, Events, Create, Messages, Profile; Explore
+ * took the compass in Home's top bar in its place), laid out like Explore: the big "Events" title with Saved at its
+ * right, then the same three
  * levels (DiscoveryBar): For you | All events above a pager with Home's sliding underline; one search field (events'
  * titles, words and places) with the filter button beside it; and one row of quick filters that narrow both pages
  * (Today, This week, Weekend: Upcoming is none of them), a removable chip for each event type picked in the sheet, and
@@ -56,9 +55,10 @@ export default function EventsScreen() {
   const scrollX = useRef(new Animated.Value(0)).current;
   /** All events is mounted the first time it comes into view, so it does not load until someone looks at it. */
   const [mounted, setMounted] = useState<Set<number>>(() => new Set([0]));
-  // Pushed over the tabs, there is no bottom bar under it to collapse: the hook stays idle (and keeps the bar whole for
-  // when Home shows again).
-  const trackTabBar = useCollapseOnScroll(false, index);
+  // The bottom bar collapses to Events' button as the page on screen scrolls on and comes back as it scrolls back, as
+  // on Home (lib/tab-bar-collapse.ts); the other page starts with the whole bar.
+  const focused = useIsFocused();
+  const trackTabBar = useCollapseOnScroll(focused, index);
   const { translateY: floatShift, select: followPage, reveal: revealFloat, onScroll: onPageScroll } = useCollapsingHeader(ORDER.length, FLOAT, 0, trackTabBar);
 
   const [text, setText] = useState("");
@@ -132,17 +132,10 @@ export default function EventsScreen() {
 
   const pageProps = { topInset: FLOAT, universityId, timeZone, q, dateFilter, categories };
 
-  // Back to where it was opened from; opened from a link with nothing under it, Home.
-  const back = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)" as never));
-
   return (
-    <InTabsContext.Provider value={false}>
     <View style={styles.screen}>
       <View style={[styles.chrome, { paddingTop: insets.top }]}>
         <View style={styles.titleRow}>
-          <Pressable onPress={back} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back" style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]}>
-            <Icon name="chevron-back" size={28} color={colors.text} />
-          </Pressable>
           <Text style={styles.title} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             Events
           </Text>
@@ -211,17 +204,14 @@ export default function EventsScreen() {
         }
       />
     </View>
-    </InTabsContext.Provider>
   );
 }
 
 const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   chrome: { backgroundColor: colors.bar, zIndex: 3 },
-  // Back, the big title right after it, Saved at the far end.
-  titleRow: { height: TITLE_ROW, flexDirection: "row", alignItems: "center", gap: 2, paddingLeft: 6, paddingRight: space.md },
-  back: { width: 40, height: 44, alignItems: "center", justifyContent: "center" },
-  title: { flex: 1, ...textStyle.largeTitle, color: colors.text },
+  titleRow: { height: TITLE_ROW, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.md, paddingLeft: 20, paddingRight: space.md },
+  title: { flexShrink: 1, ...textStyle.largeTitle, color: colors.text },
   titleButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   body: { flex: 1, overflow: "hidden" },
   float: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 2, backgroundColor: colors.bar },

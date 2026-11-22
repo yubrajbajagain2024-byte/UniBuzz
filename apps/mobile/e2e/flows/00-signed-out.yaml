@@ -1,7 +1,9 @@
-# Signed-out tour: Home (For you | Buzz | Reels beside your photo, the Campus | Global toggle under them for anyone with a university while it is shown: opens on For you, the pager swipes between them), the
-# Notifications bell (signed out it asks to log in), Events (the calendar in Home's top bar: For you | All events), Explore (Housing | Roommate | Marketplace: opens on Housing,
-# same pager), Messages (bottom tab: asks to log in), and the sign-in prompt on the Profile tab.
-# The bottom bar is icons only: Home, Explore, Create, Messages, Profile. Needs the seeded sample posts (node e2e/sim-seed.mjs).
+# Signed-out tour: Home (Stories | Orbit | Buzz along the top left, the three icons at the top right, the Campus | Global
+# toggle under them for anyone with a university while it is shown: opens on Orbit, the full-screen feed, and the pager
+# swipes between the three), the Notifications bell (signed out it asks to log in), Explore (the compass in Home's top
+# bar: Housing | Roommate | Marketplace, opening on Housing, same pager), Events (bottom tab: For you | All events),
+# Messages (bottom tab: asks to log in), and the sign-in prompt on the Profile tab.
+# The bottom bar is icons only: Home, Events, Create, Messages, Profile. Needs the seeded sample posts (node e2e/sim-seed.mjs).
 appId: host.exp.Exponent
 ---
 - extendedWaitUntil:
@@ -26,40 +28,39 @@ appId: host.exp.Exponent
     start: "88%,10%"
     end: "12%,62%"
     duration: 800
+- assertVisible: "Stories"
 - assertVisible: "Orbit"
 - assertVisible: "Buzz"
-- assertVisible: "Reels"
-# Posts is a section without a tab: For you carries its posts.
+# Posts and Reels are sections without a tab in the app: Orbit carries both.
 - assertNotVisible: "Posts"
-- takeScreenshot: e2e/screenshots/01-home-foryou
-# The top bar has two rows like X's: your photo in a gradient ring ("Your menu") opens your menu (signed out, log in),
-# the UniBuzz wordmark in the middle, the bell on the right; then the three labels, and under them the Campus | Global
-# toggle for anyone with a university (hidden for now: SCOPE_TOGGLE_SHOWN in src/lib/home-scope.ts). Create in the
-# middle of the bottom bar opens the camera on SNAP (BUZZ | SNAP | POST | REEL). Signed out there is no campus to pick, so the toggle is not drawn either way.
+- assertNotVisible: "Reels"
+- takeScreenshot: e2e/screenshots/01-home-orbit
+# The top bar is one row: the three labels along its left, then the compass (Explore), the bell and the magnifier at its
+# right; under them, for anyone with a university, the Campus | Global toggle (hidden for now: SCOPE_TOGGLE_SHOWN in
+# src/lib/home-scope.ts). Create in the middle of the bottom bar opens the camera on SNAP (BUZZ | SNAP | POST | REEL).
+# Signed out there is no campus to pick, so the toggle is not drawn either way.
 - assertNotVisible: "Campus"
 - assertNotVisible: "Global"
 - takeScreenshot: e2e/screenshots/01-home-bar
-# For you holds posts and reels only: the seeded Buzz thread is not on this page (it waits on the Buzz page).
+# Orbit holds posts and reels only: the seeded Buzz thread is not on this page (it waits on the Buzz page).
 - assertNotVisible: ".*Landlord wants to keep my whole deposit.*"
-# The three pages sit side by side in a pager: a flick to the left slides from For you to Buzz. The flick starts on the
-# seeded post's caption (centred first), because a photo carousel keeps horizontal swipes for itself (04-posts-look relies on that).
-- scrollUntilVisible:
-    element: ".*First week back on campus.*"
-    direction: DOWN
-    centerElement: true
+# The three pages sit side by side in a pager: a flick to the left slides from Orbit to Buzz. It starts low on the page,
+# clear of the rail, because a post's photo carousel keeps the horizontal swipe for itself until its last photo.
 - swipe:
-    start: "85%,50%"
-    end: "15%,50%"
+    start: "60%,80%"
+    end: "10%,80%"
     duration: 400
 - waitForAnimationToEnd
 # Buzz is for signed-in students only: signed out, its page asks you to log in (nothing of Buzz loads).
 - assertVisible: "Buzz is anonymous campus talk"
 - assertVisible: "Log in"
 - takeScreenshot: e2e/screenshots/01-home-buzz
-- tapOn: "Reels"
+- tapOn: "Stories"
 - waitForAnimationToEnd
-- takeScreenshot: e2e/screenshots/01-home-reels
-# A tap on the label brings For you back.
+# Signed out there are no stories to show, only the invitation to log in.
+- assertVisible: "Stories from your campus"
+- takeScreenshot: e2e/screenshots/01-home-stories
+# A tap on the label brings Orbit back.
 - tapOn: "Orbit"
 - waitForAnimationToEnd
 - extendedWaitUntil:
@@ -81,26 +82,12 @@ appId: host.exp.Exponent
 - extendedWaitUntil:
     visible: "Create, .*"
     timeout: 30000
-# Events (the calendar beside the magnifier in Home's top bar): Back, "Events", For you | All events, the search box and
-# the date and category pills over the campus's calendar (migration 61); signed out it still lists the campus's events.
-# It is a screen above the tabs, without the bottom bar: swipe back to Home before the next tab.
-- tapOn: "Events"
-- extendedWaitUntil:
-    visible: "Search events"
-    timeout: 30000
-- takeScreenshot: e2e/screenshots/07-events
-- swipe:
-    start: "2%,45%"
-    end: "90%,45%"
-    duration: 400
-- waitForAnimationToEnd
-- extendedWaitUntil:
-    visible: "Create, .*"
-    timeout: 30000
-# Explore (housing.tsx): its own top bar ("Find", then Housing | Roommate | Marketplace, then the search box of the page on
-# screen, named "Search apartments", "Search roommate posts" or "Search marketplace", then the pills). The bottom tab opens on Housing (apartments); the "Roommate" label above the
-# pager slides to the other half and a flick to the right brings Housing back. The floating "+" follows the visible half.
-- tapOn: "Explore.*"
+# Explore (housing.tsx), from the compass in Home's top bar: its own top bar (Back, "Find", then Housing | Roommate |
+# Marketplace, then the search box of the page on screen, named "Search apartments", "Search roommate posts" or
+# "Search marketplace", then the pills). It opens on Housing (apartments); the "Roommate" label above the pager slides to
+# the other half and a flick to the right brings Housing back. The floating "+" follows the visible half. It is a screen
+# above the tabs, without the bottom bar: swipe back to Home before the next tab.
+- tapOn: "Explore"
 - extendedWaitUntil:
     visible: "Find"
     timeout: 30000
@@ -123,6 +110,21 @@ appId: host.exp.Exponent
     visible: "Mattress & bedding"
     timeout: 30000
 - takeScreenshot: e2e/screenshots/03-marketplace
+# Back to Home, then Events, the bottom bar's second tab: "Events", For you | All events, the search box and the date and
+# category pills over the campus's calendar (migration 61); signed out it still lists the campus's events.
+- swipe:
+    start: "2%,45%"
+    end: "90%,45%"
+    duration: 400
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "Create, .*"
+    timeout: 30000
+- tapOn: "Events.*"
+- extendedWaitUntil:
+    visible: "Search events"
+    timeout: 30000
+- takeScreenshot: e2e/screenshots/07-events
 # Messages: the bottom tab after Create; signed out it asks to log in.
 - tapOn: "Messages.*"
 - assertVisible: "Log in to see your messages"

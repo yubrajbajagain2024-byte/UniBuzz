@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
-import { useIsFocused, useLocalSearchParams } from "expo-router";
+import { Animated, Pressable, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { clearExploreFilters, DEFAULT_EXPLORE_FILTERS, DEFAULT_HOUSING_SECTION, exploreActiveChips, exploreFilterCount, exploreQuickFilters, HOUSING_SECTIONS, type ExploreFilters, type HousingSection, type ItemCategoryValue } from "@apartment-book/shared";
 import { DISCOVERY_BAR_HEIGHT, DiscoveryBar } from "@/components/discovery-bar";
 import { Fab } from "@/components/feed-header";
 import { ApartmentsSection } from "@/components/housing/apartments-section";
 import { FilterSheet } from "@/components/housing/filter-sheet";
+import { Icon } from "@/components/icon";
 import { MarketplaceSection } from "@/components/housing/marketplace-section";
 import { RoommatesSection } from "@/components/housing/roommates-section";
 import { SlidingTabs } from "@/components/sliding-tabs";
 import { useCollapsingHeader } from "@/lib/collapsing-header";
+import { InTabsContext } from "@/lib/tab-bar";
 import { useCollapseOnScroll } from "@/lib/tab-bar-collapse";
 import { followOffset, handOverTarget, SectionPagerContext, type SectionPager } from "@/lib/section-pager";
 import { auroraGradient, space, textStyle } from "@/lib/theme";
@@ -30,7 +32,9 @@ const FLOAT = DISCOVERY_BAR_HEIGHT;
 /** Every page shows the person's own university (everyone's without a university of their own): there is no campus switch here. */
 const CAMPUS = "mine" as const;
 /**
- * Explore: the big "Find" title, then three levels and no more (DiscoveryBar): Housing | Roommate | Marketplace above the
+ * Explore, the campus's own market: a screen of its own, opened from the compass beside the bell in Home's top bar (it
+ * was the bottom bar's second tab until Events took that place, the owner's sketch of 2026-11-21), with Back before its
+ * big title. The big "Find" title, then three levels and no more (DiscoveryBar): Housing | Roommate | Marketplace above the
  * pager with Home's sliding violet underline; one search field (it searches the page on screen) with the filter button
  * beside it; and one row of the page's few quick filters (Furnished, Pets OK, Within 1 mi, Video tour; Has a room,
  * Looking for a room, With a video; Furniture, Textbooks, Electronics, Kitchen), a removable chip for every other choice
@@ -46,6 +50,7 @@ export default function HousingScreen() {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const router = useRouter();
   const params = useLocalSearchParams<{ section: string }>();
   /** The page to open on: the one the link asked for, else Apartments. Read once; a later link is handled below. */
   const start = useRef(pageOf(params.section) >= 0 ? pageOf(params.section) : START).current;
@@ -64,8 +69,9 @@ export default function HousingScreen() {
   const [mounted, setMounted] = useState<Set<number>>(() => new Set([start]));
   // The bottom bar collapses to Explore's button as the page on screen scrolls on and comes back as it scrolls back, as
   // on Home (lib/tab-bar-collapse.ts); another page starts with the whole bar.
-  const focused = useIsFocused();
-  const trackTabBar = useCollapseOnScroll(focused, index);
+  // Pushed over the tabs, there is no bottom bar under it to collapse: the hook stays idle (and keeps the bar whole for
+  // when Home shows again).
+  const trackTabBar = useCollapseOnScroll(false, index);
   const { translateY: floatShift, select: followPage, reveal: revealFloat, onScroll: onPageScroll } = useCollapsingHeader(ORDER.length, FLOAT, start, trackTabBar);
 
   // The search, shared by the pages, and the filters: one set per page, from the quick filters and the sheet alike.
@@ -194,10 +200,17 @@ export default function HousingScreen() {
   const chips = [...exploreQuickFilters(section, filters), ...exploreActiveChips(section, filters)].map((c) => ({ ...c, onPress: () => setFilters(c.next) }));
   const counts = { apartments: exploreFilterCount("apartments", filters), roommates: exploreFilterCount("roommates", filters), marketplace: exploreFilterCount("marketplace", filters) };
 
+  // Back to where it was opened from; opened from a link with nothing under it, Home.
+  const back = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)" as never));
+
   return (
+    <InTabsContext.Provider value={false}>
     <View style={styles.screen}>
       <View style={[styles.chrome, { paddingTop: insets.top }]}>
         <View style={styles.titleRow}>
+          <Pressable onPress={back} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back" style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]}>
+            <Icon name="chevron-back" size={28} color={colors.text} />
+          </Pressable>
           <Text style={styles.title} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             Find
           </Text>
@@ -274,14 +287,17 @@ export default function HousingScreen() {
         onClose={() => setFiltersOpen(false)}
       />
     </View>
+    </InTabsContext.Provider>
   );
 }
 
 const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   chrome: { backgroundColor: colors.bar, zIndex: 3 },
-  titleRow: { height: TITLE_ROW, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.md, paddingLeft: 20, paddingRight: space.lg },
-  title: { flexShrink: 1, ...textStyle.largeTitle, color: colors.text },
+  // Back, then the big title right after it.
+  titleRow: { height: TITLE_ROW, flexDirection: "row", alignItems: "center", gap: 2, paddingLeft: 6, paddingRight: space.lg },
+  back: { width: 40, height: 44, alignItems: "center", justifyContent: "center" },
+  title: { flex: 1, ...textStyle.largeTitle, color: colors.text },
   body: { flex: 1, overflow: "hidden" },
   float: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 2, backgroundColor: colors.bar },
 }));

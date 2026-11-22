@@ -131,7 +131,7 @@ function splitKey(key: string): [string, string] {
  * their page. Over every page, one row at the top: Back at the left, the Campus | Global toggle in the middle while the
  * Reels feed is running (the same choice as Home's, see useHomeScope: picking the other one keeps the page on screen and
  * the ones already seen, and the reels after it come from the new choice) and a video's sound button at the right. At
- * the bottom, the creator's name, the words and the rail (like, comments, share, save, "…") that ReelItem draws for every
+ * the bottom, the creator's name, the words and the rail (like, comments, save, share, "…") that ReelItem draws for every
  * page, nearer the right edge than in the Reels tab, and under them the app's own tab bar, still there and still working,
  * when the viewer was opened over the tabs (see selectTab). The rail's Comments (or a tour's Inbox) opens the comments
  * and messages; there is no comment bar. Likes, saves and comments

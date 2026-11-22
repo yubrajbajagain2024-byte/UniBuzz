@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, runOnJS, useAnimatedKeyboard, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming, ZoomIn, ZoomOut, type SharedValue } from "react-native-reanimated";
+import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, runOnJS, useAnimatedKeyboard, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming, ZoomIn, ZoomOut, type SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   blockUser,
@@ -24,7 +24,6 @@ import {
   storyAge,
   storyAudienceNote,
   storyDurationMs,
-  storyFrame,
   unlikeStory,
   type StoryGroup,
   type StoryViewer,
@@ -47,15 +46,16 @@ const PULL_CLOSE = 120;
 const PULL_VELOCITY = 900;
 
 /**
- * Stories full screen, Instagram's way: one person's stories play in turn (a photo for five seconds, a video for its
- * length), a thin bar for each along the top filling as it plays. A tap on the right goes on, on the left goes back;
- * holding the picture pauses it; a sideways swipe moves to the next or the last person (the pages sit side by side);
- * a pull down closes. A story's bar starts once its photo has loaded or its video can play, and stops while a video
+ * Stories full screen, the owner's brief of 2026-11-21: the picture edge to edge on pure black, drawn whole in its own
+ * shape, as Orbit draws a post — never cropped, stretched or boxed in — with everything else floating over it. One
+ * person's stories play in turn (a photo for five seconds, a video for its length), a thin bar for each along the very
+ * top filling as it plays. A tap on the right goes on, on the left goes back;
+ * holding the picture pauses it and fades the controls away; a sideways swipe turns to the next or the last person like
+ * a cube (see CubeFace); a pull down closes. A story's bar starts once its photo has loaded or its video can play, and stops while a video
  * buffers, so a slow connection never runs a story out behind a blank screen; the next photo loads ahead. Each story is
  * marked seen as it shows (mark_story_seen, the database refusing anything the person may not see), so its ring greys
- * in the tray. On a tall phone the story is a rounded card from under the status bar and its actions sit below it on
- * black (storyFrame): always legible, and a tap that misses one never moves the story on; on a short screen the story
- * fills it and the actions float over a deeper shade. Your own stories carry Activity (how many have seen each, and
+ * in the tray. The bars, the name and the actions sit over the picture on soft shades, each a full 44-point target, and
+ * the tap zones stop above the action bar, so a tap that misses a control never moves the story on. Your own stories carry Activity (how many have seen each, and
  * liked it: a tap lists them, the database telling only the author), Send (to friends and groups) and Delete. Someone
  * else's carry the reply pill ("Reply to Ann…", a round send arrow inside it once there are words), a heart and a paper
  * plane, each a full 44-point target, and a "⋯" at the top for Report, Mute and Block (migration 62). Holding the story
@@ -111,6 +111,11 @@ function StoriesViewer() {
   });
   const [index, setIndex] = useState(start);
   const listRef = useRef<FlatList<StoryGroup>>(null);
+  /** Where the pager stands, in points, on the UI thread: each page turns by it (see CubeFace). */
+  const scrollX = useSharedValue(start * width);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollX.value = e.contentOffset.x;
+  });
   const leaving = useRef(false);
   const close = useCallback(() => {
     if (leaving.current) return;
@@ -169,17 +174,23 @@ function StoriesViewer() {
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]} />
       <GestureDetector gesture={pan}>
         <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(160)} style={[styles.root, styles.pages, pullStyle]}>
-          <FlatList
+          <AnimatedPager
             ref={listRef}
             data={groups}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            keyExtractor={(g) => g.author.id}
+            keyExtractor={(g: StoryGroup) => g.author.id}
             initialScrollIndex={Math.min(start, Math.max(0, groups.length - 1))}
-            getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+            getItemLayout={(_: unknown, i: number) => ({ length: width, offset: width * i, index: i })}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
             onMomentumScrollEnd={onEnd}
-            renderItem={({ item, index: i }) => <StoryPage group={item} active={i === index} width={width} height={height} me={meId} keyboard={keyboard.height} onDone={() => go(i + 1)} onBack={() => go(i - 1)} onClose={close} />}
+            renderItem={({ item, index: i }: { item: StoryGroup; index: number }) => (
+              <CubeFace at={i} scrollX={scrollX} width={width} height={height}>
+                <StoryPage group={item} active={i === index} width={width} height={height} me={meId} keyboard={keyboard.height} onDone={() => go(i + 1)} onBack={() => go(i - 1)} onClose={close} />
+              </CubeFace>
+            )}
             windowSize={3}
             initialNumToRender={1}
             maxToRenderPerBatch={2}
@@ -188,6 +199,44 @@ function StoriesViewer() {
         </Animated.View>
       </GestureDetector>
     </GestureHandlerRootView>
+  );
+}
+
+/** The pager with its offset on the UI thread, so every face turns with the finger and nothing re-renders meanwhile. */
+const AnimatedPager = Animated.FlatList as unknown as typeof FlatList;
+
+/**
+ * How far a cube turns as the pager moves a whole page: a quarter turn, so the two faces meet at a right angle and the
+ * seam between them never opens. The eye sits this many screen widths in front of the cube.
+ */
+const CUBE_TURN = 90;
+const CUBE_EYE = 1.6;
+/** How dark a face is once it has turned away: the far side of a solid cube, so it reads as one object, not two pictures. */
+const CUBE_SHADE = 0.55;
+
+/**
+ * One person's page as a face of a cube (Instagram's turn between people, 2026-11-21). The page keeps the place the
+ * pager gives it; this only turns it about the edge it shares with the page coming on — its right edge going left, its
+ * left edge coming back — so the two faces stay joined through the whole swipe and the one turning away darkens as it
+ * goes. The rotation is built from translate · rotate · translate rather than a transform origin, which cannot be
+ * animated. Everything runs on the UI thread from the pager's offset, so a turn never waits on React.
+ */
+function CubeFace({ at, scrollX, width, height, children }: { at: number; scrollX: SharedValue<number>; width: number; height: number; children: React.ReactNode }) {
+  const face = useAnimatedStyle(() => {
+    // -1 a page to the right of the screen, 0 on it, 1 a page to the left.
+    const p = Math.max(-1, Math.min(1, (scrollX.value - at * width) / Math.max(width, 1)));
+    // The hinge: the right edge while this page leaves to the left, the left edge while it comes back from the right.
+    const hinge = (p > 0 ? width : -width) / 2;
+    return {
+      transform: [{ perspective: width * CUBE_EYE }, { translateX: hinge }, { rotateY: `${-p * CUBE_TURN}deg` }, { translateX: -hinge }],
+    };
+  });
+  const shade = useAnimatedStyle(() => ({ opacity: Math.min(1, Math.abs((scrollX.value - at * width) / Math.max(width, 1))) * CUBE_SHADE }));
+  return (
+    <Animated.View style={[{ width, height, backgroundColor: "#000" }, face]}>
+      {children}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.backdrop, shade]} />
+    </Animated.View>
   );
 }
 
@@ -461,9 +510,8 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
     ]);
   }
 
-  // The card and the bar (storyFrame), and the controls fading away while the story is held to be looked at.
-  const frame = storyFrame(width, height, insets.top, insets.bottom);
-  const barBottom = insets.bottom + (frame.framed ? 0 : 4);
+  // The action bar just above the home indicator, over the picture; the controls fade away while the story is held to be looked at.
+  const barBottom = insets.bottom + 4;
   const chrome = useSharedValue(1);
   useEffect(() => {
     chrome.value = withTiming(held ? 0 : 1, { duration: held ? 160 : 240, easing: Easing.out(Easing.quad) });
@@ -475,8 +523,9 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
 
   return (
     <View style={{ width, height, backgroundColor: "#000" }}>
-      <View style={[styles.card, { top: frame.top, height: frame.height }, frame.framed && styles.cardFramed]}>
-        {story.kind === "photo" && story.photo ? <Image key={story.id} source={{ uri: story.photo.url }} placeholder={story.photo.blur ? { blurhash: story.photo.blur } : undefined} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} onLoad={onPhoto} onError={onPhoto} accessibilityIgnoresInvertColors /> : null}
+      {/* The picture fills the screen, whole and in its own shape: whatever it leaves is pure black, as on Orbit. */}
+      <View style={StyleSheet.absoluteFill}>
+        {story.kind === "photo" && story.photo ? <Image key={story.id} source={{ uri: story.photo.url }} placeholder={story.photo.blur ? { blurhash: story.photo.blur } : undefined} style={StyleSheet.absoluteFill} contentFit="contain" transition={120} onLoad={onPhoto} onError={onPhoto} accessibilityIgnoresInvertColors /> : null}
         {story.kind === "video" && story.video ? <StoryVideo key={story.id} playbackId={story.video.playback_id} playing={wanted} onReady={onVideo} /> : null}
         {/* Only when loading takes a moment: a cached photo shows before this would. */}
         {active && !ready ? (
@@ -485,18 +534,18 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
           </Animated.View>
         ) : null}
         <Animated.View pointerEvents="none" style={[styles.topShade, chromeStyle]} />
-        {/* Over the picture, the bar needs a deeper shade; framed, it sits on black. */}
-        {!frame.framed ? <Animated.View pointerEvents="none" style={[styles.bottomShade, chromeStyle]} /> : null}
+        {/* The controls sit on the picture now, so both ends need a shade to hold them on a bright frame. */}
+        <Animated.View pointerEvents="none" style={[styles.bottomShade, chromeStyle]} />
 
         {/* The taps: the left third goes back, the rest goes on; a hold anywhere pauses. Never under the action bar. */}
-        <View style={[StyleSheet.absoluteFill, !frame.framed && { bottom: barBottom + STORY_ACTION_BAR }]} pointerEvents="box-none">
+        <View style={[StyleSheet.absoluteFill, { bottom: barBottom + STORY_ACTION_BAR }]} pointerEvents="box-none">
           <Pressable style={styles.leftZone} onPress={onTapBack} onLongPress={() => setHeld(true)} onPressOut={() => setHeld(false)} delayLongPress={180} accessibilityRole="button" accessibilityLabel="Previous story" />
           <Pressable style={styles.rightZone} onPress={onTapNext} onLongPress={() => setHeld(true)} onPressOut={() => setHeld(false)} delayLongPress={180} accessibilityRole="button" accessibilityLabel="Next story" />
         </View>
         {/* Typing a reply dims the story, as Instagram does. */}
         {typing ? <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(150)} pointerEvents="none" style={styles.typingShade} /> : null}
 
-        <Animated.View style={[styles.header, { paddingTop: frame.framed ? 10 : insets.top + 8 }, chromeStyle]} pointerEvents="box-none">
+        <Animated.View style={[styles.header, { paddingTop: insets.top + 8 }, chromeStyle]} pointerEvents="box-none">
           <View style={styles.bars} accessible accessibilityLabel={`Story ${at + 1} of ${group.stories.length}`}>
             {group.stories.map((s, i) => (
               <Bar key={s.id} state={i < at ? 1 : i > at ? 0 : null} progress={progress} />
@@ -549,7 +598,7 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
               <Text style={styles.sentText}>Sent to {firstName}</Text>
             </Animated.View>
           ) : null}
-          <View style={[styles.replyField, !frame.framed && styles.replyFieldOver, typing && styles.replyFieldActive]}>
+          <View style={[styles.replyField, styles.replyFieldOver, typing && styles.replyFieldActive]}>
             <TextInput
               ref={input}
               value={draft}
@@ -580,11 +629,11 @@ function StoryPage({ group, active, width, height, me, keyboard, onDone, onBack,
             <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)} style={styles.actions}>
               <Pressable onPress={() => void toggleLike()} accessibilityRole="button" accessibilityLabel={liked ? "Unlike" : "Like"} accessibilityState={{ selected: liked }} style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
                 <Animated.View style={heartStyle}>
-                  <Icon name={liked ? "heart" : "heart-outline"} size={27} weight="medium" color={liked ? LIKE_RED : "#fff"} style={!frame.framed && styles.iconShadow} />
+                  <Icon name={liked ? "heart" : "heart-outline"} size={27} weight="medium" color={liked ? LIKE_RED : "#fff"} style={styles.iconShadow} />
                 </Animated.View>
               </Pressable>
               <Pressable onPress={share} accessibilityRole="button" accessibilityLabel="Share story" accessibilityHint="Send it to friends or a group" style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-                <Icon name="paper-plane-outline" size={25} weight="medium" color="#fff" style={!frame.framed && styles.iconShadow} />
+                <Icon name="paper-plane-outline" size={25} weight="medium" color="#fff" style={styles.iconShadow} />
               </Pressable>
             </Animated.View>
           ) : null}
@@ -649,7 +698,8 @@ function Bar({ state, progress }: { state: 0 | 1 | null; progress: SharedValue<n
 }
 
 /**
- * A video story: its own player, from the start, with sound; paused with the page. It tells the page whether it can be
+ * A video story: its own player, from the start, with sound; paused with the page. Drawn whole in its own shape on
+ * black, like a photo story and like Orbit, never cropped to the screen. It tells the page whether it can be
  * seen playing (ready, not buffering); a video that fails counts as ready, so the story's time runs out and moves on.
  */
 function StoryVideo({ playbackId, playing, onReady }: { playbackId: string; playing: boolean; onReady: (canPlay: boolean) => void }) {
@@ -667,7 +717,7 @@ function StoryVideo({ playbackId, playing, onReady }: { playbackId: string; play
     const sub = player.addListener("statusChange", ({ status }) => onReady(status === "readyToPlay" || status === "error"));
     return () => sub.remove();
   }, [player, onReady]);
-  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsPictureInPicture={false} allowsVideoFrameAnalysis={false} accessibilityLabel="Video" />;
+  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} allowsPictureInPicture={false} allowsVideoFrameAnalysis={false} accessibilityLabel="Video" />;
 }
 
 const shadow = { textShadowColor: "rgba(0,0,0,0.5)", textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } } as const;
@@ -678,9 +728,6 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   backdrop: { backgroundColor: "#000" },
   pages: { overflow: "hidden", backgroundColor: "#000" },
-  // The story: the whole screen, or (storyFrame) a card with Apple's continuous corners.
-  card: { position: "absolute", left: 0, right: 0, overflow: "hidden", backgroundColor: "#0b0b0c" },
-  cardFramed: { borderRadius: 16, borderCurve: "continuous" },
   topShade: { position: "absolute", top: 0, left: 0, right: 0, height: 150, experimental_backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.18) 55%, rgba(0,0,0,0) 100%)" },
   bottomShade: { position: "absolute", bottom: 0, left: 0, right: 0, height: 230, experimental_backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.66) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0) 100%)" },
   loading: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, alignItems: "center", justifyContent: "center" },
@@ -699,7 +746,7 @@ const styles = StyleSheet.create({
   chromeButton: { width: 40, height: 44, alignItems: "center", justifyContent: "center" },
   iconShadow: shadow,
   pressed: { opacity: 0.55, transform: [{ scale: 0.92 }] },
-  // The action bar: under the card on black, or floating over the bottom shade.
+  // The action bar: over the bottom shade, just above the home indicator.
   actionBar: { position: "absolute", left: 0, right: 0, height: STORY_ACTION_BAR, flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 6 },
   replyField: { flex: 1, height: 44, flexDirection: "row", alignItems: "center", paddingLeft: 18, paddingRight: 6, borderRadius: 22, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.08)" },
   replyFieldOver: { borderColor: "rgba(255,255,255,0.45)", backgroundColor: "rgba(0,0,0,0.28)" },

@@ -50,6 +50,7 @@ export function SlidingTabs<T extends string>({
   dimColor,
   textStyle,
   gap = TAB_GAP,
+  align = "center",
   fontSize = 15,
   caret,
   badges,
@@ -68,6 +69,11 @@ export function SlidingTabs<T extends string>({
   textStyle?: StyleProp<TextStyle>;
   /** The room between two labels (TAB_GAP unless a row needs its own), and the labels' size. */
   gap?: number;
+  /**
+   * Where the labels sit in the row: together in its middle, as every tab row of the app has them, or from its left
+   * edge ("start"), which is where Home's own row sits now that the bar's right end is its icons (2026-11-21).
+   */
+  align?: "center" | "start";
   fontSize?: number;
   /** The section(s) whose label carries a small chevron: it opens a menu. */
   caret?: T | readonly T[];
@@ -139,7 +145,7 @@ export function SlidingTabs<T extends string>({
 
   return (
     <View
-      style={styles.labels}
+      style={[styles.labels, align === "start" && styles.labelsStart]}
       accessibilityRole="tablist"
       onLayout={(e) => {
         const w = e.nativeEvent.layout.width;
@@ -211,6 +217,8 @@ export function SlidingTabs<T extends string>({
 const styles = StyleSheet.create({
   // The labels together in the middle of the row; the room between them is each tab's own padding (see TAB_GAP).
   labels: { flex: 1, alignSelf: "stretch", flexDirection: "row", alignItems: "stretch", justifyContent: "center" },
+  // From the row's left edge: each label keeps half the room on either side, so the first one starts half a gap in.
+  labelsStart: { justifyContent: "flex-start" },
   // The label's box, then its badge if it has one, side by side; stretched to the row's height.
   tab: { flexDirection: "row", alignItems: "stretch" },
   // The label and, for one section, the chevron after it: what the underline is measured against. Stretched to the
