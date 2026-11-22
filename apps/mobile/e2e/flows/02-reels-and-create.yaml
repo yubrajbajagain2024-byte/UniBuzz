@@ -1,4 +1,4 @@
-# Reels and the create menu, signed in (run 01-signed-in.yaml first so a session is stored).
+# Orbit's full-screen feed and the create menu, signed in (run 01-signed-in.yaml first so a session is stored).
 appId: host.exp.Exponent
 ---
 - extendedWaitUntil:
@@ -25,19 +25,24 @@ appId: host.exp.Exponent
       - tapOn: "Cancel"
 - assertVisible: "Edit profile"
 - tapOn: "Home.*"
-# Reels. The Home bar may have slid away with an earlier scroll (Instagram style): a scroll up brings it back.
-- scrollUntilVisible:
-    element: "Reels"
-    direction: UP
-    timeout: 15000
-- tapOn: "Reels"
+# Orbit, the landing page: the campus's posts and reels full screen, one to a page. A reel plays with its sound on and
+# there is no sound button at all (VIDEO_MUTED in src/lib/video-sound.ts); the rail reads like, comments, save, share.
 - extendedWaitUntil:
-    visible: "Turn sound on|Turn sound off"
-    timeout: 30000
-- assertVisible: "Pause|Play"
-- takeScreenshot: e2e/screenshots/13-reels
+    visible: "Orbit"
+    timeout: 15000
 - tapOn: "Orbit"
 - waitForAnimationToEnd
+- assertVisible: "Like|Unlike"
+- assertVisible: "Save|Unsave"
+- assertNotVisible: "Turn sound on|Turn sound off"
+- takeScreenshot: e2e/screenshots/13-orbit
+# Swiping up moves to the next post, TikTok's way.
+- swipe:
+    start: "50%,75%"
+    end: "50%,25%"
+    duration: 300
+- waitForAnimationToEnd
+- takeScreenshot: e2e/screenshots/13-orbit-next
 # Create, in the middle of the bottom bar, opens the live camera straight away on SNAP (BUZZ | SNAP | POST | REEL,
 # Upload for the library).
 - tapOn: "Create, .*"

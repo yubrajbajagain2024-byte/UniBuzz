@@ -29,7 +29,7 @@ type Router = ReturnType<typeof useRouter>;
 /**
  * One page of the full-screen viewer (app/reels/[id].tsx): a reel (a posted reel or a listing's video tour, one video), a
  * post with its photos and videos, which the page swipes through sideways, or a buzz's photos or video (`buzz`). Author,
- * words, counts and saved are a Reel's, so every post page has the same rail: like, comments, share, save, the profile
+ * words, counts and saved are a Reel's, so every post page has the same rail: like, comments, save, share, the profile
  * and "…". A buzz page is anonymous: its author is nobody (ANONYMOUS), and ReelItem draws Buzz's own alias, words and
  * rail (votes, replies, share) from `buzz`, as the Buzz card does; no post function ever gets its id (sourceType "buzz"
  * is not a post's, so the compiler refuses one).

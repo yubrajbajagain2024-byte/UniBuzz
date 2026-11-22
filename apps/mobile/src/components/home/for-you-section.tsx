@@ -79,9 +79,13 @@ const ForYouRow = memo(function ForYouRow({
 });
 
 /**
- * Home → Orbit, the landing page: posts and reels blended into one list (listForYou). Rows reuse the Instagram-style
- * post, so nothing here looks different from the Posts section. Anonymous Buzz threads stay on the Buzz page. Creating
- * starts from Create in the middle of the bottom bar (see app/(tabs)/_layout.tsx), so the page has no floating "+".
+ * Orbit as a feed of cards: posts and reels blended into one list (listForYou), each row the Instagram-style post, so
+ * nothing here looks different from the Posts section. Anonymous Buzz threads stay on the Buzz page.
+ *
+ * Nothing mounts this now. Orbit has been the full-screen feed since 2026-11-21 (components/home/orbit-section.tsx, the
+ * owner's sketch), and this card feed is kept beside PostsSection, whose section has had no tab for longer
+ * (HIDDEN_HOME_SECTIONS): the feed, its data and the post features all stay, and the website still draws its Home this
+ * way. A words-only post has no page in the full-screen feed, which is the one thing these cards showed and it does not.
  */
 export function ForYouSection({ active, topInset, onScroll }: { active: boolean; topInset: number; onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void }) {
   const { user, profile } = useSession();

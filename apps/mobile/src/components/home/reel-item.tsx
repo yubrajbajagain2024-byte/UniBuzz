@@ -59,7 +59,7 @@ const topShare = (t: number) => {
 };
 const TOP_SHADE_MIN = 170;
 const TOP_SHADE_EXTRA = 96;
-/** Tall enough to sit under the whole rail (like, comments, share, save, "…") with room to fade in above the like. */
+/** Tall enough to sit under the whole rail (like, comments, save, share, "…") with room to fade in above the like. */
 const SHADE_HEIGHT = 540;
 /** The rail's bottom padding: the "…" centre 46pt above the bottom inset, Instagram's geometry. */
 const OVERLAY_PAD = 31;
@@ -152,7 +152,7 @@ type Props = {
 
 /**
  * One full-screen page: a reel's video, or a post's photos and videos swiped sideways (dots show where you are), under
- * the same overlay for every page: the creator's name and words, and the rail (like, comments, share, save, "…"). A
+ * the same overlay for every page: the creator's name and words, and the rail (like, comments, save, share, "…"). A
  * video plays while its page (and its slide) is on screen; a tap pauses it. Every photo and video is shown whole, in its
  * own shape, never cropped or stretched, as big as the screen allows and centred on it (see photoLayout, placeVideo);
  * whatever of the screen it leaves is pure black, TikTok's way, in both themes (see MediaFrame). The words and the rail
@@ -862,9 +862,9 @@ export const ReelItem = memo(function ReelItem({ reel: source, width, height, to
             // A roommate tour has no public comments: the poster is reached in private (your own opens your Inbox).
             <RailButton icon="chatbubble-ellipses-outline" label="Inbox" onPress={unlessSwiped(() => (own ? router.push("/messages") : void message()))} a11y={own ? "Inbox" : `Message ${reel.author.name.split(" ")[0]}`} />
           )}
-          {shareable ? <RailButton icon="paper-plane-outline" label="Share" onPress={unlessSwiped(share)} a11y="Share" /> : null}
-          {/* Saved: the filled bookmark, in the same colour as the rest of the rail (white over a picture). */}
+          {/* Saved before Share, as TikTok has them and as the owner asked for Orbit (2026-11-21): the filled bookmark is in the same colour as the rest of the rail (white over a picture). */}
           <RailButton icon={reel.savedByMe ? "bookmark" : "bookmark-outline"} label={reel.savedByMe ? "Saved" : "Save"} onPress={unlessSwiped(() => void toggleSave())} a11y={reel.savedByMe ? "Unsave" : "Save"} selected={reel.savedByMe} />
+          {shareable ? <RailButton icon="paper-plane-outline" label="Share" onPress={unlessSwiped(share)} a11y="Share" /> : null}
           <RailButton icon="ellipsis-horizontal" onPress={unlessSwiped(() => void more())} a11y="More options" small />
         </View>
         )}

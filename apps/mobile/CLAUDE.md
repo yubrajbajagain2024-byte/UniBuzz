@@ -7,16 +7,17 @@ device builds and store releases.
 ## Layout
 
 ```
-src/app/(tabs)/   index (Home: the story tray, then Orbit, Buzz, Reels), housing (Explore), messages,
-                  profile; the bar is icons only, Create in its middle (_layout.tsx)
+src/app/(tabs)/   index (Home: Stories | Orbit | Buzz), events, messages, profile; the bar is icons only,
+                  Create in its middle (_layout.tsx)
+src/app/housing.tsx  Explore (Housing | Roommate | Marketplace), pushed from the compass in Home's top bar
 src/app/search.tsx  the search screen (people, topics, posts, what is popular): the magnifier beside the bell
 src/app/compose/  the create flow behind Create and every "+": camera → edit → publish; listing, listing-form,
                   listing-preview for roommate posts and Marketplace items
 src/app/create/   per-kind entry points: post, reel, buzz, apartment, roommate, item
 src/app/…         buzz, messages, posts, reels, apartments, roommates, marketplace, profile, follows,
                   call, snap, stories, topics, settings, notifications, saved, find-people, events
-                  (index: For you | All events, from Home's calendar; an event, saved, interests, new,
-                  edit), organizations (page, new, edit, members), (auth)/forgot-password,
+                  (an event, saved, interests, new, edit; the For you | All events screen is the tab),
+                  organizations (page, new, edit, members), (auth)/forgot-password,
                   reset-password (a recovery link that opens the app; Change password)
 src/lib/          app-only helpers: calls.ts, home-scope.ts, stories-store.ts, event-saves-store.ts,
                   organization-follows-store.ts, campus-time-zone.ts, supabase.ts, dev-overrides.ts, …
@@ -60,7 +61,10 @@ Why each exists: [docs/decisions.md](../../docs/decisions.md).
   rollback.
 - `SCOPE_TOGGLE_SHOWN = false` (`src/lib/home-scope.ts`): the Campus | Global toggle is hidden.
 - `HIDDEN_HOME_SECTIONS = ["posts"]` (`packages/shared/src/constants.ts`, read by the website's
-  Home too): Posts has no Home tab.
+  Home too): Posts has no Home tab. The app's own row is `APP_HOME_TABS` in `src/lib/home-tabs.ts`
+  (Stories | Orbit | Buzz): Reels has no tab in the app either, Orbit carrying it, while the website
+  keeps its Reels tab. The card feed and the story row Orbit replaced are kept beside the Posts
+  section's (`components/home/for-you-section.tsx`, `stories-tray.tsx`): nothing mounts them.
 - `EXPO_PUBLIC_BUZZ_FIXTURES=<variant>` in `.env.local`: development only, answers Buzz from
   sample data.
 
@@ -76,8 +80,11 @@ Why each exists: [docs/decisions.md](../../docs/decisions.md).
 - Gesture Handler inside a React Native `Modal` needs its own `GestureHandlerRootView` in it.
 - Every video plays with its sound on and there is no mute or sound button (`VIDEO_MUTED` in
   `src/lib/video-sound.ts`): keep one video playing at a time, paused when its screen is covered.
-- The viewer closes sideways only on a swipe to the right from a post's first photo (`swipeChoice` in
-  `src/lib/viewer-swipe.ts`); elsewhere a sideways swipe moves between the photos, resisting past the last.
+- The full-screen viewer has no Back button: it is left by a swipe to the right from the screen's
+  left edge, or one on a post's first photo (`swipeChoice` in `src/lib/viewer-swipe.ts`). On Home's
+  Orbit a sideways swipe moves between a post's photos and, once it leaves them, is handed to the
+  pager of sections (`useSectionPager`), so Stories and Buzz are always a swipe away. Keep a way out
+  of every page.
 - The camera's beauty filters are for photos only: the camera records video itself, where the shader
   cannot reach. The looks are numbers in `packages/shared/src/beauty.ts`, the shader and GL in
   `src/lib/beauty-gl.ts`; expo-gl is optional, so check `BEAUTY_AVAILABLE` and never import it at a

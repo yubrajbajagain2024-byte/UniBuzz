@@ -21,7 +21,7 @@ import { Icon, useBounceOn, type IconName } from "@/components/icon";
  */
 const ICONS: Record<string, { on: IconName; off: IconName; sfOn: SFSymbol; sfOff: SFSymbol }> = {
   index: { on: "home", off: "home-outline", sfOn: "house.fill", sfOff: "house" },
-  housing: { on: "compass", off: "compass-outline", sfOn: "safari.fill", sfOff: "safari" },
+  events: { on: "calendar", off: "calendar-outline", sfOn: "calendar", sfOff: "calendar" },
   messages: { on: "chatbubble", off: "chatbubble-outline", sfOn: "message.fill", sfOff: "message" },
   profile: { on: "person-circle", off: "person-circle-outline", sfOn: "person.crop.circle.fill", sfOff: "person.crop.circle" },
 };
@@ -96,14 +96,14 @@ function CreateIcon() {
 }
 
 /**
- * Home, Explore (Housing | Roommate | Marketplace) | Create | Messages, Profile: icons only, the campus's tools second.
+ * Home, Events | Create | Messages, Profile: icons only, the campus's calendar second (the owner's sketch, 2026-11-21).
  * Create sits in the middle and opens the live camera on SNAP (BUZZ | SNAP | POST | REEL, see app/compose; signed out,
- * the login screen); the story tray's + and Upload in the menu under your photo open it on POST, where a story is
- * shared, and Buzz's pen still writes a buzz. Search and Events are not tabs: the calendar and the magnifier beside the
- * bell in Home's top bar open app/events (For you | All events) and app/search.tsx (people, topics, posts and what is
- * popular on every campus). The bar is FloatingTabBar: a frosted glass pill floating over the tabs' content (see
- * lib/tab-bar.ts for its size and the room each tab keeps clear under it); while a page of Home (For you, Buzz) or
- * Explore scrolls on it collapses to that tab's own icon, like Reddit's (lib/tab-bar-collapse.ts).
+ * the login screen); the Stories page's + opens it on POST, where a story is shared, and Buzz's pen still writes a buzz.
+ * Explore and Search are not tabs: the compass and the magnifier beside the bell in Home's top bar open app/housing.tsx
+ * (Housing | Roommate | Marketplace) and app/search.tsx (people, topics, posts and what is popular on every campus). The
+ * bar is FloatingTabBar: a frosted glass pill floating over the tabs' content (see lib/tab-bar.ts for its size and the
+ * room each tab keeps clear under it); while a page of Home (Stories, Buzz) or Events scrolls on it collapses to that
+ * tab's own icon, like Reddit's (lib/tab-bar-collapse.ts).
  */
 export default function TabsLayout() {
   const { user, profile } = useSession();
@@ -133,8 +133,8 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Home", headerShown: false, tabBarIcon: icon("index") }} />
-      {/* Explore (housing.tsx, the route name old links use) draws its own top bar ("Find", then Housing | Roommate | Marketplace, the search box for the page on screen and the pills). */}
-      <Tabs.Screen name="housing" options={{ title: "Explore", headerShown: false, tabBarIcon: icon("housing") }} />
+      {/* Events draws its own top bar ("Events" with Saved at its right, then For you | All events, the search box and the quick filters). */}
+      <Tabs.Screen name="events" options={{ title: "Events", headerShown: false, tabBarIcon: icon("events") }} />
       {/* Messages draws its own top bar: the new-message pencil, the "Messages" title, Chats | Requests and the search. */}
       <Tabs.Screen name="messages" options={{ title: "Messages", headerShown: false, tabBarBadge: unread > 0 ? (unread > 99 ? "99+" : unread) : undefined, tabBarIcon: icon("messages") }} />
       {/* Profile draws its own top bar (Find friends, your name, the menu), like TikTok. */}

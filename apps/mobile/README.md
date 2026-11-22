@@ -119,8 +119,9 @@ sign in with `apartmentbook://dev-login?email=…&password=…` once that dialog
 
 ## Home and the tabs
 
-The bottom bar is five icons and no labels: Home, Explore, Create, Messages, Profile (screen readers still hear each
-place, counting Create: "Home, tab, 1 of 5", "Create, 3 of 5", "Messages, tab, 4 of 5, 3 new"). It floats over the
+The bottom bar is five icons and no labels: Home, Events, Create, Messages, Profile (screen readers still hear each
+place, counting Create: "Home, tab, 1 of 5", "Create, 3 of 5", "Messages, tab, 4 of 5, 3 new"). Explore took the
+compass in Home's top bar when Events came back to the bar (the owner's sketch, 2026-11-21). It floats over the
 content as a frosted glass pill, 60pt tall, 14pt in from the screen's sides and low, just above the home indicator
 (12pt into the home-indicator inset, 22pt up from the screen's edge on a Face ID iPhone; 10pt up where there is no
 indicator) (`src/app/(tabs)/_layout.tsx`, its size and place in `src/lib/tab-bar.ts`): on iOS 26 real liquid glass, the
@@ -134,7 +135,7 @@ Reanimated; at once with Reduce Motion). Profile is your own photo in a circle (
 tab is on screen (the person icon signed out); the unread count is the system's plain red badge. Create (`action`) is a
 plain plus inside a thin aurora ring, 36pt across and nothing filled, so the glass shows through; it opens the
 camera on SNAP (BUZZ | SNAP | POST | REEL; signed out, the login screen) and never becomes the tab on screen; your
-circle in the story tray and Upload in the menu under your photo open it on POST, where a story is shared, and Buzz
+circle on the Stories page and Upload in the menu on your Profile open it on POST, where a story is shared, and Buzz
 keeps its pen at the bottom right.
 
 **The camera's beauty filters** (2026-11-17, `src/lib/beauty-gl.ts`, `src/components/compose/`, the looks themselves in
@@ -151,12 +152,12 @@ over the camera's preview, fed the camera's own frames), so what is on screen is
 drawn through the very same shader as it is taken (`lib/beauty-photo.ts`). On Android, and if the live picture cannot
 start, the camera's own preview shows and the filter still goes on the photo. **Photos only**: the camera records video
 itself, where these filters cannot reach, so on REEL (and while a video is being shot) the row says so and nothing is
-filtered. A build made before expo-gl was added (the testers' current one) shows no sparkles at all. For you has no floating "+" of its own, and Home's top bar has none. Events and
-search are not tabs: the calendar and the magnifier beside the bell in Home's top bar open Events
-(`src/app/events/index.tsx`, a screen with Back above the tabs) and search. Every tab's list and floating button keeps
-`tabBarInset` clear under it (`useTabBarInset` gives a screen off the tabs, like Events, just the safe area). The bar
+filtered. A build made before expo-gl was added (the testers' current one) shows no sparkles at all. Orbit has no floating "+" of its own, and Home's top bar has none. Explore and
+search are not tabs: the compass and the magnifier beside the bell in Home's top bar open Explore
+(`src/app/housing.tsx`, a screen with Back above the tabs) and search. Every tab's list and floating button keeps
+`tabBarInset` clear under it (`useTabBarInset` gives a screen off the tabs, like Explore, just the safe area). The bar
 collapses like Reddit's (iOS 26's tab bar minimising), by the speed of the scroll: reading at any pace keeps the whole
-bar, and only a deliberate flick down a page of Home (For you, Buzz) or Explore (Messages and your Profile always keep
+bar, and only a deliberate flick down a page of Home (Stories, Buzz) or Events (Messages and your Profile always keep
 the whole bar), at 700 points a second or more over at least 32 points
 (`createScrollCollapse` in `packages/shared/src/scroll-collapse.ts`, from each scroll event's native timestamp, tuned by
 `TAB_BAR_SCROLL` in `src/lib/tab-bar-collapse.ts`; first values, to be tuned on a phone), narrows it to a circle at the
@@ -167,36 +168,56 @@ the page scrolls back 24 points (at any speed; smaller turns are ignored), or re
 way, springing on the UI thread (at once with Reduce Motion). A bounce past a list's end is not a scroll back, and once
 the bar has come back a new flick has to wait a quarter of a second, so one gesture never flickers it. A tap on the
 circle brings it back too, and so do another page of the tab, another tab or a screen reader, which always gets the whole
-bar. Reels, a profile pushed over a screen and the full-screen viewers never collapse it. Search is the magnifier beside the bell in Home's top bar, which opens `src/app/search.tsx` (below); the people search the share sheet's Find people
+bar. Orbit, a profile pushed over a screen and the full-screen viewers never collapse it. Search is the magnifier beside the bell in Home's top bar, which opens `src/app/search.tsx` (below); the people search the share sheet's Find people
 and a profile's Find friends push is `src/app/find-people.tsx`. The Notifications bell in the top-right corner of Home's floating top bar opens every
 notification the database keeps for you (`src/app/notifications.tsx`: likes, comments and replies, follows,
 saves of your listings, places near campus, newest first; new messages and Snaps stay in Messages, with its unread
 counts and the push, each unread one marked only by a small blue dot, the row
 itself like any other in both themes); tapping one marks it read and opens what
-it is about, "Mark all read" sits in the header, and the bell's badge counts the unread live. Home opens on **For you**, a blend of posts and reels (anonymous Buzz threads stay on
-the Buzz page; the fixed pattern lives in `packages/shared/src/for-you.ts` and is shared with the website). Its
-three pages, For you | Buzz | Reels, sit side by side in a pager (Posts is a section without a tab: `HIDDEN_HOME_SECTIONS` in the shared constants keeps it out of the row and the pager while its feed, the post features and the data stay; its Following filter is reachable on the website's `/?tab=posts`; reels also run through For you): swipe left or right to move
-between them, or tap a label in the floating top bar. A post with several photos takes the swipes first, TikTok's way:
+it is about, "Mark all read" sits in the header, and the bell's badge counts the unread live.
+
+Home opens on **Orbit**, a blend of posts and reels (anonymous Buzz threads stay on the Buzz page; the fixed pattern
+lives in `packages/shared/src/for-you.ts` and is shared with the website), shown TikTok's way since 2026-11-21 (the
+owner's sketch): one post to a page, edge to edge, swiped up for the next (`src/components/home/orbit-section.tsx`).
+Every page is a `ReelItem`, the same component the full-screen viewer draws, so a post's photos swipe sideways with its
+dots at the bottom, its video plays with its sound on while its page is on screen, the rail (like, comments, save,
+share, "…") runs up the right and the name and caption sit at the bottom left, over black wherever the picture does not
+reach. A post of nothing but words has no page there (`postHasMedia`): it keeps its own screen, its author's profile and
+search.
+
+Its three pages, **Stories | Orbit | Buzz**, sit side by side in a pager (`src/lib/home-tabs.ts` holds the row; Posts and
+Reels are sections without a tab in the app — `HIDDEN_HOME_SECTIONS` keeps Posts out of the website's row too, and Orbit
+carries both their feeds — while their data, their post features and their addresses stay, Posts' Following filter on the
+website's `/?tab=posts`): swipe left or right to move between them, or tap a label in the floating top bar. **Stories**
+(`src/components/home/stories-section.tsx`) is a page of rings, three to a row, where the row across the top of the feed
+used to be: "Your story" first with its + , then everyone whose stories you may see, the unseen in the aurora ring and
+the seen in a quiet grey one, a first name under each; a tap opens them full screen and swipes on through the page.
+**Buzz** is unchanged. A post with several photos takes the sideways swipes first, TikTok's way:
 from its last photo the next swipe on goes to the next section, from its first the next swipe back to the one before,
 so a carousel never keeps the finger (`src/lib/section-pager.ts`; Explore's three pages do the same; it never moves to
 another tab of the bottom bar). On iOS the carousel's own scroll gesture still takes a swipe that starts at its end,
 though it cannot move, so the pager never gets it and the touch used to end as a tap that opened the post: the carousel
 (`src/components/photo-carousel.tsx`) reads the finger from React Native's touches, which keep coming meanwhile, moves
-the pager by it and drops the tap; let go, the pager glides on (a quarter of the way, or a flick) or back. Reels' page
-needs none of this: every reel there is one video, so a sideways swipe on it is the pager's own. That bar has two rows, like X's (`src/components/home/home-top-tabs.tsx`): your photo in an aurora
-ring on the left, which opens your menu (`src/components/home/profile-menu.tsx`, as UniVerse's: a card with your photo,
-name and @username that opens your profile, then Upload, Saved, Settings, Community Guidelines, and Log out on its own;
-over Reels too: the bar has no "+"), the UniBuzz wordmark in the middle (it reads "Following" while
-that feed shows) and the Notifications bell on the right; then the three labels side by side in the middle of the row,
-24 points apart as in every tab row of the app (`TAB_GAP` in `src/components/sliding-tabs.tsx`; Explore's, Messages' and
-Events' rows too), Buzz's lime mask hanging just before its label while Buzz is near: the active one bold with a rounded aurora underline as wide as the label, sliding
-with the finger; moving between sections, by tap or swipe, plays no haptic. No line divides the tabs, the story tray and the
-feed: the bar is the screen's own colour (Buzz's canvas near Buzz), so they read as one surface. Under the labels sits the Campus | Global
-toggle, a small segmented pill whose thumb slides to the choice: Campus is your own university, Global every university (and,
-only while Posts has a tab, Following: the posts of people you follow, which switches to Posts); the choice scopes For you,
-Posts and Reels alike (`src/lib/home-scope.ts`; Buzz has its own Campus | Global, its two feeds being separate). Someone without a university has nothing to choose, so the row is not drawn.
+the pager by it and drops the tap; let go, the pager glides on (a quarter of the way, or a flick) or back. Orbit's
+full-screen pages do the same from their own gesture (`usePageSwipe` in `src/lib/viewer-swipe.ts`): a sideways swipe
+that leaves the carousel — on past its last picture, back past its first, or on a page with one picture — is handed to
+the same pager, so neither a photo nor a video ever keeps the finger. In the full-screen viewer, which is on no pager of
+sections, that swipe is the way back instead.
+
+The top bar is one row (`src/components/home/home-top-tabs.tsx`): the three labels along its left, 24 points apart as in
+every tab row of the app (`TAB_GAP` in `src/components/sliding-tabs.tsx`; Explore's, Messages' and Events' rows too),
+Buzz's lime mask hanging just before its label while Buzz is near, the active one bold with a rounded aurora underline
+as wide as the label, sliding with the finger; and at its right the compass (Explore), the Notifications bell with its
+badge and the magnifier (search). Moving between sections, by tap or swipe, plays no haptic. Your photo and its menu are
+not up here: Profile is the last tab of the bottom bar and carries the same menu. No line divides the tabs from the page
+under them: the bar is the screen's own colour (Buzz's canvas near Buzz, nothing at all over Orbit, whose labels and
+icons turn white with a soft shadow), so they read as one surface. While it is shown, a second row holds the Campus |
+Global toggle, a small segmented pill whose thumb slides to the choice: Campus is your own university, Global every
+university (and, only while Posts has a tab, Following: the posts of people you follow, which switches to Posts); the
+choice scopes Orbit, Posts and Reels alike (`src/lib/home-scope.ts`; Buzz has its own Campus | Global, its two feeds
+being separate). Someone without a university has nothing to choose, so the row is not drawn.
 For now the toggle is hidden everywhere, here and in the viewer (`SCOPE_TOGGLE_SHOWN` in `src/lib/home-scope.ts` is
-`false`): the bar is just its first two rows and every feed stays on your own campus. Its code is all kept; set the flag
+`false`): the bar is just its one row and every feed stays on your own campus. Its code is all kept; set the flag
 back to `true` to bring it back.
 Tapping any reel, or the photo or video of any post (photos, videos or both), anywhere in the app opens it full screen in
 the viewer (`src/app/reels/[id].tsx`), like Instagram. It does not slide in: the tapped picture itself grows out of its
@@ -219,12 +240,14 @@ fading away; let go past about a third of the way, or with a flick, and it carri
 from, still exactly where it was (the feed keeps its scroll position and its video plays on, and a carousel post's row has
 followed the viewer to the photo on screen, `emitPostSlide`): from the page it opened on, the feed's own picture takes
 over as it lands; from any other (a later reel), it fades into that picture on the way (`CROSS_FADE`), as Instagram's
-does, and Back does the same. Only a viewer opened from a link, with no post behind it, sends the page sliding on out and
-fading. Let go sooner (under 30% of the width, or a flick of under 40 points) and it springs back. Only a swipe to the
-right on a post's first photo, or on a page with one picture, pulls the page back (`swipeChoice` in
-`src/lib/viewer-swipe.ts`, 2026-11-16); every other sideways swipe on a post's photos moves between them, wherever it
-starts (the left edge too), and past the last one the edge resists (about a third of the pull shows) and the photo
-springs back: the viewer never closes from there, and a back pull turned round to the left only stretches. The viewer is a modal screen, outside the view in which the gesture library cancels React
+does. Only a viewer opened from a link, with no post behind it, sends the page sliding on out and
+fading. Let go sooner (under 30% of the width, or a flick of under 40 points) and it springs back. The page has no Back button (2026-11-21, the owner's choice): it is left by a swipe to
+the right begun at the screen's left edge (within 24pt of it, as elsewhere in iOS), wherever the post's photos stand, or
+by a swipe to the right on its first photo or on a page with one picture (`swipeChoice` in
+`src/lib/viewer-swipe.ts`); Android's own back button and, over the tabs, tapping the tab it was opened from leave too.
+Every other sideways swipe moves between a post's photos, and past the last one the edge resists (about a third of the
+pull shows) and the photo springs back: the viewer never closes from there, and a back pull turned round to the left
+only stretches. The viewer is a modal screen, outside the view in which the gesture library cancels React
 Native's touches, so the page's taps check `swipedJustNow` themselves: a touch that ended a swipe never pauses, likes or
 opens anything. Feed and viewer videos skip Live Text on a paused frame (`allowsVideoFrameAnalysis={false}`): its button
 would sit over the play control, and its scan was what crashed Expo Go in the simulator. Screens opened from the viewer (a profile, a chat) come up as cards over it. Pictures are laid out
@@ -244,11 +267,15 @@ switch: the phone's volume buttons rule it), with the app's own controls instead
 them, and they fade a moment after it plays): play or pause in the middle and the same timeline with the time gone and
 the time left, as in Photos, plus the hold for 2×; the close button and the counter are clear glass; with VoiceOver on they never fade
 (`useScreenReader` in `src/lib/accessibility.ts`), and faded ones leave the accessibility tree as they leave touch.
-Stories have their own layout (`src/app/stories/[id].tsx`, `storyFrame` in
-`packages/shared/src/stories.ts`): on a tall phone a rounded 9:16 card under the status bar with the reply pill, the heart
-and the paper plane (or, on your own, Activity, Send and Delete) on black below it, so they are always legible and a near
-miss never moves the story on; on a short screen the story fills it and the bar floats over a deeper shade. Holding a
-story fades every control away. Over every page, one top row with Back at the left and the
+Stories are laid out the same way since 2026-11-21 (`src/app/stories/[id].tsx`): the picture edge to edge on pure
+black, whole and in its own shape, and everything else floating over it on soft shades — the bars for each of that
+person's stories along the very top, the name and "⋯" under them, and the reply pill, the heart and the paper plane (or,
+on your own, Activity, Send and Delete) just above the home indicator. The tap zones (the left third back, the rest on)
+stop above that bar, so a near miss never moves the story on, and holding a story fades every control away so the
+picture is seen whole. It used to sit in a rounded 9:16 card with the actions on black below it (`storyFrame`, now
+gone), which cropped anything that was not 9:16. A sideways swipe turns from one person to the next like a cube
+(`CubeFace` in the same file): each page hinges on the edge it shares with the page coming on, a quarter turn over a
+whole page, darkening as it turns away, all from the pager's offset on the UI thread. Over every page, one top row with Back at the left and the
 Campus | Global toggle in the middle (for reels and For you, while the toggle is shown); the creator's name, the words and the heart, comments, share,
 save and "…" rail sit at the bottom (as on the Reels page, the rail a little nearer the right edge: `railRight`). The
 words (the name, the title and caption, a link) sit right on what is under them, TikTok's way (2026-11-16): their last
@@ -317,7 +344,7 @@ with their videos loaded and waiting (from the moment the zoom open has finished
 has its player and pictures, since a large photo or poster is decoded and resized on the main thread as it
 arrives, which made the zoom drop frames; profiled with Instruments), a video's still is its very first frame (Mux `time=0`) so the player takes over
 without a jump, and in dark mode the top row keeps one style over photos and videos alike. The bottom tab bar plays no
-haptic, and neither do Home's For you | Buzz | Reels, Explore's Housing | Roommate | Marketplace and its "+", Messages'
+haptic, and neither do Home's Stories | Orbit | Buzz, Explore's Housing | Roommate | Marketplace and its "+", Messages'
 Chats | Groups, the profile's section tabs or the inbox's All | Unread | Requests pills. A swipe up moves on: a reel goes on
 into the Reels feed (only reels, page by page, the other campus choice keeping the page on screen while what follows comes
 from the new choice); a post in For you goes on down For you, its next pages loading as needed; a square in a profile grid
@@ -346,10 +373,12 @@ reaches the top edge too. The same goes for Explore's and Events' search and fil
 title stays put): they slide up under the fixed bar
 as the list under them scrolls down, and back as soon as it
 scrolls up. The bottom bar never moves. The choice lives in
-`src/lib/home-scope.ts` and drives For you and Posts alike: those pages have no filter chips of their own (Buzz keeps its
+`src/lib/home-scope.ts` and drives Orbit and Posts alike: those pages have no filter chips of their own (Buzz keeps its
 own filter bar, see Buzz below).
-Explore (the Housing tab in the code, with a compass icon) works the same way with three pages,
-**Housing | Roommate | Marketplace** (apartments, roommates, items) (`src/app/(tabs)/housing.tsx`): the big "Find"
+Explore (housing.tsx in the code, opened by the compass in Home's top bar — a screen of its own above the tabs since
+Events took its place in the bottom bar on 2026-11-21: Back returns to Home, and no bottom bar is drawn there) works the
+same way with three pages,
+**Housing | Roommate | Marketplace** (apartments, roommates, items) (`src/app/housing.tsx`): the big "Find"
 title, then three levels and nothing more (`src/components/discovery-bar.tsx`, shared with Events): the three labels
 with the sliding aurora underline; one search field (searching the page on screen) with the filter button beside it,
 which counts the filters on; and one row of small round pills, see-through with a hairline ring (the one in force in
@@ -632,8 +661,8 @@ the grid is the newest posts and reels, the suggestions the newest people, and t
 
 ## Events
 
-The calendar beside the magnifier in Home's top bar opens Events (`src/app/events/index.tsx`), the campus's calendar,
-as a screen of its own above the tabs (Back returns to Home; no bottom bar there): Back and the big "Events" title with
+Events (`src/app/(tabs)/events.tsx`), the campus's calendar, is the bottom bar's second tab (it was a screen of its own,
+opened from a calendar in Home's top bar, between 2026-11-15 and 2026-11-21): the big "Events" title with
 Saved at its right,
 For you | All events above a pager, with Explore's three levels (DiscoveryBar: the labels, one search field with the
 filter button, one row of chips, all sliding up under the title as a page scrolls), and the floating "+" to publish.

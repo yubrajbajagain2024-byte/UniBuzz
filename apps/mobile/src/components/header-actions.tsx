@@ -14,27 +14,25 @@ export function headerActionsWidth(count: number): number {
 }
 
 /**
- * The top-right corner of Home: with `events`, the calendar, which opens the campus's Events (app/events: it left the
- * bottom bar when the bar became icons only); the magnifier, which opens the search screen (app/search.tsx: people,
- * topics, posts and what is popular on every campus); then the Notifications bell, which opens the notifications
- * screen with a badge of how many are unread while signed in. `color` lets Home paint them white over the Reels page
- * (with `iconStyle`'s shadow); `inHeader` adds the right margin a native header does not give its headerRight.
+ * The top-right corner of Home, in the owner's own order (2026-11-21): with `explore`, the compass, which opens Explore
+ * (app/housing.tsx: Housing | Roommate | Marketplace, which left the bottom bar when Events took its place); the
+ * Notifications bell, which opens the notifications screen with a badge of how many are unread while signed in; then
+ * the magnifier, which opens the search screen (app/search.tsx: people, topics, posts and what is popular on every
+ * campus). `color` lets Home paint them white over the Orbit feed (with `iconStyle`'s shadow); `inHeader` adds the
+ * right margin a native header does not give its headerRight.
  */
-export function HeaderActions({ color, inHeader = false, iconStyle, events = false }: { color?: string; inHeader?: boolean; iconStyle?: StyleProp<TextStyle>; events?: boolean }) {
+export function HeaderActions({ color, inHeader = false, iconStyle, explore = false }: { color?: string; inHeader?: boolean; iconStyle?: StyleProp<TextStyle>; explore?: boolean }) {
   const colors = useColors();
   const router = useRouter();
   const { user } = useSession();
   const unread = useUnreadNotifications(user?.id ?? null);
   return (
     <View style={[styles.row, inHeader && styles.inHeader]}>
-      {events ? (
-        <Pressable onPress={() => router.push("/events" as never)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Events" accessibilityHint="Your campus's events and clubs" style={styles.button}>
-          <Icon name="calendar-outline" sf="calendar" size={25} color={color ?? colors.text} style={iconStyle} />
+      {explore ? (
+        <Pressable onPress={() => router.push("/housing" as never)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Explore" accessibilityHint="Housing, roommates and the marketplace" style={styles.button}>
+          <Icon name="compass-outline" sf="safari" size={25} color={color ?? colors.text} style={iconStyle} />
         </Pressable>
       ) : null}
-      <Pressable onPress={() => router.push("/search" as never)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Search" accessibilityHint="People, topics, posts and what is popular" style={styles.button}>
-        <Icon name="search-outline" sf="magnifyingglass" size={25} color={color ?? colors.text} style={iconStyle} />
-      </Pressable>
       <Pressable onPress={() => router.push("/notifications")} hitSlop={6} accessibilityRole="button" accessibilityLabel={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"} style={styles.button}>
         <Icon name="notifications-outline" size={26} color={color ?? colors.text} style={iconStyle} />
         {unread > 0 ? (
@@ -44,6 +42,9 @@ export function HeaderActions({ color, inHeader = false, iconStyle, events = fal
             </Text>
           </View>
         ) : null}
+      </Pressable>
+      <Pressable onPress={() => router.push("/search" as never)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Search" accessibilityHint="People, topics, posts and what is popular" style={styles.button}>
+        <Icon name="search-outline" sf="magnifyingglass" size={25} color={color ?? colors.text} style={iconStyle} />
       </Pressable>
     </View>
   );

@@ -27,7 +27,6 @@ import { supabase } from "@/lib/supabase";
 import { auroraGradient, textStyle } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { Icon } from "@/components/icon";
-import { GlassIconButton } from "@/components/glass";
 import { FloatingTabBar, useTabBarMirror } from "@/components/floating-tab-bar";
 import { tabBarInset } from "@/lib/tab-bar";
 
@@ -132,7 +131,7 @@ function splitKey(key: string): [string, string] {
  * their page. Over every page, one row at the top: Back at the left, the Campus | Global toggle in the middle while the
  * Reels feed is running (the same choice as Home's, see useHomeScope: picking the other one keeps the page on screen and
  * the ones already seen, and the reels after it come from the new choice) and a video's sound button at the right. At
- * the bottom, the creator's name, the words and the rail (like, comments, share, save, "…") that ReelItem draws for every
+ * the bottom, the creator's name, the words and the rail (like, comments, save, share, "…") that ReelItem draws for every
  * page, nearer the right edge than in the Reels tab, and under them the app's own tab bar, still there and still working,
  * when the viewer was opened over the tabs (see selectTab). The rail's Comments (or a tour's Inbox) opens the comments
  * and messages; there is no comment bar. Likes, saves and comments
@@ -970,11 +969,10 @@ export default function ReelViewerScreen() {
     <View style={styles.root} onLayout={(e) => setHeight(Math.round(e.nativeEvent.layout.height))}>
       {body}
 
-      {/* One row floating over the picture: Back at the left, the toggle in the middle; touches between them go through to the page. */}
+      {/* One row floating over the picture, holding the toggle; there is no Back button (2026-11-21, the owner's choice):
+          a swipe to the right from the screen's left edge leaves, as it does elsewhere in iOS (see swipeChoice). */}
       <Animated.View pointerEvents="box-none" style={[styles.top, { paddingTop: rowTop }, chromeStyle]}>
         <View pointerEvents="box-none" style={styles.row}>
-          {/* Back on clear glass over the picture, as the system draws its bar buttons over media. */}
-          <GlassIconButton icon="chevron-back" label="Back" onPress={leave} variant="media" size={40} iconSize={19} haptic={false} hitSlop={8} style={styles.back} />
           {SCOPE_TOGGLE_SHOWN && scoped && segments.length > 1 ? <ScopeToggle segments={segments} value={chosen} onChange={choose} overVideo shadow={styles.shadow} /> : null}
         </View>
       </Animated.View>
@@ -1072,9 +1070,8 @@ const useStyles = makeStyles((colors) => ({
   stateButton: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.brand, experimental_backgroundImage: auroraGradient(colors.aurora), borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12, marginTop: 12 },
   stateButtonText: { color: colors.onBrand, fontSize: 15, fontWeight: "700" },
   top: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10 },
-  // The toggle is centred on the screen; Back keeps to the left edge, level with it.
+  // The toggle is centred on the screen.
   row: { height: ROW, alignItems: "center", justifyContent: "center" },
-  back: { position: "absolute", left: 12, top: (ROW - 40) / 2 },
   shadow: { textShadowColor: colors.mediaScrim, textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
   foot: { position: "absolute", left: 0, right: 0, alignItems: "center" },
   retry: { backgroundColor: colors.mediaPill, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },

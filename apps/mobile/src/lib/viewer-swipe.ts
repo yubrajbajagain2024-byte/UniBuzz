@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo } from "react";
 import { Gesture } from "react-native-gesture-handler";
 import { cancelAnimation, runOnJS, useSharedValue, withSpring, type DerivedValue, type SharedValue } from "react-native-reanimated";
+import { useSectionPager } from "./section-pager";
 
 /**
  * The full-screen viewer's swipe back. `drag` is how far the page on screen has been pulled sideways, in points (either
@@ -13,6 +14,12 @@ export const ViewerSwipeContext = createContext<ViewerSwipe | null>(null);
 
 /** How far a finger moves before a page decides what the swipe is for: sideways, or up and down (the next post). */
 const DECIDE = 10;
+/**
+ * A swipe to the right that starts this close to the screen's left edge leaves the viewer, wherever the carousel stands,
+ * as the system's own back swipe does. It is the way out now that the page has no Back button (2026-11-21): a swipe
+ * begun further in still only moves between a post's pictures, so nothing closes by accident mid-carousel.
+ */
+const EDGE = 24;
 /**
  * Let go past this share of the page's width, or flicked to the right faster than BACK_VELOCITY after at least
  * BACK_FLICK_MIN points, a pull goes on back; otherwise the page springs home. The flick needs a little travel of its own,
@@ -40,17 +47,19 @@ const HOME_SPRING = { damping: 26, stiffness: 320, mass: 1 };
 /**
  * What a sideways swipe on a page does: move its carousel to the next or previous slide ("slide"), pull the page back
  * towards where the viewer was opened from ("back"), or nothing (left to what is around the page). The viewer goes back
- * only one way: a swipe to the right on a carousel's first slide, or on a page with one picture. Every other sideways
- * swipe on a carousel moves it, past its last slide against the edge's resistance (it springs back), never closing the
- * viewer, wherever the finger starts. `dx` is the finger's sideways travel so far (positive: to the right), `at` the
- * carousel's position in slides (0 at the first), `count` its slides.
+ * two ways: a swipe to the right begun at the screen's left edge (see EDGE), wherever the carousel stands, and a swipe
+ * to the right on a carousel's first picture or on a page with only one. Every other sideways swipe on a carousel moves
+ * it, past its last picture against the edge's resistance (it springs back), never closing the viewer. `dx` is the
+ * finger's sideways travel so far (positive: to the right), `startX` where it touched down, `at` the carousel's
+ * position in pictures (0 at the first), `count` how many it has.
  */
-export function swipeChoice(dx: number, at: number, count: number, canGoBack: boolean): "slide" | "back" | "none" {
+export function swipeChoice(dx: number, startX: number, at: number, count: number, canGoBack: boolean): "slide" | "back" | "none" {
   "worklet";
+  if (dx > 0 && startX < EDGE && canGoBack) return "back";
   if (count > 1) {
-    // To the next slide, or back towards the first while the strip is past it: the carousel follows the finger.
+    // To the next picture, or back towards the first while the strip is past it: the carousel follows the finger.
     if (dx < 0 || at > 0.01) return "slide";
-    // On the first slide, to the right: back, in the viewer; on the Reels tab, the first slide's edge resists.
+    // On the first picture, to the right: back, in the viewer; on the Reels tab, the first picture's edge resists.
     return canGoBack ? "back" : "slide";
   }
   return dx > 0 && canGoBack ? "back" : "none";
@@ -65,17 +74,27 @@ export type PageSlides = { count: number; pos: SharedValue<number>; onLand: (ind
  * (or on a page with one picture) pulls the whole page back towards the post it was opened from, following the finger
  * too, and let go far enough or with a flick to the right, it goes back (see ViewerSwipe), otherwise the page springs
  * home (see swipeChoice). Up and down is left to the pager between posts, and a tap or a
- * double tap still reaches the page. Off the viewer (no ViewerSwipe) it only moves a carousel. `swipedJustNow` tells a tap
+ * double tap still reaches the page.
+ *
+ * Off the viewer (no ViewerSwipe) it moves the carousel, and a swipe that leaves it — on past its last picture, or back
+ * past its first — is handed to the pager of sections the page is on instead (Home's Stories | Orbit | Buzz, see
+ * lib/section-pager.ts), TikTok's way, so a post with several photos never keeps the finger. A page with one picture
+ * has nothing to hand over: the gesture simply fails and the pager's own ScrollView takes the swipe natively.
+ * `swipedJustNow` tells a tap
  * handler on the page that the touch it is about to act on was a swipe (or the tail of one): it should do nothing.
  * `locked` (above 0 while a photo on the page is zoomed, or its video's timeline is being scrubbed) leaves the touch to
  * that, decided on the UI thread; so does a second finger, which is a pinch.
  */
 export function usePageSwipe(width: number, slides: PageSlides | null, locked?: Readonly<SharedValue<number>> | DerivedValue<number>) {
   const swipe = useContext(ViewerSwipeContext);
+  // Null in the viewer (its own screen is outside Home's pager) and wherever a page is not on a pager of sections.
+  const section = useSectionPager();
   const touchX = useSharedValue(0);
   const touchY = useSharedValue(0);
-  /** 0 until the swipe is decided, then 1 moving the carousel, 2 pulling the page back. */
+  /** 0 until the swipe is decided, then 1 moving the carousel, 2 pulling the page back, 3 moving the pager of sections. */
   const mode = useSharedValue(0);
+  /** Which way a handed-over swipe set out: 1 on to the next section (the finger going left), -1 back to the one before. */
+  const outward = useSharedValue(1);
   /** Where the strip (or the pull) was when the swipe was decided, less the finger's travel so far: nothing jumps. */
   const grab = useSharedValue(0);
   /** 1 while a swipe moves the carousel or pulls the page; when the last one let go (ms). Read synchronously by the page's taps. */
@@ -87,11 +106,14 @@ export function usePageSwipe(width: number, slides: PageSlides | null, locked?: 
   const onLand = slides?.onLand;
   const drag = swipe?.drag ?? null;
   const close = swipe?.close ?? null;
+  // Only off the viewer: in it, a swipe to the right on the first picture is the way back, not another section.
+  const follow = drag === null ? (section?.follow ?? null) : null;
+  const release = drag === null ? (section?.release ?? null) : null;
 
   const gesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(count > 1 || drag !== null)
+        .enabled(count > 1 || drag !== null || follow !== null)
         .manualActivation(true)
         .onTouchesDown((e) => {
           const t = e.changedTouches[0];
@@ -115,12 +137,18 @@ export function usePageSwipe(width: number, slides: PageSlides | null, locked?: 
             return;
           }
           if (Math.abs(dx) <= DECIDE) return;
-          const choice = swipeChoice(dx, -strip.value / width, count, drag !== null);
-          if (choice === "none") {
+          const choice = swipeChoice(dx, touchX.value, -strip.value / width, count, drag !== null);
+          // On the last picture going on, on the first going back, or on a page with one picture: the pager of sections
+          // takes it from here. translationX is measured from where the finger touched down, which is what it follows.
+          const at = -strip.value / width;
+          const leaving = choice === "none" || (choice === "slide" && (dx < 0 ? at >= count - 1 - 0.01 : at <= 0.01));
+          if (leaving && follow) {
+            outward.value = dx < 0 ? 1 : -1;
+            mode.value = 3;
+          } else if (choice === "none") {
             manager.fail();
             return;
-          }
-          if (choice === "slide") {
+          } else if (choice === "slide") {
             // A strip still settling stops under the finger.
             cancelAnimation(strip);
             grab.value = strip.value - dx;
@@ -141,6 +169,9 @@ export function usePageSwipe(width: number, slides: PageSlides | null, locked?: 
             // A back pull goes to the right; turned round to the left, it only stretches against the edge.
             const x = e.translationX - grab.value;
             drag.value = x >= 0 ? x : x * RUBBER;
+          } else if (mode.value === 3 && follow) {
+            // Only ever towards the section it set out for: the pictures are still there the other way.
+            runOnJS(follow)(outward.value === 1 ? Math.min(0, e.translationX) : Math.max(0, e.translationX));
           }
         })
         .onEnd((e) => {
@@ -158,6 +189,8 @@ export function usePageSwipe(width: number, slides: PageSlides | null, locked?: 
             const far = pulled > width * BACK_SHARE || (e.velocityX > BACK_VELOCITY && pulled > BACK_FLICK_MIN);
             if (far) close(e.velocityX);
             else drag.value = withSpring(0, { ...HOME_SPRING, velocity: e.velocityX });
+          } else if (mode.value === 3 && release) {
+            runOnJS(release)(outward.value === 1 ? Math.min(0, e.translationX) : Math.max(0, e.translationX), e.velocityX);
           }
         })
         .onFinalize(() => {
@@ -167,7 +200,7 @@ export function usePageSwipe(width: number, slides: PageSlides | null, locked?: 
           }
           mode.value = 0;
         }),
-    [count, width, strip, onLand, drag, close, touchX, touchY, mode, grab, busy, endedAt, locked],
+    [count, width, strip, onLand, drag, close, follow, release, touchX, touchY, mode, outward, grab, busy, endedAt, locked],
   );
   const swipedJustNow = useCallback(() => busy.value === 1 || Date.now() - endedAt.value < TAP_AFTER_SWIPE_MS, [busy, endedAt]);
   return { gesture, swipedJustNow };

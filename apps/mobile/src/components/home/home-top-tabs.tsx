@@ -1,51 +1,42 @@
 import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Animated, Pressable, StyleSheet, Text, View, type LayoutChangeEvent, type StyleProp, type TextStyle } from "react-native";
 import type { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { HOME_BRAND, HOME_TABS, type HomeSection } from "@apartment-book/shared";
-import { Avatar } from "@/components/avatar";
 import { HEADER_ACTION_SIZE, HeaderActions, headerActionsWidth } from "@/components/header-actions";
 import { SlidingTabs } from "@/components/sliding-tabs";
 import { hapticTap } from "@/lib/haptics";
+import { APP_HOME_TABS, type AppHomeSection } from "@/lib/home-tabs";
 import { SCOPE_TOGGLE_SHOWN, useHomeScope } from "@/lib/home-scope";
 import { useSession } from "@/lib/session";
 import { auroraGradient, radius, statusShade } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
-import { ProfileMenuSheet } from "./profile-menu";
-import { BuzzBarLayer, BuzzMeGlyph, BuzzStatusShade, BuzzTabMask, useBuzzBar } from "./buzz-top-bar";
+import { BuzzBarLayer, BuzzStatusShade, BuzzTabMask, useBuzzBar } from "./buzz-top-bar";
 import { phosphor } from "@/lib/palette";
 import { Icon } from "@/components/icon";
 import { GlassBackdrop } from "@/components/glass";
 
-/** Height of each of the bar's first two rows: the wordmark row, then the labels row. */
-const ROW = 44;
-/** The third row: the Campus | Global toggle, a 32pt pill with 6pt above and below (none while it is hidden). */
+/** The bar's one row: the tabs at its left, the three icons at its right. */
+const ROW = 46;
+/** The second row, while it is shown: the Campus | Global toggle, a 32pt pill with 6pt above and below. */
 const TOGGLE_ROW = 44;
 /**
- * Breathing room between the status bar (the safe area's top inset) and the first row, so the photo ring and the bell sit
- * clearly under the clock on every phone: with the row starting right at the inset the 40pt ring came within 2pt of
- * it, and on a phone whose inset is only the status bar (no notch, Android) it touched the clock.
+ * Breathing room between the status bar (the safe area's top inset) and the row, so the labels and the icons sit clearly
+ * under the clock on every phone, a phone whose inset is only the status bar (no notch, Android) included.
  */
 const TOP_GAP = 8;
-/** The side margin of the rows: the ring and the bell keep this clear of the screen's edges. */
+/** The row's inset from the screen's right edge, where the icons are; the labels start SIDE_PAD from the left (see `tabs`). */
 const SIDE_PAD = 16;
-export const HOME_TOP_BAR_HEIGHT = TOP_GAP + ROW * 2 + (SCOPE_TOGGLE_SHOWN ? TOGGLE_ROW : 0);
-/** Your photo on the left of the bar: the picture, the gap around it and the gradient ring. */
-const PHOTO = 32;
-const PHOTO_GAP = 2;
-const RING = 2;
-const RING_SIZE = PHOTO + 2 * (PHOTO_GAP + RING);
-/** The square your photo (or, over Reels, the "+") sits in at the left, as the bell does at the right. */
+export const HOME_TOP_BAR_HEIGHT = TOP_GAP + ROW + (SCOPE_TOGGLE_SHOWN ? TOGGLE_ROW : 0);
+/** The square each icon sits in at the right, a touch wider than its glyph. */
 const SIDE = 44;
+/** As wide as the right side's three buttons (the compass, the bell, the magnifier) with the last one's inset from the edge. */
+const ACTIONS_SLOT = headerActionsWidth(3) + (SIDE - HEADER_ACTION_SIZE) / 2;
 /**
- * The slot on each side of the wordmark: the magnifier and the Notifications bell on the right (two actions, a 4pt gap,
- * and the bell's inset from the edge), your photo at the left of the left one. The same width both sides keeps the
- * wordmark centred on the screen.
+ * Half of SlidingTabs' room between labels, which the first label keeps to its left: taken off the row's own padding, so
+ * "Stories" starts SIDE_PAD from the screen's edge, in line with everything else.
  */
-// As wide as the right side's three buttons (the calendar, the magnifier, the bell), on both sides, so the wordmark stays centred.
-const SIDE_SLOT = headerActionsWidth(3) + (SIDE - HEADER_ACTION_SIZE) / 2;
-const LABEL_SIZE = 16;
+const TABS_LEAD = 12;
+const LABEL_SIZE = 17;
 /** The toggle: each segment this wide, the sliding thumb inset by the pill's padding. */
 const SEGMENT = 108;
 const TOGGLE_PAD = 3;
@@ -83,10 +74,10 @@ export function useOverVideo(store: OverVideoStore): boolean {
   return useSyncExternalStore(store.subscribe, store.get, store.get);
 }
 
-/** How solid the bar's background is on each page: fully on For you, Buzz and Posts, gone on Reels. */
-const SOLID = HOME_TABS.map((s) => (s.value === "reels" ? 0 : 1));
-/** The Following choice opens the Posts page, so it is offered only while Posts has a tab. */
-const POSTS_SHOWN = HOME_TABS.some((s) => s.value === "posts");
+/** How solid the bar's background is on each page: fully on Stories and Buzz, gone over the Orbit feed. */
+const SOLID = APP_HOME_TABS.map((s) => (s.value === "foryou" ? 0 : 1));
+/** The Following choice opens the Posts page, so it is offered only while Posts has a tab (it has none: see HIDDEN_HOME_SECTIONS). */
+const POSTS_SHOWN = APP_HOME_TABS.some((s) => s.value === "posts");
 
 /** One choice of the Campus | Global toggle (and Following, while Posts has a tab). */
 export type ScopeSegment = { key: "mine" | "all" | "following"; label: string; icon: keyof typeof Ionicons.glyphMap; hint: string };
@@ -105,33 +96,33 @@ export function campusSegments(profile: { university_id: string | null; universi
 }
 
 /**
- * Floating top bar of Home, X style, in three rows. Row 1: your photo in a gradient ring on the left, which opens your
- * menu (ProfileMenuSheet: your profile, Upload, Saved, Settings, Community Guidelines, Log out; signed out, log in); the
- * UniBuzz wordmark in the middle (it reads "Following" while that feed shows); on the right the calendar (the campus's
- * Events, a screen of its own since the bottom bar became icons only), the magnifier (the search screen) and the
- * Notifications bell (it opens the notifications screen; its badge counts the unread). Row 2: the Home tabs (Orbit | Buzz | Reels) side by side in
- * the middle of the row (SlidingTabs' TAB_GAP apart, as in every tab row) with X's sliding underline (violet, as wide as
- * the label), Buzz's lime mask hung just before its label while Buzz is near. No line under the bar: it is the screen's
- * own colour, so the tabs, the stories and the feed read as one seamless surface. Row 3: the Campus | Global toggle, a small
- * segmented pill whose thumb slides to the choice (see useHomeScope: it scopes For you, Buzz, Posts and Reels alike;
- * Campus is the person's own university, Global every university; "Following" joins it only while Posts has a tab,
- * and moves to Posts). Someone without a university has nothing to choose, so the row is not drawn for them. `scrollX`
- * is the pager's offset in points and `pageWidth` the width of one page: the underline slides, the labels crossfade (see
- * SlidingTabs) and the bar's solid background (colors.bar) fades out towards Reels with the finger, all
- * on the native driver. `overVideo` says when the text, icons and the toggle turn white and glassy for the video: Home
- * flips it halfway between Posts and Reels. Creating starts from Create in the middle of the bottom bar and the menu's
- * Upload; the calendar on the right opens Events; your photo keeps the left slot over the Reels video too. `section` is the section committed once the pager settles: what screen readers hear as selected
- * follows it. `translateY` slides the whole bar up out of the way as the page on screen scrolls down and back as soon as
- * it scrolls up, Instagram style (see useCollapsingHeader). Memoized: Home mounting a page ahead of time leaves it alone.
+ * Floating top bar of Home, the owner's sketch (2026-11-21): one row, the Home tabs along its left — Stories | Orbit |
+ * Buzz, side by side with X's sliding underline (violet, as wide as the label), Buzz's lime mask hung just before its
+ * label while Buzz is near — and at its right the three icons of HeaderActions: the compass (Explore: housing,
+ * roommates and the marketplace, a screen of its own since Events took its place in the bottom bar), the Notifications
+ * bell (its badge counts the unread) and the magnifier (the search screen: people, topics, posts and what is popular).
+ * Your photo and its menu are not here: Profile is the last tab of the bottom bar, and it carries the same menu
+ * (Settings and privacy, Saved, the legal pages, Log out). Creating starts from Create in the middle of the bottom bar.
+ * No line under the bar: it is the screen's own colour, so the tabs and the page under them read as one surface. While
+ * it is shown (SCOPE_TOGGLE_SHOWN), a second row holds the Campus | Global toggle, a small segmented pill whose thumb
+ * slides to the choice (see useHomeScope: it scopes Orbit, Buzz, Posts and Reels alike; Campus is the person's own
+ * university, Global every university). Someone without a university has nothing to choose, so that row is not drawn for
+ * them.
+ *
+ * `scrollX` is the pager's offset in points and `pageWidth` the width of one page: the underline slides, the labels
+ * crossfade (see SlidingTabs) and the bar's solid background (colors.bar) fades out towards Orbit with the finger, all
+ * on the native driver. `overVideo` says when the labels and the icons turn white and glassy for the full-screen feed:
+ * Home flips it halfway between Orbit and the page beside it. `section` is the section committed once the pager
+ * settles: what screen readers hear as selected follows it. `translateY` slides the whole bar up out of the way as the
+ * page on screen scrolls down and back as soon as it scrolls up, Instagram style (see useCollapsingHeader); Orbit, which
+ * fills the screen, never moves it. Memoized: Home mounting a page ahead of time leaves it alone.
  */
-export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVideo: overVideoStore, onPosts: onPostsStore, onLayout, scrollX, pageWidth, translateY }: { section: HomeSection; onSelect: (s: HomeSection) => void; overVideo: OverVideoStore; onPosts: OverVideoStore; onLayout: (e: LayoutChangeEvent) => void; scrollX: Animated.Value; pageWidth: number; translateY: Animated.AnimatedInterpolation<number> }) {
+export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVideo: overVideoStore, onPosts: onPostsStore, onLayout, scrollX, pageWidth, translateY }: { section: AppHomeSection; onSelect: (s: AppHomeSection) => void; overVideo: OverVideoStore; onPosts: OverVideoStore; onLayout: (e: LayoutChangeEvent) => void; scrollX: Animated.Value; pageWidth: number; translateY: Animated.AnimatedInterpolation<number> }) {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { user, profile } = useSession();
   const [scope, setScope] = useHomeScope();
   const colors = useColors();
   const styles = useStyles();
-  const [menuOpen, setMenuOpen] = useState(false);
   const overVideo = useOverVideo(overVideoStore);
   // Whether the page under the finger is Posts: flipped halfway, like overVideo, so the title and the toggle follow the swipe, not the settle.
   const onPosts = useOverVideo(onPostsStore);
@@ -170,10 +161,9 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
   const ink = overVideo ? colors.onMedia : onBuzz ? phosphor.accent : colors.accent;
   // Signed out there is nobody you follow: the Posts page drops the filter too (see PostsSection).
   const following = Boolean(user) && scope.following;
-  // Like X's "Following", the wordmark reads it while that feed is showing. Only Posts can filter by follows, so on the
-  // other sections the toggle shows the campus the page is really showing.
+  // Only Posts can filter by follows, and it has no page here: on every other section the toggle shows the campus the
+  // page is really showing.
   const followingShown = following && onPosts;
-  const title = followingShown ? "Following" : HOME_BRAND;
 
   // The person's own campus (by its name for screen readers), every campus, and the people they follow while Posts has a tab.
   const segments: Segment[] = campusSegments(profile);
@@ -198,51 +188,29 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
         <Animated.View pointerEvents="none" style={[styles.solid, { opacity: solid ?? (overVideo ? 0 : 1) }]} />
         <BuzzBarLayer layer={buzzBar.layer} />
         <View style={styles.row}>
-          <View style={styles.sideSlot}>
-            {/* Your photo and its menu on every page, Reels included: creating starts from the "+" at the bottom right (X's way), not up here. */}
-            <View style={styles.side}>
-              {/* Your photo is not drawn at all while the pager rests on Buzz; near it, it crossfades to a neutral glyph. */}
-              {buzzBar.avatarShown ? (
-                <Animated.View style={[styles.sideLayer, buzzBar.avatarOpacity ? { opacity: buzzBar.avatarOpacity } : null]}>
-                  <Pressable onPress={() => (user ? setMenuOpen(true) : router.push("/(auth)/login"))} hitSlop={4} accessibilityRole="button" accessibilityLabel="Your menu" accessibilityHint="Your profile, Upload, Saved, Settings and more" style={styles.ring}>
-                    <View style={styles.ringGap}>
-                      {profile ? <Avatar name={profile.full_name} url={profile.avatar_url} size={PHOTO} online={false} transition={0} /> : <Icon name="person-circle" size={PHOTO} color={colors.faint} />}
-                    </View>
-                  </Pressable>
-                </Animated.View>
-              ) : null}
-              {buzzBar.glyphShown ? <BuzzMeGlyph opacity={buzzBar.layer} onPress={() => router.push("/(tabs)/profile")} size={RING_SIZE - 6} /> : null}
-            </View>
+          {/* The tabs from the row's left edge; the icons at its right. */}
+          <View style={styles.tabs}>
+            <SlidingTabs
+              sections={APP_HOME_TABS}
+              section={section}
+              onSelect={onSelect}
+              scrollX={scrollX}
+              pageWidth={pageWidth}
+              tint={ink}
+              tintGradient={overVideo || onBuzz ? undefined : auroraGradient(colors.auroraGlow, 90)}
+              labelColor={fg}
+              dimColor={dim}
+              textStyle={overVideo ? styles.shadow : undefined}
+              align="start"
+              fontSize={LABEL_SIZE}
+              leading={{ buzz: <BuzzTabMask layer={buzzBar.layer} fontSize={LABEL_SIZE} /> }}
+            />
           </View>
-          {/* Two equal side slots keep the wordmark truly centred. */}
-          <View style={styles.middle}>
-            <View style={styles.title}>
-              <Text style={[styles.wordmark, { color: fg }, overVideo && styles.shadow]} accessibilityRole="header" numberOfLines={1}>
-                {title}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.sideSlot, styles.sideEnd]}>
-            <HeaderActions events color={fg} iconStyle={overVideo ? styles.shadow : undefined} />
+          <View style={styles.actions}>
+            <HeaderActions explore color={fg} iconStyle={overVideo ? styles.shadow : undefined} />
           </View>
         </View>
-        <View style={styles.row}>
-          <SlidingTabs
-            sections={HOME_TABS}
-            section={section}
-            onSelect={onSelect}
-            scrollX={scrollX}
-            pageWidth={pageWidth}
-            tint={ink}
-            tintGradient={overVideo || onBuzz ? undefined : auroraGradient(colors.auroraGlow, 90)}
-            labelColor={fg}
-            dimColor={dim}
-            textStyle={overVideo ? styles.shadow : undefined}
-            fontSize={LABEL_SIZE}
-            leading={{ buzz: <BuzzTabMask layer={buzzBar.layer} fontSize={LABEL_SIZE} /> }}
-          />
-        </View>
-        {/* Temporarily hidden everywhere (SCOPE_TOGGLE_SHOWN): the bar is then its first two rows, as it is for anyone with
+        {/* Temporarily hidden everywhere (SCOPE_TOGGLE_SHOWN): the bar is then its one row, as it is for anyone with
             no university to choose. */}
         {SCOPE_TOGGLE_SHOWN && segments.length > 1 ? (
           <View style={styles.toggleRow}>
@@ -253,7 +221,6 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
       {/* Behind the status bar, only a faint tint (see `away`): the feed passes under the clock, to the screen's top edge. */}
       <Animated.View pointerEvents="none" style={[styles.statusShade, { height: insets.top, opacity: shadeOpacity }]} />
       <BuzzStatusShade layer={buzzBar.layer} away={away} height={insets.top} />
-      <ProfileMenuSheet visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </>
   );
 });
@@ -300,19 +267,11 @@ const useStyles = makeStyles((colors, scheme) => ({
   // the tabs, the bar and the stories under it are one surface. Faded by the pager (see `solid`).
   solid: { position: "absolute", top: 0, left: 0, right: 0, bottom: -StyleSheet.hairlineWidth, backgroundColor: colors.bar },
   statusShade: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 11, experimental_backgroundImage: statusShade(colors.bar) },
-  row: { height: ROW, flexDirection: "row", alignItems: "center", paddingHorizontal: SIDE_PAD },
-  side: { width: SIDE, height: ROW, alignItems: "center", justifyContent: "center" },
-  // Your photo and, near Buzz, the glyph in its place: layers over each other in the same square.
-  sideLayer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
-  sideSlot: { width: SIDE_SLOT, height: ROW, flexDirection: "row", alignItems: "center" },
-  sideEnd: { justifyContent: "flex-end", paddingRight: (SIDE - HEADER_ACTION_SIZE) / 2 },
-  middle: { flex: 1, alignItems: "center", justifyContent: "center" },
-  title: { minHeight: ROW, alignItems: "center", justifyContent: "center", maxWidth: "100%" },
-  wordmark: { fontSize: 21, fontWeight: "800", letterSpacing: -0.5, flexShrink: 1 },
-  // The ring: the aurora, corner to corner (plain brand blue where the platform draws no gradient), with a gap in the bar's colour around the photo.
-  ring: { width: RING_SIZE, height: RING_SIZE, borderRadius: RING_SIZE / 2, alignItems: "center", justifyContent: "center", backgroundColor: colors.brand, experimental_backgroundImage: auroraGradient(colors.auroraGlow, 135) },
-  ringGap: { width: PHOTO + 2 * PHOTO_GAP, height: PHOTO + 2 * PHOTO_GAP, borderRadius: PHOTO / 2 + PHOTO_GAP, backgroundColor: colors.bar, alignItems: "center", justifyContent: "center" },
-  // Under the white words and icons over Reels: dark and soft enough to hold them on a bright frame.
+  row: { height: ROW, flexDirection: "row", alignItems: "stretch", paddingLeft: SIDE_PAD - TABS_LEAD, paddingRight: SIDE_PAD - (SIDE - HEADER_ACTION_SIZE) / 2 },
+  // The labels take the room the icons leave; a row too narrow for them closes their gaps up (see SlidingTabs).
+  tabs: { flex: 1, alignSelf: "stretch", flexDirection: "row" },
+  actions: { width: ACTIONS_SLOT, alignItems: "flex-end", justifyContent: "center" },
+  // Under the white words and icons over the full-screen feed: dark and soft enough to hold them on a bright frame.
   shadow: { textShadowColor: colors.mediaTextShadow, textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } },
   // The toggle sits centred in its row, just under the labels.
   toggleRow: { height: TOGGLE_ROW, alignItems: "center", justifyContent: "center" },
