@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Animated, Pressable, StyleSheet, Text, View, type LayoutChangeEvent, type StyleProp, type TextStyle } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, useWindowDimensions, View, type LayoutChangeEvent, type StyleProp, type TextStyle } from "react-native";
 import type { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HEADER_ACTION_SIZE, HeaderActions, headerActionsWidth } from "@/components/header-actions";
@@ -37,6 +37,14 @@ const ACTIONS_SLOT = headerActionsWidth(3) + (SIDE - HEADER_ACTION_SIZE) / 2;
  */
 const TABS_LEAD = 12;
 const LABEL_SIZE = 17;
+/**
+ * Home's row sits a little higher than the gap under the status bar alone would put it: by this share of the screen's
+ * height (the owner's brief, 2026-11-22), about 10 points on a 6.1-inch phone, so it scales with the phone.
+ */
+const ROW_LIFT = 0.012;
+/** The labels at medium weight, never bold (the active one is told by its colour), and the underline a short bar under it. */
+const LABEL_WEIGHTS = { active: "500", rest: "500" } as const;
+const UNDERLINE_SHARE = 0.6;
 /** The toggle: each segment this wide, the sliding thumb inset by the pill's padding. */
 const SEGMENT = 108;
 const TOGGLE_PAD = 3;
@@ -74,7 +82,10 @@ export function useOverVideo(store: OverVideoStore): boolean {
   return useSyncExternalStore(store.subscribe, store.get, store.get);
 }
 
-/** How solid the bar's background is on each page: fully on Stories and Buzz, gone over the Orbit feed. */
+/**
+ * How solid the bar's background is on each page: fully on Buzz, gone over Orbit, whose pictures run the whole height
+ * of the screen and are meant to be seen behind the tabs (the owner's brief, 2026-11-21).
+ */
 const SOLID = APP_HOME_TABS.map((s) => (s.value === "foryou" ? 0 : 1));
 /** The Following choice opens the Posts page, so it is offered only while Posts has a tab (it has none: see HIDDEN_HOME_SECTIONS). */
 const POSTS_SHOWN = APP_HOME_TABS.some((s) => s.value === "posts");
@@ -96,8 +107,8 @@ export function campusSegments(profile: { university_id: string | null; universi
 }
 
 /**
- * Floating top bar of Home, the owner's sketch (2026-11-21): one row, the Home tabs along its left — Stories | Orbit |
- * Buzz, side by side with X's sliding underline (violet, as wide as the label), Buzz's lime mask hung just before its
+ * Floating top bar of Home, the owner's sketch (2026-11-21): one row, the Home tabs along its left — Orbit | Buzz,
+ * side by side with X's sliding underline (violet, as wide as the label), Buzz's lime mask hung just before its
  * label while Buzz is near — and at its right the three icons of HeaderActions: the compass (Explore: housing,
  * roommates and the marketplace, a screen of its own since Events took its place in the bottom bar), the Notifications
  * bell (its badge counts the unread) and the magnifier (the search screen: people, topics, posts and what is popular).
@@ -117,13 +128,19 @@ export function campusSegments(profile: { university_id: string | null; universi
  * page on screen scrolls down and back as soon as it scrolls up, Instagram style (see useCollapsingHeader); Orbit, which
  * fills the screen, never moves it. Memoized: Home mounting a page ahead of time leaves it alone.
  */
-export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVideo: overVideoStore, onPosts: onPostsStore, onLayout, scrollX, pageWidth, translateY }: { section: AppHomeSection; onSelect: (s: AppHomeSection) => void; overVideo: OverVideoStore; onPosts: OverVideoStore; onLayout: (e: LayoutChangeEvent) => void; scrollX: Animated.Value; pageWidth: number; translateY: Animated.AnimatedInterpolation<number> }) {
+export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVideo: overVideoStore, onPosts: onPostsStore, onLayout, scrollX, pageWidth, translateY, hidden = false }: { section: AppHomeSection; onSelect: (s: AppHomeSection) => void; overVideo: OverVideoStore; onPosts: OverVideoStore; onLayout: (e: LayoutChangeEvent) => void; scrollX: Animated.Value; pageWidth: number; translateY: Animated.AnimatedInterpolation<number>; /** Orbit's post on screen is clear (a pinch: TikTok's clear mode): the whole bar fades away and takes no touches. */ hidden?: boolean }) {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const { user, profile } = useSession();
   const [scope, setScope] = useHomeScope();
   const colors = useColors();
   const styles = useStyles();
   const overVideo = useOverVideo(overVideoStore);
+  // A clear post on Orbit: the bar fades away with everything else over it, and back.
+  const fade = useRef(new Animated.Value(hidden ? 0 : 1)).current;
+  useEffect(() => {
+    Animated.timing(fade, { toValue: hidden ? 0 : 1, duration: hidden ? 160 : 220, useNativeDriver: true }).start();
+  }, [hidden, fade]);
   // Whether the page under the finger is Posts: flipped halfway, like overVideo, so the title and the toggle follow the swipe, not the settle.
   const onPosts = useOverVideo(onPostsStore);
   // Page i (offset i * pageWidth) shows SOLID[i]; in between the background follows the finger. Only once pageWidth > 0
@@ -184,7 +201,7 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
 
   return (
     <>
-      <Animated.View onLayout={measure} pointerEvents={overVideo ? "box-none" : "auto"} style={[styles.bar, { paddingTop: insets.top + TOP_GAP, transform: [{ translateY }] }]}>
+      <Animated.View onLayout={measure} pointerEvents={hidden ? "none" : overVideo ? "box-none" : "auto"} accessibilityElementsHidden={hidden} importantForAccessibility={hidden ? "no-hide-descendants" : "auto"} style={[styles.bar, { paddingTop: Math.max(0, insets.top + TOP_GAP - Math.round(windowHeight * ROW_LIFT)), opacity: fade, transform: [{ translateY }] }]}>
         <Animated.View pointerEvents="none" style={[styles.solid, { opacity: solid ?? (overVideo ? 0 : 1) }]} />
         <BuzzBarLayer layer={buzzBar.layer} />
         <View style={styles.row}>
@@ -203,11 +220,13 @@ export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVi
               textStyle={overVideo ? styles.shadow : undefined}
               align="start"
               fontSize={LABEL_SIZE}
+              weights={LABEL_WEIGHTS}
+              underlineShare={UNDERLINE_SHARE}
               leading={{ buzz: <BuzzTabMask layer={buzzBar.layer} fontSize={LABEL_SIZE} /> }}
             />
           </View>
           <View style={styles.actions}>
-            <HeaderActions explore color={fg} iconStyle={overVideo ? styles.shadow : undefined} />
+            <HeaderActions explore weight="bold" color={fg} iconStyle={overVideo ? styles.shadow : undefined} />
           </View>
         </View>
         {/* Temporarily hidden everywhere (SCOPE_TOGGLE_SHOWN): the bar is then its one row, as it is for anyone with

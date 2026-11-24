@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { adCtaLabel, muxPlaybackUrl, muxPosterUrl, type FeedAd } from "@apartment-book/shared";
@@ -17,7 +17,7 @@ function adVideo(ad: FeedAd) {
 }
 
 /** The ad's video, looping with its sound on like every video (see VIDEO_MUTED), playing only while its page is the one on screen. */
-function AdVideo({ playbackId, playing }: { playbackId: string; playing: boolean }) {
+function AdVideo({ playbackId, playing, style }: { playbackId: string; playing: boolean; style: StyleProp<ViewStyle> }) {
   const player = useVideoPlayer({ uri: muxPlaybackUrl(playbackId) }, (p) => {
     p.loop = true;
     p.muted = VIDEO_MUTED;
@@ -27,18 +27,21 @@ function AdVideo({ playbackId, playing }: { playbackId: string; playing: boolean
     if (playing) player.play();
     else player.pause();
   }, [playing, player]);
-  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsVideoFrameAnalysis={false} />;
+  return <VideoView player={player} style={style} contentFit="contain" nativeControls={false} allowsVideoFrameAnalysis={false} />;
 }
 
 /**
- * Home → Reels: an ad as a page of its own, one swipe like any reel. Its vertical video full screen (its picture when it
- * has none), "Sponsored" under the business's name, the headline, the caption and its button above the bottom bar; the
- * ••• menu hides it, reports it, blocks the business or says why it is there. A player exists only near the page on
- * screen (`near`), as for reels.
+ * Orbit (and Home → Reels): an ad as a page of its own, one swipe like any post. Its video (its picture when it has
+ * none) is shown whole, never cropped, centred in the area above the bottom bar (`mediaBottom`, the bar's room, as
+ * every picture on Orbit is: the owner's brief, 2026-11-22), black round it; "Sponsored" under the business's name, the
+ * headline, the caption and its button above the bottom bar; the ••• menu hides it, reports it, blocks the business or
+ * says why it is there. A player exists only near the page on screen (`near`), as for reels.
  */
-export function SponsoredReel({ ad, width, height, topInset, bottomInset, playing, near }: { ad: FeedAd; width: number; height: number; topInset: number; bottomInset: number; playing: boolean; near: boolean }) {
+export function SponsoredReel({ ad, width, height, topInset, bottomInset, mediaBottom = 0, playing, near }: { ad: FeedAd; width: number; height: number; topInset: number; bottomInset: number; mediaBottom?: number; playing: boolean; near: boolean }) {
   const styles = useStyles();
   const colors = useColors();
+  // From the top of the screen to the top of the bottom bar, never behind it.
+  const box = { position: "absolute" as const, top: 0, left: 0, width, height: Math.max(0, height - mediaBottom) };
   const { gone, act, menu, openProfile } = useAdActions(ad, "reels");
   const video = adVideo(ad);
   const poster = video ? safeBusinessImage(video.poster_url ?? muxPosterUrl(video.playback_id!)) : adPicture(ad);
@@ -51,8 +54,8 @@ export function SponsoredReel({ ad, width, height, topInset, bottomInset, playin
         </View>
       ) : (
         <>
-          {poster ? <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} contentFit="cover" transition={0} /> : null}
-          {video && near ? <AdVideo playbackId={video.playback_id!} playing={playing} /> : null}
+          {poster ? <Image source={{ uri: poster }} style={box} contentFit="contain" transition={0} /> : null}
+          {video && near ? <AdVideo playbackId={video.playback_id!} playing={playing} style={box} /> : null}
           <View style={styles.shade} pointerEvents="none" />
           <View style={[styles.bottom, { bottom: bottomInset + 16 }]}>
             <View style={styles.header}>

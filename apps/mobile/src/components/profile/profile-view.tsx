@@ -996,6 +996,8 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
   }
   function menu() {
     show([
+      // On your own tab Find friends has no button of its own (the magnifier holds that corner), so it is here.
+      ...(topBar ? [{ label: "Find friends", icon: "person-add-outline" as const, onPress: () => router.push("/find-people") }] : []),
       { label: "Settings and privacy", icon: "settings-outline", onPress: () => router.push("/settings") },
       { label: "Saved", icon: "bookmark-outline", onPress: () => router.push("/saved") },
       { label: "Privacy policy", icon: "shield-checkmark-outline", onPress: () => void Linking.openURL(`${SITE_URL}/privacy`) },
@@ -1143,14 +1145,17 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
     [profile, own, topBar, followStats, likes, postCount, topInset, onOpenFollows, onShare, onChangePhoto, changingPhoto, onAccount, actions],
   );
 
-  // The round buttons floating over the cover (and over the bar once the cover has gone). Your own tab: Find friends at the
-  // left, the menu (Settings and privacy, Saved, the legal pages, Log out) at the right. A stacked profile: Back at the left,
-  // then on your own the menu with Find friends beside it, on someone else's More (Block, Report).
+  // The round buttons floating over the cover (and over the bar once the cover has gone). Your own tab (the owner's
+  // layout, 2026-11-22): the menu's gear at the left (Find friends, Settings and privacy, Saved, the legal pages, Log out)
+  // and the magnifier at the right, Home's search (people, topics, posts). A stacked profile: Back at the left, then on
+  // your own the menu with Find friends beside it, on someone else's More (Block, Report).
   const onMenu = useStableCallback(menu);
+  const onSearch = useStableCallback(() => router.push("/search" as never));
   const onBack = useStableCallback(() => (router.canGoBack() ? router.back() : router.replace("/(tabs)")));
-  const leftAction: CoverAction = topBar ? { icon: "person-add-outline", label: "Find friends", onPress: onFindFriends } : { icon: "chevron-back", label: "Back", onPress: onBack };
+  const menuAction: CoverAction = { icon: "settings-outline", label: "Menu", onPress: onMenu };
+  const leftAction: CoverAction = topBar ? menuAction : { icon: "chevron-back", label: "Back", onPress: onBack };
   const findFriends: CoverAction = { icon: "person-add-outline", label: "Find friends", onPress: onFindFriends };
-  const rightActions: CoverAction[] = own ? [...(topBar ? [] : [findFriends]), { icon: "settings-outline", label: "Menu", onPress: onMenu }] : [{ icon: "ellipsis-horizontal", label: "More", onPress: onMore }];
+  const rightActions: CoverAction[] = own ? (topBar ? [{ icon: "search-outline", label: "Search", onPress: onSearch }] : [findFriends, menuAction]) : [{ icon: "ellipsis-horizontal", label: "More", onPress: onMore }];
 
   // A visitor's tabs depend on what they may open: the screen waits for that first answer too, so no tab comes or goes.
   const accessPending = !own && accessQ.loading && !accessQ.data && !accessQ.error;

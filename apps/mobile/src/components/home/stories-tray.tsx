@@ -19,8 +19,8 @@ const RING = AVATAR + 2 * (STORY_RING + STORY_RING_GAP);
  * the aurora ring, the rest in a quiet grey one, a first name under each. A tap opens them full screen (app/stories).
  * Only what the database lets this person see is ever here (migration 58's rules). Signed out there is no tray.
  *
- * Nothing mounts this now: the stories moved to a page of their own at the left of Home's tabs on 2026-11-21
- * (components/home/stories-section.tsx), and this row is kept with the card feed it sat on top of (ForYouSection).
+ * Nothing mounts this now: the card feed it sat on top of (ForYouSection) is kept unmounted, and Orbit's own row of
+ * rings, white over the picture with the "N new stories" label, is components/home/stories-row.tsx.
  */
 export const StoriesTray = memo(function StoriesTray({ active = true }: { active?: boolean }) {
   const { user, profile } = useSession();

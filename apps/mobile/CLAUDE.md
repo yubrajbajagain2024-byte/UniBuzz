@@ -7,7 +7,7 @@ device builds and store releases.
 ## Layout
 
 ```
-src/app/(tabs)/   index (Home: Stories | Orbit | Buzz), events, messages, profile; the bar is icons only,
+src/app/(tabs)/   index (Home: Orbit | Buzz, stories as a row over Orbit that folds into a pill), events, messages, profile; the bar is icons only,
                   Create in its middle (_layout.tsx)
 src/app/housing.tsx  Explore (Housing | Roommate | Marketplace), pushed from the compass in Home's top bar
 src/app/search.tsx  the search screen (people, topics, posts, what is popular): the magnifier beside the bell
@@ -62,7 +62,7 @@ Why each exists: [docs/decisions.md](../../docs/decisions.md).
 - `SCOPE_TOGGLE_SHOWN = false` (`src/lib/home-scope.ts`): the Campus | Global toggle is hidden.
 - `HIDDEN_HOME_SECTIONS = ["posts"]` (`packages/shared/src/constants.ts`, read by the website's
   Home too): Posts has no Home tab. The app's own row is `APP_HOME_TABS` in `src/lib/home-tabs.ts`
-  (Stories | Orbit | Buzz): Reels has no tab in the app either, Orbit carrying it, while the website
+  (Orbit | Buzz): Reels has no tab in the app either, Orbit carrying it, while the website
   keeps its Reels tab. The card feed and the story row Orbit replaced are kept beside the Posts
   section's (`components/home/for-you-section.tsx`, `stories-tray.tsx`): nothing mounts them.
 - `EXPO_PUBLIC_BUZZ_FIXTURES=<variant>` in `.env.local`: development only, answers Buzz from
@@ -72,7 +72,8 @@ Why each exists: [docs/decisions.md](../../docs/decisions.md).
 
 - A photo that zooms uses `src/components/zoomable.tsx`; a video's timeline and its "2×" pill are
   `src/components/video-controls.tsx` (1× always, 2× only while a finger is held on it). In the
-  full-screen viewer a double tap on a photo zooms it; in the feeds a double tap likes
+  full-screen viewer a double tap on a photo zooms it; in the feeds a double tap likes, and a pinch springs back and
+  leaves the page clear (TikTok's; `photoDoubleTap`)
   ([docs/decisions.md](../../docs/decisions.md)).
 - A bar that rides the keyboard (the chat's message bar, a story's reply row) moves by Reanimated's
   `useAnimatedKeyboard` and a transform (`keyboardLift` in `src/components/messages/composer.tsx`),

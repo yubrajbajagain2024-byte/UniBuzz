@@ -62,7 +62,8 @@ function clamp(v: number, lo: number, hi: number): number {
  * area is `width` × `height` with the picture at `frame` inside it; zoomed, the picture never leaves a gap at an edge it
  * is big enough to cover. `zoomed` (a shared value, 1 while zoomed) lets the gestures around it stand down on the UI
  * thread at once, `onZoomChange` tells the screen (to stop its pager scrolling and hide its chrome), and `active` false
- * (the photo scrolled away, the viewer closing) settles it back at rest. `onTap` is a single tap, once a double tap is ruled out. Reduce Motion
+ * (the photo scrolled away, the viewer closing) settles it back at rest. `onTap` is a single tap, once a double tap is ruled out.
+ * `doubleTapZoom` false leaves double taps to the screen around it (a feed likes with them); a pinch still zooms. Reduce Motion
  * keeps the gestures and drops the springs.
  */
 export function Zoomable({
@@ -73,6 +74,7 @@ export function Zoomable({
   zoomed,
   onZoomChange,
   onTap,
+  doubleTapZoom = true,
   children,
 }: {
   width: number;
@@ -82,6 +84,7 @@ export function Zoomable({
   zoomed?: SharedValue<number>;
   onZoomChange?: (zoomed: boolean) => void;
   onTap?: () => void;
+  doubleTapZoom?: boolean;
   children: ReactNode;
 }) {
   const reduce = useReduceMotion();
@@ -239,6 +242,7 @@ export function Zoomable({
         y.value = to(clamp(e.y - midY - (py - midY) * s, y0, y1));
       });
 
+    if (!doubleTapZoom) return Gesture.Simultaneous(pinch, pan);
     if (!onTap) return Gesture.Simultaneous(pinch, pan, doubleTap);
     const singleTap = Gesture.Tap()
       .maxDistance(12)
@@ -246,14 +250,18 @@ export function Zoomable({
         if (success) runOnJS(onTap)();
       });
     return Gesture.Simultaneous(pinch, pan, Gesture.Exclusive(doubleTap, singleTap));
-  }, [reduce, width, height, fx, fy, fw, fh, midX, midY, onTap, scale, x, y, startScale, pointX, pointY, pinching, anchorX, anchorY]);
+  }, [reduce, width, height, fx, fy, fw, fh, midX, midY, onTap, doubleTapZoom, scale, x, y, startScale, pointX, pointY, pinching, anchorX, anchorY]);
 
   const style = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }, { translateY: y.value }, { scale: scale.value }] }));
 
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={StyleSheet.absoluteFill} collapsable={false}>
-        <Animated.View style={[StyleSheet.absoluteFill, style]}>{children}</Animated.View>
+        {/* The picture takes no touches of its own: they land on the area, which the gestures above are on, so a tap's place
+            is always measured from the area (a feed's double-tap heart goes there). */}
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
+          {children}
+        </Animated.View>
       </Animated.View>
     </GestureDetector>
   );

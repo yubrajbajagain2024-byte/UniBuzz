@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useIsFocused, useRouter } from "expo-router";
 import { listConversations, listFriends, markConversationRead, markConversationsRead, MUTE_DURATIONS, muteLabel, type ConversationSummary, type MessageWithSender, type MuteDuration, type MuteScope, type ProfileSummary } from "@apartment-book/shared";
 import { useActionSheet, type SheetOption } from "@/components/action-sheet";
-import { INBOX_HEADER_HEIGHT, INBOX_PAGES, InboxHeader, InboxSearchField } from "@/components/messages/inbox-header";
+import { INBOX_HEADER_HEIGHT, INBOX_PAGES, InboxHeader, InboxSearchField, NewChatButton } from "@/components/messages/inbox-header";
 import { InboxMessageRow, InboxNote, InboxRow, InboxSectionHeader } from "@/components/messages/inbox-row";
 import { inInbox, matchConversations, useMessageSearch, useNow, useUsernames, type InboxFilter, type InboxPage } from "@/components/messages/inbox-utils";
 import { InboxOnlineFriends, useOpenFriendChat } from "@/components/messages/online-friends";
@@ -44,8 +44,8 @@ const INSET = listInset(INBOX_HEADER_HEIGHT);
 const AT_TOP: Record<InboxPage, number> = { chats: 0, groups: 0 };
 
 /**
- * The Messages tab (between Explore and Profile in the bottom bar): its own header (the new-message pencil, the big
- * "Messages" title, Chats | Groups, a search box and the All | Unread | Requests pills), then the two pages side by side
+ * The Messages tab (between Explore and Profile in the bottom bar): its own header (the big "Messages" title with Home's
+ * magnifier, Chats | Groups, a search box with the new-message pencil beside it and the All | Unread | Requests pills), then the two pages side by side
  * in a pager like Home's. The header scrolls away with the list on screen as if it were part of it, and comes back as
  * the list returns to its top; only the bottom bar stays. The pages: your direct chats and your group chats, newest first, a swipe or a tap on a label moving
  * between them silently, as on Home. Requests, a pill on Chats, holds the direct chats people you do not
@@ -381,7 +381,7 @@ export default function MessagesScreen() {
   if (!sessionLoading && !user) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
-        <InboxHeader signedIn={false} page="chats" onPage={selectPage} scrollX={scrollX} pageWidth={width} requestCount={0} filter="all" unreadChats={0} onFilter={setFilter} onNewChat={newChat} />
+        <InboxHeader signedIn={false} page="chats" onPage={selectPage} scrollX={scrollX} pageWidth={width} requestCount={0} filter="all" unreadChats={0} onFilter={setFilter} />
         <EmptyState icon="chatbubbles-outline" title="Log in to see your messages" action={<Button title="Log in" onPress={() => router.push("/(auth)/login")} />} />
       </View>
     );
@@ -505,8 +505,8 @@ export default function MessagesScreen() {
         {/* Over the lists, moving with the one on screen; a drag on its plain parts reaches the list below (InboxHeader),
             except during a search, when results pass under it. */}
         <Animated.View pointerEvents={searching ? "auto" : "box-none"} style={[styles.header, { transform: [{ translateY: headerShift }] }]}>
-          <InboxHeader signedIn={Boolean(user)} page={page} onPage={selectPage} scrollX={scrollX} pageWidth={width} requestCount={requestCount} filter={filter} unreadChats={unreadChats} pageUnread={pageUnread} onFilter={setFilter} onNewChat={newChat}>
-            {user ? <InboxSearchField value={text} onChangeText={setText} placeholder={placeholder} inputRef={inputRef} onFocusChange={setSearchFocused} showCancel={searchFocused || text.length > 0} onCancel={cancelSearch} accessibilityLabel="Search chats and messages" /> : null}
+          <InboxHeader signedIn={Boolean(user)} page={page} onPage={selectPage} scrollX={scrollX} pageWidth={width} requestCount={requestCount} filter={filter} unreadChats={unreadChats} pageUnread={pageUnread} onFilter={setFilter}>
+            {user ? <InboxSearchField value={text} onChangeText={setText} placeholder={placeholder} inputRef={inputRef} onFocusChange={setSearchFocused} showCancel={searchFocused || text.length > 0} onCancel={cancelSearch} accessibilityLabel="Search chats and messages" accessory={<NewChatButton onPress={newChat} />} /> : null}
           </InboxHeader>
         </Animated.View>
       </View>

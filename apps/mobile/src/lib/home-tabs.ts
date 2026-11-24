@@ -1,19 +1,19 @@
 import { DEFAULT_HOME_SECTION, HOME_SECTIONS, type HomeSection } from "@apartment-book/shared";
 
 /**
- * A page of the app's Home, left to right: Stories | Orbit | Buzz (the owner's sketch, 2026-11-21). "stories" is the
- * app's own page — a whole page of story rings, where the row across the top of the feed used to be — so it is not one
- * of the shared HOME_SECTIONS the website's Home is built from. Posts and Reels keep their sections, their feeds, their
- * data and their addresses (HIDDEN_HOME_SECTIONS, and the website's own tabs): here Orbit carries both of them, full
- * screen, so neither has a tab in the app.
+ * A page of the app's Home, left to right: Orbit | Buzz. Posts and Reels keep their sections, their feeds, their data
+ * and their addresses (HIDDEN_HOME_SECTIONS, and the website's own tabs): here Orbit carries both of them, full
+ * screen, so neither has a tab in the app. Stories had a tab of their own between 2026-11-21 and 2026-11-22; they are
+ * a row of rings across the top of Orbit again now (components/home/stories-row.tsx), as on Instagram, and the app's
+ * row is the website's two tabs once more. It stays the app's own list rather than the shared HOME_TABS because the
+ * website keeps its Reels tab.
  */
-export type AppHomeSection = HomeSection | "stories";
+export type AppHomeSection = HomeSection;
 
 const labelOf = (value: HomeSection) => HOME_SECTIONS.find((s) => s.value === value)?.label ?? value;
 
 /** The tab row across the top left of Home, and the pages of its pager, in order. */
 export const APP_HOME_TABS: readonly { value: AppHomeSection; label: string }[] = [
-  { value: "stories", label: "Stories" },
   { value: "foryou", label: labelOf("foryou") },
   { value: "buzz", label: labelOf("buzz") },
 ];

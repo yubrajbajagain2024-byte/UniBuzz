@@ -1,5 +1,6 @@
 import { type ReactNode, type Ref } from "react";
 import { Animated, Pressable, StyleSheet, Text, TextInput, View, type TextInputInstance } from "react-native";
+import { useRouter } from "expo-router";
 import { SlidingTabs } from "@/components/sliding-tabs";
 import { auroraGradient, radius, space, textStyle } from "@/lib/theme";
 import { makeStyles, useAppTheme, useColors } from "@/lib/theme-provider";
@@ -31,17 +32,18 @@ const FILTERS_ROOM = space.sm;
 export const INBOX_HEADER_HEIGHT = TOP_ROW + TABS_ROW + SEARCH_ROOM + SEARCH_FIELD + SEARCH_ROOM + CHIP + FILTERS_ROOM;
 
 /**
- * The Messages tab's own top bar, below the status bar: the big "Messages" title with the new-message pencil at the right
- * of the same row, then Chats | Groups above the pager with Home's sliding violet underline (`scrollX` is the pager's
+ * The Messages tab's own top bar, below the status bar: the big "Messages" title with Home's magnifier at the right of
+ * the same row (the search screen; the new-message pencil sits beside the search box, NewChatButton), then Chats | Groups above the pager with Home's sliding violet underline (`scrollX` is the pager's
  * offset and `pageWidth` the width of one page, so the underline follows the finger), `children` (the search field) and
  * the All | Unread | Requests pills that narrow the page (Requests on Chats only, each pill carrying its count). The tab
  * scrolls all of it away with the list (app/(tabs)/messages.tsx); a drag that starts on the title or between the
  * controls goes through to the list underneath, so it scrolls as if the header were part of it. Signed out, the bar
  * shows only the title.
  */
-export function InboxHeader({ signedIn, page, onPage, scrollX, pageWidth, requestCount, filter, unreadChats, pageUnread, onFilter, onNewChat, children }: { signedIn: boolean; page: InboxPage; onPage: (page: InboxPage) => void; scrollX: Animated.Value; pageWidth: number; requestCount: number; filter: InboxFilter; unreadChats: number; /** Unread messages on each page, for the red badges on Chats and Groups. */ pageUnread?: Partial<Record<InboxPage, number>>; onFilter: (filter: InboxFilter) => void; onNewChat: () => void; children?: ReactNode }) {
+export function InboxHeader({ signedIn, page, onPage, scrollX, pageWidth, requestCount, filter, unreadChats, pageUnread, onFilter, children }: { signedIn: boolean; page: InboxPage; onPage: (page: InboxPage) => void; scrollX: Animated.Value; pageWidth: number; requestCount: number; filter: InboxFilter; unreadChats: number; /** Unread messages on each page, for the red badges on Chats and Groups. */ pageUnread?: Partial<Record<InboxPage, number>>; onFilter: (filter: InboxFilter) => void; children?: ReactNode }) {
   const styles = useStyles();
   const colors = useColors();
+  const router = useRouter();
 
   function pickFilter(next: InboxFilter) {
     if (next === filter) return;
@@ -57,11 +59,11 @@ export function InboxHeader({ signedIn, page, onPage, scrollX, pageWidth, reques
         <Text pointerEvents="none" style={styles.title} accessibilityRole="header" numberOfLines={1}>
           Messages
         </Text>
-        {signedIn ? (
-          <Pressable onPress={onNewChat} hitSlop={8} accessibilityRole="button" accessibilityLabel="New message" style={({ pressed }) => [styles.compose, pressed && { opacity: 0.6 }]}>
-            <Icon name="create-outline" size={24} color={colors.text} />
-          </Pressable>
-        ) : null}
+        {/* Home's magnifier, to the same search screen (people, topics, posts); the owner's layout, 2026-11-22. A new
+            message starts from the pencil beside the search box below. */}
+        <Pressable onPress={() => router.push("/search" as never)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Search" accessibilityHint="People, topics, posts and what is popular" style={({ pressed }) => [styles.compose, pressed && { opacity: 0.6 }]}>
+          <Icon name="search-outline" sf="magnifyingglass" size={25} color={colors.text} />
+        </Pressable>
       </View>
       {signedIn ? (
         <View style={styles.tabs}>
@@ -88,11 +90,23 @@ export function InboxHeader({ signedIn, page, onPage, scrollX, pageWidth, reques
   );
 }
 
+/** The inbox's new-message pencil, beside its search box (the magnifier took its old corner, 2026-11-22). */
+export function NewChatButton({ onPress }: { onPress: () => void }) {
+  const styles = useStyles();
+  const colors = useColors();
+  return (
+    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel="New message" style={({ pressed }) => [styles.newChat, pressed && { opacity: 0.6 }]}>
+      <Icon name="create-outline" size={24} color={colors.text} />
+    </Pressable>
+  );
+}
+
 /**
  * The rounded search box of the inbox and the new-chat screen: magnifier, the words, a clear button once something is
- * typed, and (when `onCancel` is given and the box is in use) a Cancel that leaves the search.
+ * typed, and (when `onCancel` is given and the box is in use) a Cancel that leaves the search. `accessory` sits at the
+ * box's right while Cancel does not (the inbox's new-message pencil).
  */
-export function InboxSearchField({ value, onChangeText, placeholder = "Search", autoFocus, inputRef, onFocusChange, showCancel = false, onCancel, accessibilityLabel, compact = false }: { value: string; onChangeText: (text: string) => void; placeholder?: string; autoFocus?: boolean; inputRef?: Ref<TextInputInstance>; onFocusChange?: (focused: boolean) => void; showCancel?: boolean; onCancel?: () => void; accessibilityLabel?: string; /** New Message: a slimmer field (40 points, Explore's height) with even room above and below. */ compact?: boolean }) {
+export function InboxSearchField({ value, onChangeText, placeholder = "Search", autoFocus, inputRef, onFocusChange, showCancel = false, onCancel, accessibilityLabel, compact = false, accessory }: { value: string; onChangeText: (text: string) => void; placeholder?: string; autoFocus?: boolean; inputRef?: Ref<TextInputInstance>; onFocusChange?: (focused: boolean) => void; showCancel?: boolean; onCancel?: () => void; accessibilityLabel?: string; /** New Message: a slimmer field (40 points, Explore's height) with even room above and below. */ compact?: boolean; accessory?: ReactNode }) {
   const styles = useStyles();
   const { colors, isDark } = useAppTheme();
   return (
@@ -125,16 +139,20 @@ export function InboxSearchField({ value, onChangeText, placeholder = "Search", 
         <Pressable onPress={onCancel} hitSlop={8} accessibilityRole="button" accessibilityLabel="Cancel search" style={({ pressed }) => pressed && { opacity: 0.6 }}>
           <Text style={styles.cancel}>Cancel</Text>
         </Pressable>
-      ) : null}
+      ) : (
+        accessory
+      )}
     </View>
   );
 }
 
 const useStyles = makeStyles((colors) => ({
   chrome: { backgroundColor: colors.bar },
-  // The title and the pencil share one row, so the tabs and the search box sit a row higher.
+  // The title and the magnifier share one row, so the tabs and the search box sit a row higher.
   topRow: { height: TOP_ROW, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingLeft: 20, paddingRight: space.lg },
   compose: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  // The new-message pencil beside the inbox's search box: as tall as the box, the box giving up its width.
+  newChat: { width: 40, height: SEARCH_FIELD, alignItems: "center", justifyContent: "center", marginRight: -8 },
   title: { flexShrink: 1, ...textStyle.largeTitle, color: colors.text },
   // The labels row, as tall as Home's, with the hairline the sliding underline sits on.
   tabs: { height: TABS_ROW, flexDirection: "row", marginHorizontal: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },

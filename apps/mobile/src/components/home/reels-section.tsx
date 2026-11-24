@@ -266,7 +266,7 @@ export function ReelsSection({ active, preload = false, topInset, height }: { ac
           return isAdRow(item) ? (
             <SponsoredReel ad={item.ad} width={width} height={height} topInset={topInset} bottomInset={tabBar} near={near} playing={active && index === visible} />
           ) : (
-            <ReelItem reel={item} width={width} height={height} topInset={topInset} bottomInset={tabBar} near={near} playing={active && index === visible} onPatch={onPatch} onOpenComments={onOpenComments} onRemoved={onRemoved} />
+            <ReelItem reel={item} photoDoubleTap="like" width={width} height={height} topInset={topInset} bottomInset={tabBar} near={near} playing={active && index === visible} onPatch={onPatch} onOpenComments={onOpenComments} onRemoved={onRemoved} />
           );
         }}
         extraData={`${visible}:${active}:${height}:${width}`}

@@ -10,7 +10,7 @@ import { getFeedPost, getPostEngagement, isSaved, listReels, REELS_PAGE_SIZE, ty
 import { campusSegments, ScopeToggle, type ScopeSegment } from "@/components/home/home-top-tabs";
 import { ReelCommentsSheet } from "@/components/home/reel-comments-sheet";
 import { ShareSheetProvider } from "@/components/share-sheet";
-import { aspectOf, mediaRoom, photoLayout, ReelItem, wholeVideo } from "@/components/home/reel-item";
+import { aspectOf, mediaBox, photoLayout, ReelItem, wholeVideo } from "@/components/home/reel-item";
 import { markReelsStale } from "@/components/home/reels-section";
 import { hapticTap } from "@/lib/haptics";
 import { SCOPE_TOGGLE_SHOWN, useHomeScope } from "@/lib/home-scope";
@@ -414,6 +414,8 @@ export default function ReelViewerScreen() {
   // The words, the timeline and the rail sit on this, up from the screen's bottom edge: just over the tab bar when it is
   // drawn, just over the home indicator when it is not (see BOTTOM_ROOM).
   const barHeight = tabBar ? tabBarInset(insets) + BAR_CLEAR : Math.max(insets.bottom, BOTTOM_MIN) + BOTTOM_ROOM;
+  /** Pictures stop at the top edge of the copy of the bottom bar, where it is drawn; with no bar they run to the bottom. */
+  const mediaBottom = tabBar ? tabBarInset(insets) : 0;
 
   /*
    * The zoom: the page grows out of the picture that was tapped (its frame on screen, `origin`) to fill the screen, the
@@ -442,16 +444,18 @@ export default function ReelViewerScreen() {
    */
   const origin = origins?.[startSlide] ?? tapped;
   const focus = useMemo(() => {
+    // The same area the page places its pictures in (mediaBox): above the copy of the bottom bar where it is drawn.
+    const { boxH, room } = mediaBox(screenH, contentTop, barHeight, mediaBottom);
     const m = startItem?.media[startSlide];
     if (startItem && m?.type === "video") {
-      const v = wholeVideo(aspectOf(m), screenW, screenH, mediaRoom(contentTop, barHeight));
+      const v = wholeVideo(aspectOf(m), screenW, boxH, room);
       return { y: v.top + v.height / 2, width: v.width, height: v.height };
     }
     const aspect = m && m.type === "photo" ? aspectOf(m) : null;
-    if (!startItem || aspect === null) return { y: screenH / 2, width: screenW, height: screenH };
-    const place = photoLayout(aspect, screenW, screenH, mediaRoom(contentTop, barHeight));
+    if (!startItem || aspect === null) return { y: boxH / 2, width: screenW, height: boxH };
+    const place = photoLayout(aspect, screenW, boxH, room);
     return { y: place.top + place.height / 2, width: place.width, height: place.height };
-  }, [startItem, startSlide, screenW, screenH, contentTop, barHeight]);
+  }, [startItem, startSlide, screenW, screenH, contentTop, barHeight, mediaBottom]);
   // The post the viewer was opened from keeps its feed row on the same photo as the page (it is hidden behind it), so a
   // swipe back uncovers that photo, and the page lands on it.
   useEffect(() => {
@@ -863,6 +867,7 @@ export default function ReelViewerScreen() {
                     topInset={muteInset}
                     contentTop={contentTop}
                     bottomInset={barHeight}
+                    mediaBottom={mediaBottom}
                     railRight={RAIL_RIGHT}
                     near={index === visible || (opened && index - visible >= -1 && index - visible <= 2)}
                     playing={focused && index === visible && !(closingNow && !isStartAt(index))}
