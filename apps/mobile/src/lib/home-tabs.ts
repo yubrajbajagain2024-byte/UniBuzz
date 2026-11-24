@@ -2,11 +2,11 @@ import { DEFAULT_HOME_SECTION, HOME_SECTIONS, type HomeSection } from "@apartmen
 
 /**
  * A page of the app's Home, left to right: Orbit | Buzz. Posts and Reels keep their sections, their feeds, their data
- * and their addresses (HIDDEN_HOME_SECTIONS, and the website's own tabs): here Orbit carries both of them, full
- * screen, so neither has a tab in the app. Stories had a tab of their own between 2026-11-21 and 2026-11-22; they are
- * a row of rings across the top of Orbit again now (components/home/stories-row.tsx), as on Instagram, and the app's
- * row is the website's two tabs once more. It stays the app's own list rather than the shared HOME_TABS because the
- * website keeps its Reels tab.
+ * and their addresses (HIDDEN_HOME_SECTIONS, and the website's own tabs): here Orbit carries both of them (a card feed
+ * again since 2026-11-24, each post opening full screen on a tap), so neither has a tab in the app. Stories had a tab
+ * of their own between 2026-11-21 and 2026-11-22; they are a tray of rings at the top of Orbit's feed now
+ * (components/home/stories-tray.tsx), as on Instagram. It stays the app's own list rather than the shared HOME_TABS
+ * because the website keeps its Reels tab.
  */
 export type AppHomeSection = HomeSection;
 
