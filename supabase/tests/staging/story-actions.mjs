@@ -1,4 +1,4 @@
-// What a viewer can do with a story (migration 62) on the staging project, through the real Supabase stack the app uses:
+// What a viewer can do with a story (migrations 62 and 68) on the staging project, through the real Supabase stack the app uses:
 // Auth sessions, the REST API (PostgREST's upsert for a like, the policies, the card trigger), Storage (each story's
 // photo from its author's own stories folder), and the app's own shared code for every action: likeStory and
 // unlikeStory (also through createLikeSync, the heart's latest-tap-wins requests), sendStoryReply, sendSharedPost to
@@ -8,11 +8,12 @@
 //   SUPABASE_ACCESS_TOKEN=… STAGING_SUPABASE_REF=<ref> node supabase/tests/staging/story-actions.mjs [--restore]
 //
 // Applies 62 when staging does not have it yet (the file, then its public._migrations row, as db:setup records them),
-// as production will take it, on its own. Then five students of one campus (confirmed txstate.edu accounts made by the
+// as production will take it, on its own; then 68 (a like on one's own story) the same way. Then five students of one campus (confirmed txstate.edu accounts made by the
 // admin API, no email sent): Ann posts four stories (campus, friends, selected, global); Bob and Cara are her friends,
 // Dev is Bob's friend and not hers, Eve is nobody's. They like and unlike, reply, share into direct and group chats, and
 // the refusals come back with their reasons. Everything made is deleted at the end and every table's row count compared
-// with the start. With --restore, 62 is rolled back afterwards (its rollback file and the removal of its _migrations row).
+// with the start. With --restore, 68 and then 62 are rolled back afterwards (each one's rollback file and the removal of
+// its _migrations row, newest first).
 import fs from "node:fs";
 import { register } from "node:module";
 import { createClient } from "@supabase/supabase-js";
@@ -43,6 +44,7 @@ if (REF === PRODUCTION) throw new Error("This test writes, deletes and may roll 
 const ROOT = new URL("../../../", import.meta.url);
 const read = (rel) => fs.readFileSync(new URL(rel, ROOT), "utf8");
 const MIGRATION = "20261114000000_story_actions.sql";
+const SELF_LIKE = "20261120000000_story_self_like.sql";
 const S = (rel) => import(new URL(`packages/shared/src/${rel}`, ROOT));
 const { sharedPostFromStory, shareFailureSummary, sharedPostNoun } = await S("share.ts");
 const { createLikeSync } = await S("stories.ts");
@@ -96,6 +98,16 @@ else {
     console.log(`    applied in ${Date.now() - t0} ms`);
   });
 }
+// 68 replaces one policy of 62's and needs nothing else, so it follows it here as it follows it on production.
+if (before.has(SELF_LIKE)) ok(`${SELF_LIKE} is already on staging`);
+else {
+  await check(`${SELF_LIKE} applies on its own after 62, and is recorded`, async () => {
+    const t0 = Date.now();
+    await sql(read(`supabase/migrations/${SELF_LIKE}`));
+    await sql(`insert into public._migrations (name) values (${lit(SELF_LIKE)}) on conflict do nothing`);
+    console.log(`    applied in ${Date.now() - t0} ms`);
+  });
+}
 await sql("notify pgrst, 'reload schema'");
 await sleep(4000);
 await check("the objects are there: story_likes and story_mutes with row-level security, the card trigger, the widened card check", async () => {
@@ -104,6 +116,10 @@ await check("the objects are there: story_likes and story_mutes with row-level s
     (select count(*)::int from pg_trigger where tgname = 'messages_guard_story_card') as trigger,
     (select pg_get_constraintdef(oid) like '%story_reply%' from pg_constraint where conname = 'messages_shared_post_check') as card_check`))[0];
   expect(o.tables === 2 && o.trigger === 1 && o.card_check === true, JSON.stringify(o));
+});
+await check("68's insert policy: only as oneself, on a story one may see, with no condition on the author", async () => {
+  const p = (await sql(`select count(*)::int as n, max(with_check) as w from pg_policies where schemaname = 'public' and tablename = 'story_likes' and policyname = 'story_likes_insert_own'`))[0];
+  expect(p.n === 1 && /auth\.uid\(\)/.test(p.w) && /stories/.test(p.w) && !/author_id/.test(p.w), JSON.stringify(p));
 });
 const baseline = await counts();
 
@@ -181,9 +197,19 @@ await check("quick taps (like, unlike, like) through the heart's requests end li
   await Promise.all([back.set(false), back.set(true), back.set(false)]);
   expect((await seen(cara, st.global)).liked === false, "the database ended liked");
 });
-await check("Like is refused outside the audience (Dev and the friends-only story) and on one's own story", async () => {
+await check("Like is refused outside the audience (Dev and the friends-only story) and in someone else's name", async () => {
   await rejects(likeStory(dev.c, dev.id, st.friends), "row-level security");
-  await rejects(likeStory(ann.c, ann.id, st.global), "row-level security");
+  await rejects(likeStory(ann.c, bob.id, st.global), "row-level security");
+});
+await check("Ann likes and unlikes her own story (68); she reads her like, Bob does not", async () => {
+  await likeStory(ann.c, ann.id, st.global);
+  const { data: mine } = await ann.c.from("story_likes").select("user_id").eq("story_id", st.global).eq("user_id", ann.id);
+  expect((mine ?? []).length === 1, "Ann's own like is not there");
+  const { data: theirs } = await bob.c.from("story_likes").select("user_id").eq("story_id", st.global).eq("user_id", ann.id);
+  expect((theirs ?? []).length === 0, "Bob reads Ann's like of her own story");
+  await unlikeStory(ann.c, ann.id, st.global);
+  const { data: gone } = await ann.c.from("story_likes").select("user_id").eq("story_id", st.global).eq("user_id", ann.id);
+  expect((gone ?? []).length === 0, "the unlike left it");
 });
 
 // --- Reply -------------------------------------------------------------------------------------------------------------------
@@ -264,6 +290,12 @@ await check("everything made is deleted; every table's row count is as at the st
   expect(drift.length === 0, drift.join(", "));
 });
 if (RESTORE) {
+  await check("68 rolled back: its rollback file and its _migrations row removed; one's own story refuses a like again", async () => {
+    await sql(read("supabase/rollbacks/20261120000000_story_self_like.down.sql"));
+    await sql(`delete from public._migrations where name = ${lit(SELF_LIKE)}`);
+    const w = await val(`select with_check from pg_policies where schemaname = 'public' and tablename = 'story_likes' and policyname = 'story_likes_insert_own'`);
+    expect(/author_id/.test(w), String(w));
+  });
   await check("62 rolled back: its rollback file and its _migrations row removed", async () => {
     await sql(read("supabase/rollbacks/20261114000000_story_actions.down.sql"));
     await sql(`delete from public._migrations where name = ${lit(MIGRATION)}`);
