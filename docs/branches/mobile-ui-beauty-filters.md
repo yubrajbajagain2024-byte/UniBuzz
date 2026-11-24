@@ -194,9 +194,15 @@ on 2026-11-24. The card feed's return and the viewer losing its top shade (2026-
 - Looked at on the iPhone 16e Simulator (iOS 26.3, Expo Go over a tunnel) on 2026-11-21: all three Home tabs, the pager
   both ways, Orbit's vertical paging, Events as a tab, Explore from the compass, and the stories viewer on a temporary
   dev route with sample groups (deleted again). Not checked on a real phone or on Android.
+- **The iPhone build for this branch is `d30b8306-3fdc-4967-91f1-35ec2fa86dd1`** (EAS preview, internal distribution,
+  2026-11-21, from `828e0a4`; its install link lapses on 2026-12-05). It carries expo-gl for the beauty filters, so its
+  fingerprint (`a98395a2…`) differs from the four-iPhone build of 2026-11-11 (`8f77d85f`): an update from this branch
+  reaches `d30b8306` only, and an iPhone still on `8f77d85f` has to install `d30b8306` first. `fingerprint:compare`
+  against `d30b8306` still matched at `75b1f33` (2026-11-24).
 - An EAS preview update (`da62c538-1b0c-4127-8773-c35f94fb7a17`) was published to the preview channel on 2026-11-21
-  from `7e75ea9`, with the owner's approval. **Nothing since then has been published**, so the testers' build does not
-  have the Home or stories redesign.
+  from `7e75ea9`, with the owner's approval. **Nothing since then has been published** (as of 2026-11-24): the owner
+  asked for `75b1f33` on their iPhone, but the session's permission check refused `eas update`, so the testers' build
+  still has neither the card feed's return nor the viewer without its top shade.
 
 ## Pending
 
