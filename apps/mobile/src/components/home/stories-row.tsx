@@ -74,6 +74,7 @@ function useOpenStories() {
  * the other way as it opens. A tap on the pill asks Orbit to open the row (`onOpenRow`) over whichever post is on
  * screen. `rowShown` says which of the two takes touches and VoiceOver. A ring opens that person's stories full screen,
  * going on through the rest; "Your story" opens yours, or the camera when you have none, and its "+" always the camera.
+ * Mounted nowhere since 2026-11-24, with the full-screen Orbit it belongs to; the card feed has StoriesTray.
  */
 export function StoriesHeader({ topInset, open, rowShown, onOpenRow, groups, me }: { topInset: number; open: Readonly<SharedValue<number>>; rowShown: boolean; onOpenRow: () => void; groups: StoryGroup[]; me: Me }) {
   const styles = useStyles();

@@ -2,7 +2,7 @@
 
 Sunil's mobile line since 2026-11-16, branched from `main` after PR #112 (`chat-redesign`). **Not merged**;
 no PR open yet as of 2026-11-24. The work of 2026-11-22 and 2026-11-23 below is in one commit after `c9a1f4f`, pushed
-on 2026-11-24. The website is untouched; the one database change is migration 68, applied nowhere yet (below).
+on 2026-11-24. The card feed's return and the viewer losing its top shade (2026-11-24, below) are in one commit after `8eea329`, pushed on 2026-11-24. The website is untouched; the one database change is migration 68, applied nowhere yet (below).
 
 ## What is on it
 
@@ -60,7 +60,7 @@ on 2026-11-24. The website is untouched; the one database change is migration 68
   in the Simulator, before and after.
 - **No dark shade at the top of Orbit** (2026-11-22; the owner's brief): the feeds'
   pages draw no top shade (MediaFrame skips it where a photo's double tap likes), so a picture's top shows clear under
-  Home's labels and icons, which keep their own soft shadow; the viewer keeps its shade. Seen in the Simulator on a 9:16
+  Home's labels and icons, which keep their own soft shadow; the viewer kept its shade until 2026-11-24 (below). Seen in the Simulator on a 9:16
   photo (temporary screen, removed).
 - **TikTok's display for photos and videos** (2026-11-22; the owner's table): in the
   area above the bottom bar, vertical content (9:16, up to 3:5) fills it, a sliver of its sides cropped on a taller
@@ -152,6 +152,25 @@ on 2026-11-24. The website is untouched; the one database change is migration 68
   cropped. Checked on Orbit's real page with 9:16, 4:5, square and 16:9 photos over a stand-in bar: all whole, and a
   pixel scan at the bar's top edge found the 9:16 photo's last row at 760pt and pure black from 762pt down. Videos and
   ads go through the same area but were not looked at on screen (no sample of either).
+- **Orbit is the card feed again** (2026-11-24; the owner's request, from a screenshot of the card feed on their
+  phone, which still runs the update of 2026-11-21): Home mounts `ForYouSection` for Orbit (posts and reels as
+  Instagram-style cards under the story tray, words-only posts included), and a tap on a post's photo or video opens it
+  full screen in the viewer, which goes on down the feed with a swipe up, as before 2026-11-21. Home's top bar is solid
+  over Orbit and slides away as it scrolls, and the bottom bar collapses on it, as on Buzz (`REELS` in
+  `app/(tabs)/index.tsx` and `SOLID` in `home-top-tabs.tsx` name the one page that would be full-screen video, none in the
+  app today). The full-screen Orbit (`orbit-section.tsx`) and its folding stories row (`stories-row.tsx`) are kept,
+  mounted nowhere. The top bar (Orbit | Buzz at its left, compass, bell and magnifier at its right) and the bottom bar
+  (Home, Events, Create, Messages, Profile) are unchanged, though the screenshot showed the older ones (your photo, the
+  UniBuzz wordmark, Orbit | Buzz | Reels centred; Explore in the bottom bar). `npm run check` 9/9. Seen in the Simulator
+  (Expo Go, signed out, so no story tray and only reads): Orbit's cards under a solid top bar, and a tap on the first
+  post's photo opening the full-screen viewer with the rail and the name. Not seen signed in (the tray, likes), on a
+  phone or on Android.
+- **No dark shade at the top of the full-screen viewer either** (2026-11-24; the owner's report from Expo Go on their
+  phone: "some shadowy transparent layer on top" of the full-screen pages): `MediaFrame` draws no top shade on any page
+  now (it had kept one in the viewer, and over videos on the feeds), only the bottom one under the name and the rail.
+  The viewer's top row holds nothing but the hidden Campus | Global toggle, so nothing there needed it; the white status
+  bar is drawn straight over the picture, as on TikTok. `npm run check` 9/9. Seen in the Simulator (signed out, Expo Go):
+  a tall video opened from Orbit's cards fills the screen with its top clear.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.
@@ -175,13 +194,20 @@ on 2026-11-24. The website is untouched; the one database change is migration 68
 - Looked at on the iPhone 16e Simulator (iOS 26.3, Expo Go over a tunnel) on 2026-11-21: all three Home tabs, the pager
   both ways, Orbit's vertical paging, Events as a tab, Explore from the compass, and the stories viewer on a temporary
   dev route with sample groups (deleted again). Not checked on a real phone or on Android.
+- **The iPhone build for this branch is `d30b8306-3fdc-4967-91f1-35ec2fa86dd1`** (EAS preview, internal distribution,
+  2026-11-21, from `828e0a4`; its install link lapses on 2026-12-05). It carries expo-gl for the beauty filters, so its
+  fingerprint (`a98395a2…`) differs from the four-iPhone build of 2026-11-11 (`8f77d85f`): an update from this branch
+  reaches `d30b8306` only, and an iPhone still on `8f77d85f` has to install `d30b8306` first. `fingerprint:compare`
+  against `d30b8306` still matched at `75b1f33` (2026-11-24).
 - An EAS preview update (`da62c538-1b0c-4127-8773-c35f94fb7a17`) was published to the preview channel on 2026-11-21
-  from `7e75ea9`, with the owner's approval. **Nothing since then has been published**, so the testers' build does not
-  have the Home or stories redesign.
+  from `7e75ea9`, with the owner's approval. **Nothing since then has been published** (as of 2026-11-24): the owner
+  asked for `75b1f33` on their iPhone, but the session's permission check refused `eas update`, so the testers' build
+  still has neither the card feed's return nor the viewer without its top shade.
 
 ## Pending
 
-- The Maestro flow `01-signed-in.yaml` still drives the card feed Orbit replaced, and `04-posts-look.yaml` needs a
+- The Maestro flow `01-signed-in.yaml` drives the card feed, Orbit again since 2026-11-24, but was written for the
+  three-tab Home and has not been run since; and `04-posts-look.yaml` needs a
   Posts tab the app has not had since `HIDDEN_HOME_SECTIONS`. Both say so at the top of the file. Maestro is not
   installed on the owner's Mac, so neither has been run.
 - The shared files (docs/status.md, docs/testing.md, docs/branches/README.md) are left for the PR, after `main` is

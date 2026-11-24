@@ -51,16 +51,6 @@ function scrimGradient(scrim: string, share: (t: number) => number, stops = 10):
 }
 /** Bottom shade: from nothing at its top edge, already a light tint behind the rail's first counts, nearly the full scrim at the bottom. */
 const bottomShare = (t: number) => 0.96 * Math.pow(t, 0.7);
-/**
- * Top shade: holds nearly its full strength behind whatever is drawn over the top (Home's wordmark and tabs, the
- * viewer's row), then eases out below it, so the dimmed tab names stay readable even on a blown-out white frame.
- */
-const topShare = (t: number) => {
-  const x = Math.min(Math.max((t - 0.42) / 0.58, 0), 1);
-  return 0.92 * (1 - x * x * (3 - 2 * x));
-};
-const TOP_SHADE_MIN = 170;
-const TOP_SHADE_EXTRA = 96;
 /** Tall enough to sit under the whole rail (like, comments, save, share, "…") with room to fade in above the like. */
 const SHADE_HEIGHT = 540;
 /** The rail's bottom padding: the "…" centre 46pt above the bottom inset, Instagram's geometry (half its 42pt square over it). */
@@ -1158,8 +1148,8 @@ export function wholeVideo(aspect: number | null, pageW: number, pageH: number, 
 
 /**
  * Every slide, photo or video: pure black (colors.mediaBg, black in both themes) wherever the picture leaves the page, as
- * TikTok draws it, and over the picture the shades that keep the white status bar, the row, the words and the rail
- * readable. Shades only, as Instagram draws them: a blur under the words would be sampled again every frame the video
+ * TikTok draws it, and over the bottom of the picture the shade that keeps the words and the rail readable (none at the
+ * top: see below). A shade only, as Instagram draws it: a blur under the words would be sampled again every frame the video
  * plays, and re-drawn every frame the page zooms or is pulled back, which is where frames were being dropped.
  * `interactive` lets what is drawn in it take touches (a photo's zoom); otherwise every touch goes through to the slide.
  */
@@ -1177,11 +1167,11 @@ function MediaFrame({ whole, width, height, topInset, bottomInset, interactive =
   return (
     <View style={{ width, height, backgroundColor: colors.mediaBg }} pointerEvents={interactive ? "box-none" : "none"}>
       {children}
-      {/* Soft shades so white words and icons stay readable over a bright picture: at the top under the bar, at the bottom under the name and the rail. */}
+      {/* A soft shade at the bottom, under the name and the rail, so white words and icons stay readable over a bright
+          picture. None at the top, on any page (the owner's brief, 2026-11-24, after the feeds lost theirs on 2026-11-22):
+          the top of the picture shows clear, TikTok's way; Home's labels carry their own soft shadow, and the viewer's top
+          row holds only the Campus | Global toggle, hidden today (SCOPE_TOGGLE_SHOWN). */}
       <Reanimated.View pointerEvents="none" style={[StyleSheet.absoluteFill, across, shadesStyle]}>
-        {/* None on the feeds (Orbit: the owner's brief, 2026-11-22, the top of the picture clear, TikTok's): Home's labels
-            and icons carry their own soft shadow there. The viewer keeps it under its own top row. */}
-        {zoom && !zoom.doubleTap ? null : <View style={[styles.topShade, { height: Math.max(TOP_SHADE_MIN, topInset + TOP_SHADE_EXTRA) }]} />}
         <View style={styles.shade} />
       </Reanimated.View>
     </View>
@@ -1484,8 +1474,6 @@ const useStyles = makeStyles((colors) => {
     // The play button, dead centre.
     controls: { alignItems: "center" },
     shade: { position: "absolute", left: 0, right: 0, bottom: 0, height: SHADE_HEIGHT, experimental_backgroundImage: scrimGradient(colors.mediaScrim, bottomShare) },
-    // Drawn from the darker text-shadow colour: the top carries smaller, dimmer words than the bottom does.
-    topShade: { position: "absolute", left: 0, right: 0, top: 0, experimental_backgroundImage: scrimGradient(colors.mediaTextShadow, topShare, 14) },
     // A carousel's slides side by side, moved as one.
     strip: { position: "absolute", top: 0, left: 0, flexDirection: "row" },
     // A photo's place on the page (see photoLayout): clipped, so a cover fit never spills past it.

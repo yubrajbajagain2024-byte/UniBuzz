@@ -168,7 +168,7 @@ the page scrolls back 24 points (at any speed; smaller turns are ignored), or re
 way, springing on the UI thread (at once with Reduce Motion). A bounce past a list's end is not a scroll back, and once
 the bar has come back a new flick has to wait a quarter of a second, so one gesture never flickers it. A tap on the
 circle brings it back too, and so do another page of the tab, another tab or a screen reader, which always gets the whole
-bar. Orbit, a profile pushed over a screen and the full-screen viewers never collapse it. Search is the magnifier beside the bell in Home's top bar, which opens `src/app/search.tsx` (below); the people search the share sheet's Find people
+bar. A profile pushed over a screen and the full-screen viewers never collapse it; Orbit's card feed and Buzz do. Search is the magnifier beside the bell in Home's top bar, which opens `src/app/search.tsx` (below); the people search the share sheet's Find people
 and a profile's Find friends push is `src/app/find-people.tsx`. The Notifications bell in the top-right corner of Home's floating top bar opens every
 notification the database keeps for you (`src/app/notifications.tsx`: likes, comments and replies, follows,
 saves of your listings, places near campus, newest first; new messages and Snaps stay in Messages, with its unread
@@ -177,22 +177,29 @@ itself like any other in both themes); tapping one marks it read and opens what
 it is about, "Mark all read" sits in the header, and the bell's badge counts the unread live.
 
 Home opens on **Orbit**, a blend of posts and reels (anonymous Buzz threads stay on the Buzz page; the fixed pattern
-lives in `packages/shared/src/for-you.ts` and is shared with the website), shown TikTok's way since 2026-11-21 (the
-owner's sketch): one post to a page, edge to edge, swiped up for the next (`src/components/home/orbit-section.tsx`).
-Every page is a `ReelItem`, the same component the full-screen viewer draws, so a post's photos swipe sideways with its
-dots at the bottom, its video plays with its sound on while its page is on screen, the rail (like, comments, save,
-share, "…") runs up the right and the name and caption sit at the bottom left, over black wherever the picture does not
-reach. A post of nothing but words has no page there (`postHasMedia`): it keeps its own screen, its author's profile and
-search.
+lives in `packages/shared/src/for-you.ts` and is shared with the website), as a feed of cards under the story tray
+(`src/components/home/for-you-section.tsx`, each row the Instagram-style `InstaPost`; a post of nothing but words has
+its card too). A tap on a post's photo or video opens it full screen in the viewer (`openViewer`, `src/app/reels/[id].tsx`),
+TikTok's way: edge to edge on black, its photos swiping sideways with dots at the bottom, its video going on from where
+it was with its sound on, the rail (like, comments, save, share, "…") up the right and the name and caption at the
+bottom left; a swipe up goes on down Orbit's posts with pictures, their next pages loading as needed. A reel opens on its
+own, followed by the Reels feed. The card feed is the landing page again since 2026-11-24 (the owner's request, from a
+screenshot of it); from 2026-11-21 to 11-24 Orbit was those full-screen pages themselves, one post to a page
+(`src/components/home/orbit-section.tsx`, kept and mounted nowhere, with its stories row).
 
 Its two pages, **Orbit | Buzz**, sit side by side in a pager (`src/lib/home-tabs.ts` holds the row; Posts and
 Reels are sections without a tab in the app — `HIDDEN_HOME_SECTIONS` keeps Posts out of the website's row too, and Orbit
 carries both their feeds — while their data, their post features and their addresses stay, Posts' Following filter on the
 website's `/?tab=posts`): swipe left or right to move between them, or tap a label in the floating top bar.
 
-**Stories** sit at the top of Orbit as a row of rings that folds away, TikTok's Following page (the owner's screen
-recording, 2026-11-22; `src/components/home/stories-row.tsx` draws it, `orbit-section.tsx` moves it; between 2026-11-21
-and 11-22 Stories were a tab of their own before Orbit, playing inline). Open, the row sits on black under Home's tabs:
+**Stories** sit at the top of Orbit's card feed as a tray of rings that scrolls away with it, Instagram's way
+(`src/components/home/stories-tray.tsx`): "Your story" first with its "+", then everyone whose stories you may see, those
+with something unseen in the aurora ring and the rest in a quiet grey one, a first name under each; a ring opens that
+person's stories in the full-screen viewer (below), going on through the rest. Signed out there is no tray. From
+2026-11-22 to 11-24, on the full-screen Orbit, they were a row of rings that folded away, TikTok's Following page (the
+owner's screen recording; `src/components/home/stories-row.tsx` drew it, `orbit-section.tsx` moved it; between
+2026-11-21 and 11-22 Stories were a tab of their own before Orbit, playing inline). How that row worked, kept for when it
+comes back with the full-screen Orbit: open, the row sat on black under Home's tabs:
 "Your story" first with its "+", then everyone whose stories you may see, those with something unseen in the aurora
 ring and the rest in a quiet grey one, a first name under each, at TikTok's size (72-point photos, about 98 points
 apart), scrolling sideways. The post on screen is a card under it, lowered by the row's room with its top corners
@@ -245,8 +252,8 @@ Buzz's lime mask hanging just before its label while Buzz is near, the active on
 as wide as the label, sliding with the finger; and at its right the compass (Explore), the Notifications bell with its
 badge and the magnifier (search). Moving between sections, by tap or swipe, plays no haptic. Your photo and its menu are
 not up here: Profile is the last tab of the bottom bar and carries the same menu. No line divides the tabs from the page
-under them: the bar is the screen's own colour (Buzz's canvas near Buzz, nothing at all over Orbit, whose labels and
-icons turn white with a soft shadow), so they read as one surface. While it is shown, a second row holds the Campus |
+under them: the bar is the screen's own colour (Buzz's canvas near Buzz; on the full-screen Orbit of 2026-11-21 to 11-24
+it was nothing at all, its labels and icons white with a soft shadow), so they read as one surface. While it is shown, a second row holds the Campus |
 Global toggle, a small segmented pill whose thumb slides to the choice: Campus is your own university, Global every
 university (and, only while Posts has a tab, Following: the posts of people you follow, which switches to Posts); the
 choice scopes Orbit, Posts and Reels alike (`src/lib/home-scope.ts`; Buzz has its own Campus | Global, its two feeds
@@ -301,9 +308,11 @@ still show their picture or video whole in the same area (`mediaBottom` on `Spon
 known there). Before: from 2026-11-21 to 11-22 a vertical picture filled the whole screen, running under the bar; then
 for a day nothing was cropped at all, a 9:16 picture sitting on the bar with a band of black above it, and pictures
 narrower than the area were raised toward the top row (`mediaRoom`, now kept only for the zoom and the heart). Nothing is
-pushed down by the safe area: the status bar and the top row float over the page on a soft shade (gone while it zooms)
-in the viewer; on Orbit there is no shade at the top at all (the owner's brief, 2026-11-22: the top of the picture shows
-clear, TikTok's), Home's labels and icons carrying their own soft text shadow instead.
+pushed down by the safe area: the status bar and the viewer's top row float over the page with no shade at the top at
+all, the top of the picture showing clear, TikTok's (the feeds since the owner's brief of 2026-11-22, the full-screen
+viewer since the owner's of 2026-11-24, which called it a shadowy layer over the top); Home's labels and icons carry
+their own soft text shadow, and the viewer's row holds only the Campus | Global toggle, hidden today. The shade at the
+bottom, under the name and the rail, stays (`MediaFrame` in `reel-item.tsx`).
 A video uploaded without its size takes its poster's shape once that loads. The chat's photo and video viewer
 (`src/components/messages/media-viewer.tsx`) and a Snap's (`src/app/snap/[id].tsx`) lay out the same way, whole and
 centred on black, a video's shape read from its own player; the chat's videos play with their sound on, always (there is no sound
@@ -437,8 +446,9 @@ what you like, save or comment there shows on the row when you come back (`emitP
 a post deleted there leaves the feeds too.
 The bar scrolls like Instagram's (`src/lib/collapsing-header.ts`): it slides up out of the way as the page on screen
 scrolls down, by as much as the page moved, and slides back the moment the page scrolls up, however far down it is; a
-swipe or a tap between pages brings it back too, and Reels never moves it. On Orbit, which pages whole screens, the bar
-stays put while the feed scrolls (the owner's brief, 2026-11-22): only the stories pill steps away, fading, while the
+swipe or a tap between pages brings it back too, and Reels never moves it. Orbit's card feed and Buzz both move it.
+On the full-screen Orbit (2026-11-21 to 11-24), which paged whole screens, the bar stayed put while the feed scrolled
+(the owner's brief, 2026-11-22), and the rest of this paragraph is how it worked: only the stories pill steps away, fading, while the
 finger drags the feed down past 24 points (on to later posts), and comes back the moment it drags up as far, or once
 the feed is at its top (the first post, or the row open); only the finger's drag decides, never the settle after it,
 so a small pull that springs back never makes it flicker (`scrolledAway` in `orbit-section.tsx`). The bar fades away

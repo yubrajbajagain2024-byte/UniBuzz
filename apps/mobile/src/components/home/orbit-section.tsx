@@ -67,8 +67,11 @@ const TOP_AWAY = 24;
 
 
 /**
- * Home → Orbit, the landing page (2026-11-21, the owner's sketch): the campus's posts and reels blended into one list
- * (listForYou, as the card feed used before) and shown TikTok's way, one full-screen page each, swiped up for the next.
+ * Nothing mounts this now: Orbit is the card feed again (ForYouSection, the owner's request of 2026-11-24), and its
+ * full-screen pages are the viewer's, one tap on a post away. Kept, like the card feed was, so either can come back.
+ *
+ * Orbit as it was from 2026-11-21 (the owner's sketch): the campus's posts and reels blended into one list
+ * (listForYou, as the card feed uses) and shown TikTok's way, one full-screen page each, swiped up for the next.
  * Every page is a ReelItem, the same component the full-screen viewer draws, so a post's photos swipe sideways, its
  * video plays while its page is on screen, and the rail (like, comments, save, share, "…") and the words sit where they
  * do everywhere else.

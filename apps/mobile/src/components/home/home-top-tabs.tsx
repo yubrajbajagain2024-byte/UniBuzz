@@ -83,10 +83,11 @@ export function useOverVideo(store: OverVideoStore): boolean {
 }
 
 /**
- * How solid the bar's background is on each page: fully on Buzz, gone over Orbit, whose pictures run the whole height
- * of the screen and are meant to be seen behind the tabs (the owner's brief, 2026-11-21).
+ * How solid the bar's background is on each page: fully on Orbit's card feed and on Buzz, gone only over full-screen
+ * video (Reels, which has no tab in the app). Orbit had it gone too while it was the full-screen feed (2026-11-21 to
+ * 2026-11-24).
  */
-const SOLID = APP_HOME_TABS.map((s) => (s.value === "foryou" ? 0 : 1));
+const SOLID = APP_HOME_TABS.map((s) => (s.value === "reels" ? 0 : 1));
 /** The Following choice opens the Posts page, so it is offered only while Posts has a tab (it has none: see HIDDEN_HOME_SECTIONS). */
 const POSTS_SHOWN = APP_HOME_TABS.some((s) => s.value === "posts");
 
@@ -121,12 +122,12 @@ export function campusSegments(profile: { university_id: string | null; universi
  * them.
  *
  * `scrollX` is the pager's offset in points and `pageWidth` the width of one page: the underline slides, the labels
- * crossfade (see SlidingTabs) and the bar's solid background (colors.bar) fades out towards Orbit with the finger, all
- * on the native driver. `overVideo` says when the labels and the icons turn white and glassy for the full-screen feed:
- * Home flips it halfway between Orbit and the page beside it. `section` is the section committed once the pager
- * settles: what screen readers hear as selected follows it. `translateY` slides the whole bar up out of the way as the
- * page on screen scrolls down and back as soon as it scrolls up, Instagram style (see useCollapsingHeader); Orbit, which
- * fills the screen, never moves it. Memoized: Home mounting a page ahead of time leaves it alone.
+ * crossfade (see SlidingTabs) and the bar's solid background (colors.bar) would fade out towards a full-screen video page
+ * with the finger (SOLID; there is none today), all on the native driver. `overVideo` says when the labels and the icons
+ * turn white and glassy over such a page: Home flips it halfway between it and the page beside it. `section` is the
+ * section committed once the pager settles: what screen readers hear as selected follows it. `translateY` slides the
+ * whole bar up out of the way as Orbit or Buzz scrolls down and back as soon as it scrolls up, Instagram style (see
+ * useCollapsingHeader). Memoized: Home mounting a page ahead of time leaves it alone.
  */
 export const HomeTopTabs = memo(function HomeTopTabs({ section, onSelect, overVideo: overVideoStore, onPosts: onPostsStore, onLayout, scrollX, pageWidth, translateY, hidden = false }: { section: AppHomeSection; onSelect: (s: AppHomeSection) => void; overVideo: OverVideoStore; onPosts: OverVideoStore; onLayout: (e: LayoutChangeEvent) => void; scrollX: Animated.Value; pageWidth: number; translateY: Animated.AnimatedInterpolation<number>; /** Orbit's post on screen is clear (a pinch: TikTok's clear mode): the whole bar fades away and takes no touches. */ hidden?: boolean }) {
   const insets = useSafeAreaInsets();
