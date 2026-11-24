@@ -111,6 +111,20 @@ export function shareBuzz(item: Pick<Buzz, "threadId" | "title" | "text">): void
 
 /* ───────────────────────────── votes ───────────────────────────── */
 
+/**
+ * A double tap's upvote on a buzz's media (the owner's brief, 2026-11-22: TikTok's double tap to like, a buzz's like
+ * being its upvote): up if it is not, never taken back by another double tap, read from the store so a quick run of taps
+ * cannot flip it off again. Says whether the buzz takes votes at all (yours and removed ones do not), so a heart is
+ * drawn only for one that counts.
+ */
+export function upvoteBuzz(id: string): boolean {
+  const item = getBuzzItem(id);
+  if (!item || item.isMine || item.status !== "active") return false;
+  if (item.myVote === 1) hapticTap();
+  else voteOnBuzz(id, 1);
+  return true;
+}
+
 type VoteQueue = { wanted: -1 | 0 | 1 | null; sending: boolean; confirmed: BuzzVoteState };
 const votes = new Map<string, VoteQueue>();
 

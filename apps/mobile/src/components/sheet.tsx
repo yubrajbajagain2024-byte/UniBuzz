@@ -1,15 +1,24 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView, type LegacyPanGesture } from "react-native-gesture-handler";
-import Animated, { Easing, Extrapolation, interpolate, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { Easing, Extrapolation, interpolate, runOnJS, useAnimatedKeyboard, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring, withTiming, type SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useReduceMotion } from "@/lib/accessibility";
 import { motion, sheetShape } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { Icon } from "@/components/icon";
 
-/** What a sheet's header and body can reach: the drag that pulls the sheet down, and the close it ends in. */
-type SheetApi = { pan: LegacyPanGesture; close: () => void };
+/**
+ * What a sheet's header and body can reach: the drag that pulls the sheet down, the close it ends in, how the sheet
+ * meets the screen's edges, and (for SheetScrollView) the pull on its list and how far that list has scrolled.
+ */
+type SheetApi = { pan: LegacyPanGesture; close: () => void; edge: SheetEdge; listPan: LegacyPanGesture; listY: SharedValue<number> };
+/** "floating": inset from the screen's edges, every corner rounded (iOS 26). "full": edge to edge and down to the bottom, only its top corners rounded (TikTok's comments). */
+type SheetEdge = "floating" | "full";
+/** The corners of a full-width sheet's top. */
+const FULL_RADIUS = 16;
+/** A full-width sheet's footer sits this far above the keyboard. */
+const KEYBOARD_GAP = 10;
 const SheetContext = createContext<SheetApi | null>(null);
 
 /** How far down a released drag has to have come (or how fast it has to be going) to close the sheet. */
@@ -27,7 +36,10 @@ const CLOSE_VELOCITY = 900;
  * `onDismiss` runs once it is fully gone (iOS presents nothing else while a modal is still on screen). The sheet floats
  * inset from the screen's edges (`sheetShape`); give it a `height` for a fixed size, or let its content size it up to
  * `maxHeight`. `draggable="sheet"` lets a drag anywhere on it pull it down (sheets without a scrolling list), and
- * `keyboard` keeps text fields above the keyboard.
+ * `keyboard` keeps text fields above the keyboard. `edge="full"` draws it edge to edge instead, down to the screen's
+ * bottom with only its top corners rounded (the comments, TikTok's way): its body shrinks as the keyboard rises, on the UI
+ * thread, so the footer rides just above the keyboard while the sheet's top stays put, and a list in it (SheetScrollView)
+ * pulled down from its top pulls the sheet down with it.
  */
 export function Sheet({
   visible,
@@ -38,6 +50,7 @@ export function Sheet({
   maxHeight = "90%",
   keyboard = false,
   draggable = "header",
+  edge = "floating",
   style,
   children,
 }: {
@@ -50,6 +63,7 @@ export function Sheet({
   maxHeight?: ViewStyle["maxHeight"];
   keyboard?: boolean;
   draggable?: "header" | "sheet";
+  edge?: SheetEdge;
   style?: StyleProp<ViewStyle>;
   children: ReactNode;
 }) {
@@ -130,6 +144,35 @@ export function Sheet({
     [y, sheetHeight, closeFromDrag],
   );
 
+  /** How far the sheet's list has scrolled (SheetScrollView), and whether the pull under way began at its top. */
+  const listY = useSharedValue(0);
+  const fromTop = useSharedValue(0);
+  const listPan = useMemo(
+    () =>
+      Gesture.Pan()
+        // Downward only: an upward drag is the list's to scroll.
+        .activeOffsetY(8)
+        .failOffsetX([-24, 24])
+        .onStart(() => {
+          fromTop.value = listY.value <= 0 ? 1 : 0;
+        })
+        .onUpdate((e) => {
+          if (fromTop.value === 1) y.value = Math.max(0, e.translationY);
+        })
+        .onEnd((e) => {
+          if (fromTop.value !== 1) return;
+          const far = e.translationY > Math.min(CLOSE_DISTANCE, sheetHeight.value * CLOSE_SHARE);
+          if (far || e.velocityY > CLOSE_VELOCITY) {
+            y.value = withTiming(sheetHeight.value + 40, { duration: 200, easing: Easing.out(Easing.quad) }, (done) => {
+              if (done) runOnJS(closeFromDrag)();
+            });
+          } else {
+            y.value = withSpring(0, { ...motion.sheet, velocity: e.velocityY });
+          }
+        }),
+    [y, sheetHeight, closeFromDrag, listY, fromTop],
+  );
+
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: fade.value * interpolate(y.value, [0, Math.max(sheetHeight.value, 1)], [1, 0], Extrapolation.CLAMP),
   }));
@@ -142,16 +185,18 @@ export function Sheet({
     sheetHeight.value = e.nativeEvent.layout.height;
   }, [sheetHeight]);
 
-  const api = useMemo<SheetApi>(() => ({ pan, close: requestClose }), [pan, requestClose]);
+  const api = useMemo<SheetApi>(() => ({ pan, close: requestClose, edge, listPan, listY }), [pan, requestClose, edge, listPan, listY]);
+  const full = edge === "full";
 
   const body = (
     <Animated.View
       onLayout={onLayout}
       accessibilityViewIsModal
       onAccessibilityEscape={requestClose}
-      style={[styles.sheet, height !== undefined ? { height } : { maxHeight }, style, sheetStyle]}
+      style={[full ? styles.sheetFull : styles.sheet, height !== undefined ? { height } : { maxHeight }, style, sheetStyle]}
     >
       {children}
+      {full && keyboard ? <KeyboardRoom /> : null}
     </Animated.View>
   );
 
@@ -161,7 +206,7 @@ export function Sheet({
         <Animated.View pointerEvents="none" style={[styles.backdrop, backdropStyle]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={requestClose} accessibilityRole="button" accessibilityLabel={closeLabel} />
         <SheetContext.Provider value={api}>
-          {keyboard ? (
+          {keyboard && !full ? (
             <KeyboardAvoidingView style={styles.stage} behavior={Platform.OS === "ios" ? "padding" : undefined} pointerEvents="box-none">
               {draggable === "sheet" ? <GestureDetector gesture={pan}>{body}</GestureDetector> : body}
             </KeyboardAvoidingView>
@@ -174,6 +219,22 @@ export function Sheet({
       </GestureHandlerRootView>
     </Modal>
   );
+}
+
+/**
+ * The foot of a full-width sheet with a text field: as tall as the keyboard over the sheet, less the home indicator's room
+ * the footer already keeps, plus a small gap, following the keyboard on the UI thread. The sheet keeps its height, so
+ * what is above it (the list) gives way and the footer rides just above the keyboard. Mounted only inside an open sheet
+ * that asks for it, so nothing else in the app tracks the keyboard on its account.
+ */
+function KeyboardRoom() {
+  const insets = useSafeAreaInsets();
+  const kb = useAnimatedKeyboard();
+  const style = useAnimatedStyle(() => {
+    const h = kb.height.value;
+    return { height: h <= 0 ? 0 : Math.max(0, h - insets.bottom) + KEYBOARD_GAP * Math.min(1, h / Math.max(insets.bottom, 1)) };
+  });
+  return <Animated.View pointerEvents="none" style={style} />;
 }
 
 /**
@@ -211,7 +272,30 @@ export function SheetHeader({ title, titleNode, leading, onClose, closeLabel = "
 export function SheetFooter({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
-  return <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom - sheetShape.marginBottom, 12) }, style]}>{children}</View>;
+  const sheet = useContext(SheetContext);
+  const full = sheet?.edge === "full";
+  return <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom - (full ? 0 : sheetShape.marginBottom), 12) }, style]}>{children}</View>;
+}
+
+/**
+ * A sheet's scrolling list (a ScrollView): pulled down from its top it pulls the sheet down with it, closing it past the
+ * header's distance, as a drag on the header does; a drag that starts with the list scrolled only scrolls it. It does not
+ * bounce at its top, so the pull goes to the sheet rather than to a gap above the list.
+ */
+export function SheetScrollView({ children, ...props }: ComponentProps<typeof Animated.ScrollView>) {
+  const sheet = useContext(SheetContext);
+  const listY = sheet?.listY;
+  const onScroll = useAnimatedScrollHandler((e) => {
+    if (listY) listY.value = e.contentOffset.y;
+  });
+  const native = useMemo(() => Gesture.Native(), []);
+  const list = (
+    <Animated.ScrollView {...props} onScroll={onScroll} scrollEventThrottle={16} bounces={false}>
+      {children}
+    </Animated.ScrollView>
+  );
+  if (!sheet) return list;
+  return <GestureDetector gesture={Gesture.Simultaneous(sheet.listPan, native)}>{list}</GestureDetector>;
 }
 
 /** The sheet this component is inside, for a body that wants to close it (null outside a sheet). */
@@ -225,6 +309,8 @@ const useStyles = makeStyles((colors) => ({
   stage: { flex: 1, justifyContent: "flex-end" },
   // iOS 26: the sheet floats inset from the screen's edges, its corners concentric with the phone's; a hairline marks its edge on black.
   sheet: { backgroundColor: colors.elevated, ...sheetShape, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  // Edge to edge, down to the bottom: only the top corners round, with a hairline along the top edge for black behind.
+  sheetFull: { backgroundColor: colors.elevated, borderTopLeftRadius: FULL_RADIUS, borderTopRightRadius: FULL_RADIUS, borderCurve: "continuous", overflow: "hidden", borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   header: { paddingTop: 6, paddingBottom: 2 },
   headerDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   grabber: { alignSelf: "center", width: 36, height: 5, borderRadius: 2.5, backgroundColor: colors.grabber },

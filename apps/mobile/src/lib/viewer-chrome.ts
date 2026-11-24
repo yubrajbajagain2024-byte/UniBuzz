@@ -10,6 +10,22 @@ import type { DerivedValue, SharedValue } from "react-native-reanimated";
 export const ViewerChromeContext = createContext<DerivedValue<number> | null>(null);
 
 /**
+ * A feed that can show its page on screen as a card under something it opens above it: Orbit, while its stories row is
+ * open (components/home/orbit-section.tsx), TikTok's way. `open` is how far that is (0 to 1, on the UI thread): the
+ * page's words, rail and shades fade out with it, and its picture rises from its place on the whole screen to its place
+ * in the card, `height` tall (what of the card shows above the bottom bar): centred there, or at the card's top when it
+ * is taller, as TikTok's card shows a video's top. `chromeOff`: the row is open, so the words and the rail, put away,
+ * take no touches and leave VoiceOver too. Nothing else about the page changes, and it re-renders for none of the motion.
+ */
+/**
+ * Told whether the post on screen in a feed is clear (a pinch on it, TikTok's clear mode: see ReelItem), so what the
+ * feed and the screen draw over it (Orbit's stories, Home's top bar) clears with it.
+ */
+export const FeedClearContext = createContext<((clear: boolean) => void) | null>(null);
+
+export const FeedCardContext = createContext<{ open: Readonly<SharedValue<number>>; height: number; chromeOff: boolean } | null>(null);
+
+/**
  * 1 while the viewer's page zooms open out of the picture that was tapped, or closed into it (0 otherwise), on the UI
  * thread. A video then shows whole through the opening, past its page's sides, exactly as the feed showed it (see
  * wholeVideo), so even a carousel's slide stops trimming its video; between zooms each slide trims its own, so nothing

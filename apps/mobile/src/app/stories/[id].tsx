@@ -11,16 +11,16 @@ import { StoryPlayer } from "@/components/stories/story-player";
 import { useSession } from "@/lib/session";
 import { findStoryGroup, getStoryGroups, refreshStories, takeStories, useStoryGroups } from "@/lib/stories-store";
 
-/** A pull to the right this far (or this fast) closes the viewer; less and it springs back. */
-const PULL_CLOSE = 110;
-const PULL_VELOCITY = 800;
+/** A pull down this far (or this fast) closes the viewer; less and it springs back. */
+const PULL_CLOSE = 120;
+const PULL_VELOCITY = 900;
 
 /**
  * Stories full screen, over whatever opened them: a story's link, a story card in a chat, a profile. The stories
- * themselves are StoryPlayer (components/stories/story-player.tsx), the same player Home's Stories tab draws inline;
- * this screen only decides whose stories to show, closes on a pull to the right, and gives the player a Close button.
- * The way out is sideways because the player moves between people up and down (2026-11-21), and it is the way out of
- * the app's other full-screen viewer too. Opened
+ * themselves are StoryPlayer (components/stories/story-player.tsx), opened from a ring in the row across Orbit's top;
+ * this screen only decides whose stories to show, closes on a pull down, and gives the player a Close button. The way
+ * out is down, Instagram's, because sideways is how the player moves between people (for a day, 2026-11-21, people
+ * moved up and down and the viewer closed sideways instead). Opened
  * from a list with the groups it showed (handStories), so nothing loads first; opened cold it reads the store. Opened
  * by a story's id or for a person a list leaves out (muted), it shows that person's stories alone, from the story named.
  */
@@ -83,29 +83,28 @@ function StoriesViewer() {
     close();
   }, [groups.length, lookup, close]);
 
-  // The pull to the right: the viewer follows the finger, shrinking a little and rounding its corners as the screen
-  // behind shows. Sideways, because up and down belong to the player's move between people; it fails on a vertical
-  // drag so the pager keeps those.
+  // The pull down: the viewer follows the finger, shrinking a little and rounding its corners as the screen behind
+  // shows. It fails on a sideways drag, so the pager keeps those to move between people.
   const pull = useSharedValue(0);
   const pan = Gesture.Pan()
-    .activeOffsetX(16)
-    .failOffsetY([-14, 14])
+    .activeOffsetY(14)
+    .failOffsetX([-12, 12])
     .onUpdate((e) => {
-      pull.value = Math.max(0, e.translationX);
+      pull.value = Math.max(0, e.translationY);
     })
     .onEnd((e) => {
-      if (pull.value > PULL_CLOSE || e.velocityX > PULL_VELOCITY) {
-        pull.value = withTiming(width, { duration: 200, easing: Easing.out(Easing.quad) });
+      if (pull.value > PULL_CLOSE || e.velocityY > PULL_VELOCITY) {
+        pull.value = withTiming(height, { duration: 200, easing: Easing.out(Easing.quad) });
         runOnJS(close)();
       } else {
         pull.value = withSpring(0, { damping: 26, stiffness: 300, mass: 1 });
       }
     });
   const pullStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: pull.value }, { scale: 1 - Math.min(pull.value / width, 1) * 0.12 }],
+    transform: [{ translateY: pull.value }, { scale: 1 - Math.min(pull.value / height, 1) * 0.12 }],
     borderRadius: Math.min(pull.value, 28),
   }));
-  const backdropStyle = useAnimatedStyle(() => ({ opacity: 1 - Math.min(pull.value / (width * 0.5), 1) }));
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: 1 - Math.min(pull.value / (height * 0.5), 1) }));
 
   if (lookup === "loading") {
     return (

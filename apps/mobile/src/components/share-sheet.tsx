@@ -4,7 +4,6 @@ import {
   Alert,
   Platform,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -24,7 +23,7 @@ import { Avatar } from "./avatar";
 import { InboxAvatar } from "./messages/inbox-row";
 import { matchConversations } from "./messages/inbox-utils";
 import { Icon } from "@/components/icon";
-import { Sheet, SheetFooter, SheetHeader } from "./sheet";
+import { Sheet, SheetFooter, SheetHeader, SheetScrollView } from "./sheet";
 
 /**
  * Besides the snapshot, the sheet needs the website link for "Share to…" and, optionally, the words that go before it.
@@ -119,7 +118,8 @@ function ShareSheet({ request, onClose }: { request: ShareRequest | null; onClos
   );
 
   return (
-    <Sheet visible={open} onClose={() => onClose()} onDismiss={runAfterDismiss} closeLabel="Close share sheet" height="72%" keyboard>
+    // Full width, edge to edge and down to the screen's bottom (the owner's brief, 2026-11-23), as the comments are.
+    <Sheet visible={open} onClose={() => onClose()} onDismiss={runAfterDismiss} closeLabel="Close share sheet" height="72%" keyboard edge="full">
       {shown ? <SheetBody key={shown.seq} shared={shown.shared} options={shown.options} onClose={() => onClose(shown.seq)} closeThen={closeThen} /> : null}
     </Sheet>
   );
@@ -376,7 +376,8 @@ function SheetBody({ shared, options, onClose, closeThen }: { shared: SharedPost
           {searching && friends ? <ActivityIndicator size="small" color={colors.muted} /> : null}
         </View>
       ) : null}
-      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.list}>
+      {/* Pulled down from its top, the list pulls the sheet down with it (SheetScrollView), as the comments' does. */}
+      <SheetScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.list}>
         {/* A search that failed once a list was showing: that list stays, with the error and Retry above it. */}
         {user && ((error && friends) || groupsError) ? (
           <View style={styles.banner}>
@@ -387,7 +388,7 @@ function SheetBody({ shared, options, onClose, closeThen }: { shared: SharedPost
           </View>
         ) : null}
         {body}
-      </ScrollView>
+      </SheetScrollView>
       <SheetFooter style={styles.footer}>
         {user && picked.size > 0 ? (
           <View style={styles.composer}>

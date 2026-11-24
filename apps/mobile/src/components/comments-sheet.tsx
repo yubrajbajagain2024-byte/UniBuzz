@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { ScrollView } from "react-native";
 import type { PostTargetType } from "@apartment-book/shared";
 import { makeStyles } from "@/lib/theme-provider";
 import { CommentComposer, CommentList, commentCountLabel, CommentsOff, CommentSortButton, useCommentThread } from "./comments";
-import { Sheet, SheetFooter, SheetHeader } from "./sheet";
+import { Sheet, SheetFooter, SheetHeader, SheetScrollView } from "./sheet";
 
 /**
  * `focusComposer` opens the sheet straight into typing, once the sheet has slid up. `commentsOff`: the author turned
@@ -13,8 +12,10 @@ export type CommentsTarget = { targetType: PostTargetType; targetId: string; own
 
 /**
  * Bottom sheet with the comment thread of one post or reel, TikTok style: the count up top (the sort button beside it),
- * the thread, and the composer pinned under it. Pass `target = null` to keep it closed. Built on the app's one Sheet:
- * it rises on the system's spring over a fading backdrop, and the header pulls it down.
+ * the thread, and the composer pinned under it. Pass `target = null` to keep it closed. Built on the app's one Sheet,
+ * full width (the owner's brief, 2026-11-22: edge to edge, no gaps at its sides, down to the bottom): it rises on the
+ * system's spring over a fading backdrop; the header, or the list pulled down from its top, pulls it down; and the
+ * composer rides just above the keyboard while the sheet's top stays where it was.
  */
 export function CommentsSheet({ target, onClose, onCountChange }: { target: CommentsTarget | null; onClose: () => void; onCountChange: (delta: number) => void }) {
   // Keep showing the last thread while the sheet slides away, so it does not go blank mid-animation.
@@ -24,7 +25,7 @@ export function CommentsSheet({ target, onClose, onCountChange }: { target: Comm
   }, [target]);
 
   return (
-    <Sheet visible={target !== null} onClose={onClose} closeLabel="Close comments" height="70%" keyboard>
+    <Sheet visible={target !== null} onClose={onClose} closeLabel="Close comments" height="72%" keyboard edge="full">
       {shown?.commentsOff ? (
         <>
           <SheetHeader title="Comments" />
@@ -53,9 +54,9 @@ function SheetBody({ target, onCountChange }: { target: CommentsTarget; onCountC
   return (
     <>
       <SheetHeader title={commentCountLabel(count)} leading={<CommentSortButton onSort={thread.setSort} />} />
-      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.list}>
+      <SheetScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.list}>
         <CommentList thread={thread} emptyText="Be the first to comment." />
-      </ScrollView>
+      </SheetScrollView>
       <SheetFooter style={styles.footer}>
         <CommentComposer thread={thread} />
       </SheetFooter>

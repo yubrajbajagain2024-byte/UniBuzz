@@ -185,18 +185,48 @@ share, "…") runs up the right and the name and caption sit at the bottom left,
 reach. A post of nothing but words has no page there (`postHasMedia`): it keeps its own screen, its author's profile and
 search.
 
-Its three pages, **Stories | Orbit | Buzz**, sit side by side in a pager (`src/lib/home-tabs.ts` holds the row; Posts and
+Its two pages, **Orbit | Buzz**, sit side by side in a pager (`src/lib/home-tabs.ts` holds the row; Posts and
 Reels are sections without a tab in the app — `HIDDEN_HOME_SECTIONS` keeps Posts out of the website's row too, and Orbit
 carries both their feeds — while their data, their post features and their addresses stay, Posts' Following filter on the
-website's `/?tab=posts`): swipe left or right to move between them, or tap a label in the floating top bar. **Stories**
-(`src/components/home/stories-section.tsx`) plays the stories themselves, where the row across the top of the feed used
-to be: no rings and nothing to tap open, just everyone's stories in turn, from the moment the tab is on screen. It
-draws `StoryPlayer` (below), the very player the full-screen viewer draws, and the picture runs the whole height and
-width of the screen — behind the status bar, behind the Stories | Orbit | Buzz tabs and down to the bottom bar — with
-only the story's own bars pinned above those tabs (`barsTop`) and the shades to hold the white labels on a bright
-frame. The floating bottom bar's room is its bottom inset, so the reply pill sits just above the bar and the bar stays
-in view; there is no Close, since this is a page of Home rather than a screen over it. Past the last story of the last
-person it moves on to Orbit.
+website's `/?tab=posts`): swipe left or right to move between them, or tap a label in the floating top bar.
+
+**Stories** sit at the top of Orbit as a row of rings that folds away, TikTok's Following page (the owner's screen
+recording, 2026-11-22; `src/components/home/stories-row.tsx` draws it, `orbit-section.tsx` moves it; between 2026-11-21
+and 11-22 Stories were a tab of their own before Orbit, playing inline). Open, the row sits on black under Home's tabs:
+"Your story" first with its "+", then everyone whose stories you may see, those with something unseen in the aurora
+ring and the rest in a quiet grey one, a first name under each, at TikTok's size (72-point photos, about 98 points
+apart), scrolling sideways. The post on screen is a card under it, lowered by the row's room with its top corners
+rounded, its words, rail and shades put away and its picture raised into what shows of the card (centred there, or at
+the card's top when taller, so a tall video shows its top and its foot passes under the bottom bar; the card is clipped
+at the bar's top edge, never drawn behind it). Folded, the post has the whole screen again and a small, quiet pill
+under the tabs reads "20 New Stories ▾" (TikTok's: 23 points tall, a lightly see-through dark fill and no edge at all,
+soft white 13-point words, a small dim arrow; its tap is a native tap gesture, so it is never lost to the feed still
+settling after a swipe, and it opens the row over the post the feed is coming to rest on, finishing that scroll
+smoothly as the row opens). It counts other people's stories you have not seen ("20 New Stories"); once all are
+watched, every story there is, yours included ("1 Story" for one of your own); with none at all it reads "Stories".
+Signed in there is always a pill, so the row is one tap away from any post (2026-11-22: with only the owner's own story
+it used to be missing). At the top of the feed the row's room is part of the feed itself, TikTok's way
+(2026-11-22): a black header above the first post as tall as the row's room, with a refresh room above it, and the feed
+snaps to the open row, to the first post (the row folded) and then post by post (`snapToOffsets`, one stop per swipe).
+So the row folds as the first post is swiped up (from the open row a swipe up always lands on the first post, however
+long), scrolling back up from lower posts stops on the first post with the row still folded, and only a further pull
+down scrolls into the row's room, natively, following the finger with the scroll's own physics, the row easing into
+view ahead of it, and settles the moment the finger lifts, from the UI thread: open past 48 points or on a flick down,
+back folded short of that (a swipe up from the open row folds it the same way). The settle is the row's own, not the
+scroll view's eased-in glide: the feed follows an eased-out value frame by frame (150 to 260 ms by distance, `settleY`),
+starting at speed and landing softly; a finger back on the feed stops it at once. The pill tapped on the first post and
+a tap folding the row settle the same way. Pulled on past the open row into the refresh room (56 points or more) and let
+go, the feed reloads under a spinner in the gap above the first post, then settles back on the open row. The row, the
+pill, the first post's rounded corners and its chrome all follow the scroll on the UI thread (`scrollOpen`, from a
+Reanimated scroll handler), so nothing re-renders or lags while it moves. Over any later post a tap on the pill opens
+the row over that post instead (`pillOpen`): the card is lowered under it and the feed holds still until a drag up over
+the card (past 30% of the way, or a flick; otherwise it springs back) or a tap on it folds it again, in 280 ms, easing
+out. On the first post the pill scrolls the feed to the open row. The row also opens at the top when the feed loads,
+after a refresh and on Home tapped again. While the row is open the post's buttons take no touches (`chromeOff`).
+Signed out there is no row and no header, and the feed pages from its first post with its usual pull to refresh. Why
+the row's room is in the feed: nested in Home's sideways pager, the list can never be pulled past its top, and a pull
+on the first post never reached a gesture of the row's own (checked in the Simulator; see docs/decisions.md). A ring
+opens that person's stories in the full-screen viewer (below), going on through the rest.
 **Buzz** is unchanged. A post with several photos takes the sideways swipes first, TikTok's way:
 from its last photo the next swipe on goes to the next section, from its first the next swipe back to the one before,
 so a carousel never keeps the finger (`src/lib/section-pager.ts`; Explore's three pages do the same; it never moves to
@@ -256,15 +286,24 @@ only stretches. The viewer is a modal screen, outside the view in which the gest
 Native's touches, so the page's taps check `swipedJustNow` themselves: a touch that ended a swipe never pauses, likes or
 opens anything. Feed and viewer videos skip Live Text on a paused frame (`allowsVideoFrameAnalysis={false}`): its button
 would sit over the play control, and its scan was what crashed Expo Go in the simulator. Screens opened from the viewer (a profile, a chat) come up as cards over it. Pictures are laid out
-TikTok style (`src/components/home/reel-item.tsx`, since 2026-11-15): every photo and video, vertical ones included, is
-shown whole in its own shape, never cropped, stretched or distorted, as big as the screen allows (as wide as it, or as
-tall for a picture taller than the screen's shape), centred across the screen and, down it, centred between the top row
-and the dots and words at the bottom rather than in the bare screen (`mediaRoom`, `photoLayout`, `placeVideo`, one
-`fitWhole`, 2026-11-21), TikTok's way: the black it leaves is mostly under it, where those words are, and every picture
-of a post is raised by the same amount so they do not shuffle as they are swiped. Whatever of the screen it leaves is
-pure black (`colors.mediaBg`, black in both themes), on the Reels tab and in the
-viewer alike: a 9:16 video on a taller phone has black above and below it rather than its sides trimmed. Nothing is
-pushed down by the safe area: the status bar and the top row float over the page on a soft shade (gone while it zooms).
+TikTok style (`src/components/home/reel-item.tsx`), on Orbit, in the full-screen viewer and in Buzz's media alike
+(2026-11-22). Every photo and video lives in the area from the very top of the screen down to the **top edge of the
+bottom navigation bar**, never behind or below it (`mediaBox`, given the bar's room as `mediaBottom` wherever the bar is
+drawn: Orbit, and the viewer opened over the tabs, which draws a copy of it; with no bar the area runs to the bottom).
+In that area the picture is placed TikTok's way (the owner's brief and table, 2026-11-22; one `fitWhole` for photos and
+videos): a vertical one (9:16, or anything up to 3:5, the shape a phone films in) fills the whole area, a sliver cropped
+where its shape and the phone's differ (on a phone taller than 9:16, about 9% of an exact 9:16's width, a little from
+each side); a portrait (4:5), square or landscape (16:9) one is shown whole, in its own shape, as wide as the area
+allows and centred in it, black above and below. Never stretched or distorted. A shape not known yet is shown whole in
+the area until it is. Whatever the picture leaves, the bar's own strip included, is pure black (`colors.mediaBg`, black
+in both themes). The name, the caption and the rail sit in the same place whatever the shape. Orbit's sponsored pages
+still show their picture or video whole in the same area (`mediaBottom` on `SponsoredReel`; an ad's shape is not
+known there). Before: from 2026-11-21 to 11-22 a vertical picture filled the whole screen, running under the bar; then
+for a day nothing was cropped at all, a 9:16 picture sitting on the bar with a band of black above it, and pictures
+narrower than the area were raised toward the top row (`mediaRoom`, now kept only for the zoom and the heart). Nothing is
+pushed down by the safe area: the status bar and the top row float over the page on a soft shade (gone while it zooms)
+in the viewer; on Orbit there is no shade at the top at all (the owner's brief, 2026-11-22: the top of the picture shows
+clear, TikTok's), Home's labels and icons carrying their own soft text shadow instead.
 A video uploaded without its size takes its poster's shape once that loads. The chat's photo and video viewer
 (`src/components/messages/media-viewer.tsx`) and a Snap's (`src/app/snap/[id].tsx`) lay out the same way, whole and
 centred on black, a video's shape read from its own player; the chat's videos play with their sound on, always (there is no sound
@@ -272,34 +311,41 @@ switch: the phone's volume buttons rule it), with the app's own controls instead
 them, and they fade a moment after it plays): play or pause in the middle and the same timeline with the time gone and
 the time left, as in Photos, plus the hold for 2×; the close button and the counter are clear glass; with VoiceOver on they never fade
 (`useScreenReader` in `src/lib/accessibility.ts`), and faded ones leave the accessibility tree as they leave touch.
-Stories are a post's page with story timing on top since 2026-11-21 (`StoryPlayer` in
-`src/components/stories/story-player.tsx`, drawn both by Home's Stories tab and by the full-screen viewer at
-`src/app/stories/[id].tsx`, which adds only the pull down to close and the Close button): the picture edge to
-edge on pure black, whole and in its own shape, and the overlay laid out exactly as Orbit lays a post out — the name
-and, under it, how long ago and who it went to at the bottom left; the rail down the right (someone else's: the heart,
-Share and "⋯"; your own: Activity, Send and Delete), drawn by Orbit's own `RailButton` with its `OVERLAY_PAD`,
-`WORDS_GAP`, `RAIL_WIDTH` and `RAIL_GAP` imported from `src/components/home/reel-item.tsx`, so the two can never drift
-apart. What stays a story's own sits over that: the bars for each of that person's stories across the very top, filling
-as it plays, Close at the top right (only where there is something to close), the creator's photo with a "+" at the top
-of the rail until they are followed (TikTok's, a tap follows and it fades away), and the reply pill under the name (it
-alone rides the keyboard; the rail steps aside while a reply is typed). The rail is the same shape on either story:
-the heart, Share, then "⋯". Your own adds the eye and its view count under Share, which opens the list of who has seen
-it, and its "⋯" holds Delete; you may like your own story like anyone else's (migration 68 — until that is live the
-database refuses it and the heart goes back with the reason). Someone else's keeps Report, Mute and Block behind "⋯".
+The story viewer (`StoryPlayer` in `src/components/stories/story-player.tsx`, drawn by `src/app/stories/[id].tsx`,
+which adds the pull down to close and the Close button) is laid out as Instagram's (the owner's brief and screenshot,
+2026-11-22), the picture drawn to its frame (a story is shot for the phone, so the little it overflows is cropped),
+which runs from the very top of the screen down to the top of the bottom row, its bottom corners rounded, the row on
+black below it (2026-11-22; signed out, with no bottom row, it runs to the screen's bottom). Across
+the very top, a bar for each of that person's stories, filling as it plays. Under it, their photo, their name, how long
+ago and who it went to, then at the far end pause or play, "⋯" and Close; on someone else's story, until you follow
+them, a small red "+" on their photo follows them (the owner's ask of 2026-11-21, here now that there is no rail). Along
+the bottom, on **every** story, your own included, Instagram's bar (the owner's reference, 2026-11-23): the "Send
+message…" field (no fill, a soft grey edge one point wide, white words), the heart and the paper plane (thin, even
+outlines, each in the same 44-point square; the heart red when liked). A reply is
+a message to the author, so on your own story the field reads "Send to friends…" and opens the share sheet instead
+(`sendStoryReply` refuses your own story: there is no chat with yourself), and the eye with its view count sits just
+above it, opening the list of who has seen it (a full-width sheet, as the share sheet is). "⋯" holds Delete on your own story and Report, Mute and Block on
+someone else's. You may like your own story like anyone else's (migration 68 — until that is live the database refuses
+it and the heart goes back with the reason). There is no sound button: every video plays with its sound on (`VIDEO_MUTED`,
+the owner's rule since 2026-11-16), which is why the screenshot's mute icon is not here.
 
-**The axes are TikTok's** (2026-11-21): a tap moves within one person — the left third back, the rest on, and neither
-leaves at the ends — a swipe **up** goes to the next person and down to the one before, and the sideways axis is left
-alone, so on Home it is the pager of sections and a swipe there moves between Stories, Orbit and Buzz. The clock
-running out moves on by itself: to this person's next story, and past their last to the next person. The tap zones
-stop above the reply pill, so a near miss never moves the story on, and holding a story fades every control away so the
-picture is seen whole. Unlike a post on Orbit, a story is drawn to the frame rather than fitted whole: it is shot for
-the phone, and nothing would be behind the tabs if it were letterboxed. It used to sit in a rounded 9:16 card with Instagram's chrome — the name on top, the actions in
-a row on black below (`storyFrame`, now gone) — which cropped anything that was not 9:16. People moved from the
-sideways axis to the vertical one on 2026-11-21, and the cube that turned between them (`CubeFace`) went with it: the
-pager is now a plain vertical `ScrollView`, not a list, drawing only the page on screen and the two beside it (a list
-inside Home's own pager would be a nested VirtualizedList), and a horizontal drag simply passes through it to whatever
-is around — Home's sections on the tab, nothing in the viewer. The viewer is therefore left by a pull **to the right** rather than
-down, as the app's other full-screen viewer is, with Close still at the top right. Over every page, one top row with Back at the left and the
+**Navigation is Instagram's** (2026-11-22). A tap on the right goes to the next story and, past this person's last, to
+the next person's first; a tap on the left goes to the story before and, before their first, to the previous person's
+**last** story (their page turns in already on it: StoryPlayer's `entries`), or at the very first story of all, back to
+its start. A swipe **sideways** switches people, the page turning like a face of a cube (`CubeFace`: each page hinges
+on the edge it shares with the page coming on, a quarter turn over a whole page, darkening as it turns away, all from
+the pager's offset on the UI thread). Holding the picture pauses the story and its bar and fades every control away so
+it is seen whole; letting go plays on from that exact place, and a hold never counts as a tap. The pause button does
+the same until it is pressed again or the story changes. The clock running out moves on exactly as a tap on the right
+does, closing the viewer after the last person; a pull **down** closes it too, the viewer shrinking after the finger.
+The tap zones start under the top row and stop above the bottom row (and your own story's views), so a near miss on a
+control never moves the story. How much of a story has played is kept from timestamps, never read back from the bar's
+animated value: on the JS side that value could still be the last story's 1 (full) just after a change, and a story
+that had to load first was then counted as over and skipped, with every story after it (found and fixed 2026-11-22).
+The pager is a plain horizontal `ScrollView` drawing only the page on screen and the two beside it. (For a day,
+2026-11-21, while Stories was a tab of Home, people moved up and down instead, TikTok's way, the name sat at the bottom
+left with a post's rail down the right, and taps never left a person.)
+Over every page of the post viewer, one top row with the
 Campus | Global toggle in the middle (for reels and For you, while the toggle is shown); the creator's name, the words and the heart, comments, share,
 save and "…" rail sit at the bottom (as on the Reels page, the rail a little nearer the right edge: `railRight`). The
 words (the name, the title and caption, a link) sit right on what is under them, TikTok's way (2026-11-16): their last
@@ -328,12 +374,12 @@ finger, the video holds on the frame under it (expo-video's scrubbing mode, loos
 it lets go) with the time over the line, and a tap on it jumps (`VideoTimeline`; VoiceOver hears it as adjustable, five
 seconds a step). A post with several
 photos or videos swipes sideways on its page, with dots on a small dark pill just above the words at the bottom (TikTok's
-place, 2026-11-21; they rise with the words over a video's timeline and as a caption is opened), and opens on the one that was showing in the feed; a video plays while its page and slide are on screen, and a double tap on a video likes. A photo zooms instead, as in Photos
+place, 2026-11-21; they rise with the words over a video's timeline and as a caption is opened), and opens on the one that was showing in the feed; a video plays while its page and slide are on screen, and a double tap on a video likes. A double tap anywhere on a post's media likes it TikTok's way (2026-11-22, `src/components/heart-burst.tsx`): a heart pops where the finger landed, leaning a little, settles, then floats up, grows and fades, each further quick tap adding one (at most six at once; a fade only under Reduce Motion); the like is never taken back by a double tap. On Orbit a photo's double tap likes too (`photoDoubleTap="like"`); in the full-screen viewer a photo's double tap zooms instead. A pinch on Orbit, on a photo or a video alike, is TikTok's and Instagram's (2026-11-22): the picture follows the fingers, the point under them staying under them, and springs back as they lift; a pinch that went in (past 1.12×) leaves the page clear, the name, the caption, the rail, the dots, the timeline, the shades, the stories pill (or row) and Home's top bar (Orbit | Buzz, the compass, the bell, the magnifier) all fading away so only the picture, the status bar and the bottom bar show (`FeedClearContext`: only the clear post reports, so the posts beside it never bring the bar back), with a small button in the corner over the bottom bar to bring them back. They also come back on a pinch out (below 0.92×) and on moving to another post. The feed holds still during a pinch (`ViewerPagerLockContext`). The full-screen viewer keeps its Photos-style zoom. On a buzz the double tap is an upvote (`upvoteBuzz`, never taken back), in the viewer and on a Buzz card's photos or video alike, where a lone tap then opens the viewer once a second tap is ruled out (at once on your own buzz or a removed one) and VoiceOver gets an Upvote action. A photo zooms instead, as in Photos
 (`src/components/zoomable.tsx`, on the UI thread): pinch around the fingers, double tap to zoom in on that point (until the
 photo fills the screen, 2× to 3×) or back out, and, zoomed, one finger pans with momentum, its edges rubber-banding; past
 4× or below its own size a pinch gives a little and springs back. While a photo is zoomed the words, the rail and the shades
 step aside, the page's sideways swipe and the viewer's pager hold still (`ViewerPagerLockContext`), and a second finger never
-starts a swipe; a photo turned away, or a viewer closing over it, settles back to rest. The like stays on the rail's heart. On iOS a video tapped while it plays in the feed is played on in the viewer by the
+starts a swipe; a photo turned away, or a viewer closing over it, settles back to rest. The like stays on the rail's heart. The rail itself (2026-11-22, the owner's brief: bold and symmetrical): like, comments, save, share and "•••" are solid white glyphs (red when liked, gold when saved), each centred in the same 42-point square with a soft shadow, the counts bold with even digits, the column 2 points from the screen's right edge on the feeds as in the viewer (`RailButton`). On iOS a video tapped while it plays in the feed is played on in the viewer by the
 feed's own player (`src/lib/video-handoff.ts`: lent as the viewer opens, in `openViewer`, so a tap that opens something
 else never lends it; counted, so the page showing it borrows it too, for as long as that page is in reach; given back as
 the viewer goes), so it opens on the very frame that was showing and never pauses, reloads or jumps, there or back. Neither
@@ -368,7 +414,7 @@ with their videos loaded and waiting (from the moment the zoom open has finished
 has its player and pictures, since a large photo or poster is decoded and resized on the main thread as it
 arrives, which made the zoom drop frames; profiled with Instruments), a video's still is its very first frame (Mux `time=0`) so the player takes over
 without a jump, and in dark mode the top row keeps one style over photos and videos alike. The bottom tab bar plays no
-haptic, and neither do Home's Stories | Orbit | Buzz, Explore's Housing | Roommate | Marketplace and its "+", Messages'
+haptic, and neither do Home's Orbit | Buzz, Explore's Housing | Roommate | Marketplace and its "+", Messages'
 Chats | Groups, the profile's section tabs or the inbox's All | Unread | Requests pills. A swipe up moves on: a reel goes on
 into the Reels feed (only reels, page by page, the other campus choice keeping the page on screen while what follows comes
 from the new choice); a post in For you goes on down For you, its next pages loading as needed; a square in a profile grid
@@ -391,7 +437,12 @@ what you like, save or comment there shows on the row when you come back (`emitP
 a post deleted there leaves the feeds too.
 The bar scrolls like Instagram's (`src/lib/collapsing-header.ts`): it slides up out of the way as the page on screen
 scrolls down, by as much as the page moved, and slides back the moment the page scrolls up, however far down it is; a
-swipe or a tap between pages brings it back too, and Reels never moves it. On Buzz the filter bar slides under it first,
+swipe or a tap between pages brings it back too, and Reels never moves it. On Orbit, which pages whole screens, the bar
+stays put while the feed scrolls (the owner's brief, 2026-11-22): only the stories pill steps away, fading, while the
+finger drags the feed down past 24 points (on to later posts), and comes back the moment it drags up as far, or once
+the feed is at its top (the first post, or the row open); only the finger's drag decides, never the settle after it,
+so a small pull that springs back never makes it flicker (`scrolledAway` in `orbit-section.tsx`). The bar fades away
+only while a post is clear after a pinch (`HomeTopTabs` `hidden`). On Buzz the filter bar slides under it first,
 then rides away with it (both from Buzz's one scroll value, `scrollValue` in the collapsing header), so Buzz's feed
 reaches the top edge too. The same goes for Explore's and Events' search and filters (DiscoveryBar; the bar with the
 title stays put): they slide up under the fixed bar
@@ -427,18 +478,23 @@ counts that open your own two lists (on anyone else's profile, the friends you h
 is private; signed out, a log-in prompt), and, signed in, the Following segment of the Home toggle (while Posts has a tab), which keeps only the
 posts of people you follow on Posts. Builds from before private follower lists show empty lists on other people's
 profiles once migration 21 is live, so publish this code (`npx eas-cli@latest update --channel preview`) right after
-applying it. Comments open in a TikTok-style sheet: "N comments" up top with a Top / Newest sort, each comment with
+applying it. Comments open in a TikTok-style sheet, full width (2026-11-22: edge to edge with no gap at its sides, down
+to the screen's bottom, only its top corners rounded; `Sheet` with `edge="full"`, every other sheet still floating):
+the header or the list pulled down from its top drags it down and closes it past a quarter of its height or with a
+flick (`SheetScrollView`), and with the keyboard up the sheet's top stays where it was while the list gives way and the
+composer rides just above the keyboard, on the UI thread (`KeyboardRoom`). "N comments" up top with a Top / Newest sort, each comment with
 a heart and its count (a dislike stays private), Reply, replies folded behind "View N replies", the composer pinned at the
 bottom, and a hold on a comment for Reply / Report / Block / Delete (your own comment, or any comment on your post); a like on a
 post, a reel or a comment buzzes the phone through `expo-haptics` (`src/lib/haptics.ts`). The same file holds the rest of the vocabulary: a selection tick for chips, segments, switches and the sound buttons, the softest impact when a primary button commits or a list is pulled to refresh, success when something is published, and a warning or an error with the alerts that ask before a delete or report a failure (`alertWithHaptic`). Tapping the tab you are on scrolls its page back to the top, as on every iOS tab bar (`src/lib/tab-reselect.ts`).
-The Share button on posts, reels and listings opens a sheet of your friends, the people you follow who follow you back
+The Share button on posts, reels and listings opens a sheet of your friends (full width since 2026-11-23, edge to edge and down to the screen's bottom like the comments, its list pulling it down from its top: `edge="full"`, `SheetScrollView`), the people you follow who follow you back
 (`src/components/share-sheet.tsx`, mounted once in `src/app/_layout.tsx`): search, tap one or more faces, add an optional
 note and Send, and each friend gets a chat message with the post as a card that opens it, the note under it; "Share to…"
 at the bottom is the system share sheet. It needs migration 17 (`supabase/migrations/20260926000000_shared_posts.sql`).
 
 The Profile tab is your profile (`src/components/profile/`, one `ProfileView` for the tab and for `/profile/[id]`), its
-top kept as the owner chose it (2026-10-31): the cover band with Find friends and the menu (Settings and privacy, Saved,
-the legal pages, Log out) as round buttons over it; your photo in its aurora ring with a "+" to change it, Share profile
+top kept as the owner chose it (2026-10-31): the cover band with round buttons over it, since 2026-11-22 the menu's gear
+at the left (Find friends, Settings and privacy, Saved, the legal pages, Log out) and Home's magnifier at the right (the
+search screen), where Find friends and the gear were; your photo in its aurora ring with a "+" to change it, Share profile
 (a sheet with the profile's QR code and Share) and Edit profile beside it; your full name (the account sheet, Log out),
 @username (made from your name at sign-up, changed in Settings → Account & Profile → Edit profile, which Edit profile
 opens too) with a QR icon; then, with no labels (2026-11-15, the owner's pick of three), the university in bold (17pt)
@@ -452,7 +508,7 @@ wait for the pager to settle), over Instagram's grid: three 3:4 tiles to a row (
 hairline between them and square corners, a play count on videos only (Listings: your live
 apartments, roommate posts and items for sale, each tile its picture with only the kind's small icon on it, no
 words). A stacked profile has Back at the top
-left instead of Find friends. The Classes tab lists classes by semester, this one first (up to 12 each; add your own there with the subject and course number as two boxes, "CS" and "3358", kept as the one code "CS 3358" the database checks, the section, the days and times it meets and the room; a hold on a class card offers Edit (the same form, filled in; Save moves you between course chats when the section changes) and Delete, which asks first, and there is no other way to change or remove one; once a class is in or changed, the form closes and a line under "Add class" says so, the button bringing it back). Listing a section puts you in that section's course chat, a group in Messages shared by everyone at your campus taking it this semester: the first classmate's listing creates it, removing the class leaves it, a notification tells you about both, it cannot be renamed or hand-filled, and it goes with the semester after a week's notice (migration 24).
+left instead of the gear, and on your own the menu with Find friends at the right. The Classes tab lists classes by semester, this one first (up to 12 each; add your own there with the subject and course number as two boxes, "CS" and "3358", kept as the one code "CS 3358" the database checks, the section, the days and times it meets and the room; a hold on a class card offers Edit (the same form, filled in; Save moves you between course chats when the section changes) and Delete, which asks first, and there is no other way to change or remove one; once a class is in or changed, the form closes and a line under "Add class" says so, the button bringing it back). Listing a section puts you in that section's course chat, a group in Messages shared by everyone at your campus taking it this semester: the first classmate's listing creates it, removing the class leaves it, a notification tells you about both, it cannot be renamed or hand-filled, and it goes with the semester after a week's notice (migration 24).
 Settings (`src/app/settings.tsx` and `src/app/settings/`, Apple's Settings in UniBuzz's colours: inset grouped sections,
 compact rows, SF Symbols, native switches, small aurora icon tiles, all from `src/components/settings/settings-ui.tsx`)
 keeps your photo with Change photo at the top, then a short menu whose sections each open their own screen with the
@@ -489,8 +545,9 @@ its ••• menu) to pin it to the top of your profile, three at most. Someone
 who-can-see settings, `profile_classes`, likes readable only through functions, `profile_stats`, `post_view_counts` and
 `feed_posts.pinned_at`); without it the header still shows, with zeros, and each tab says what it could not load.
 
-The Messages tab is the inbox (`src/app/(tabs)/messages.tsx`): the new-message pencil in the top-right corner, the big
-"Messages" title, Chats | Groups with Home's sliding aurora underline (each label's unread count raised just after it), a rounded search box and the All | Unread |
+The Messages tab is the inbox (`src/app/(tabs)/messages.tsx`): the big "Messages" title with Home's magnifier in the
+top-right corner (the search screen, since 2026-11-22, where the new-message pencil was; the pencil now sits at the
+right of the search box below, giving way to Cancel while a search is on), Chats | Groups with Home's sliding aurora underline (each label's unread count raised just after it), a rounded search box and the All | Unread |
 Requests pills (each with its count; Requests on Chats only), then the two pages side by side in a pager like Home's: a
 swipe or a tap on a label moves between your direct chats and your group chats, silently, as on Home. All of that header
 scrolls away with the list, point for point as if it were part of it, and comes back only as the list returns to its

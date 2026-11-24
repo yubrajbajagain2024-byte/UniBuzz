@@ -77,7 +77,7 @@ export type PageSlides = { count: number; pos: SharedValue<number>; onLand: (ind
  * double tap still reaches the page.
  *
  * Off the viewer (no ViewerSwipe) it moves the carousel, and a swipe that leaves it — on past its last picture, or back
- * past its first — is handed to the pager of sections the page is on instead (Home's Stories | Orbit | Buzz, see
+ * past its first — is handed to the pager of sections the page is on instead (Home's Orbit | Buzz, see
  * lib/section-pager.ts), TikTok's way, so a post with several photos never keeps the finger. A page with one picture
  * has nothing to hand over: the gesture simply fails and the pager's own ScrollView takes the swipe natively.
  * `swipedJustNow` tells a tap

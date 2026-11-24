@@ -55,6 +55,8 @@ export function SlidingTabs<T extends string>({
   caret,
   badges,
   leading,
+  weights,
+  underlineShare = 1,
 }: {
   sections: readonly { value: T; label: string }[];
   section: T;
@@ -77,6 +79,10 @@ export function SlidingTabs<T extends string>({
   fontSize?: number;
   /** The section(s) whose label carries a small chevron: it opens a menu. */
   caret?: T | readonly T[];
+  /** The labels' weights, active and at rest (semibold at rest and bold when active unless a row asks otherwise: Home's are both medium). */
+  weights?: { active: TextStyle["fontWeight"]; rest: TextStyle["fontWeight"] };
+  /** How much of its label's width the underline spans, centred under it (1, all of it, unless a row asks for a shorter one). */
+  underlineShare?: number;
   /**
    * A red count after a label (Messages' Chats and Groups), raised like a superscript; none at 0. It takes its own room
    * in the row (so the next label keeps the full gap from it) but stays out of the label's box, so the underline keeps
@@ -123,9 +129,12 @@ export function SlidingTabs<T extends string>({
     const inputRange = centres.map((_, i) => i * pageWidth);
     return {
       translateX: scrollX.interpolate({ inputRange, outputRange: centres.map((c) => c - BASE_WIDTH / 2), extrapolate: "clamp" }),
-      scaleX: scrollX.interpolate({ inputRange, outputRange: widths.map((w) => w / BASE_WIDTH), extrapolate: "clamp" }),
+      scaleX: scrollX.interpolate({ inputRange, outputRange: widths.map((w) => (w * underlineShare) / BASE_WIDTH), extrapolate: "clamp" }),
     };
-  }, [boxes, pageWidth, scrollX, sections.length]);
+  }, [boxes, pageWidth, scrollX, sections.length, underlineShare]);
+  const restWeight = weights ? { fontWeight: weights.rest } : null;
+  const activeWeight = weights ? { fontWeight: weights.active } : styles.bold;
+  const underlineInset = underlineShare < 1 ? { left: `${((1 - underlineShare) / 2) * 100}%` as const, right: `${((1 - underlineShare) / 2) * 100}%` as const } : null;
 
   // Each label is drawn in both looks, one over the other, and the two crossfade with the pager: label i keeps its active
   // look within a quarter page of page i and its resting look from three quarters of a page away, crossfading over the
@@ -184,20 +193,20 @@ export function SlidingTabs<T extends string>({
               ) : null}
               <View>
                 {/* An invisible bold copy gives every label the width of its bold form: nothing shifts when the active one changes weight, and the underline fits it exactly. */}
-                <Text style={[styles.label, { fontSize }, styles.bold, styles.ghost, textStyle]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE} aria-hidden>
+                <Text style={[styles.label, { fontSize }, activeWeight, styles.ghost, textStyle]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE} aria-hidden>
                   {s.label}
                 </Text>
                 {fade ? (
                   <>
-                    <Animated.Text style={[styles.label, { fontSize }, styles.text, { color: dimColor }, textStyle, { opacity: fade.off }]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{s.label}</Animated.Text>
-                    <Animated.Text style={[styles.label, { fontSize }, styles.text, styles.bold, { color: labelColor }, textStyle, { opacity: fade.on }]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{s.label}</Animated.Text>
+                    <Animated.Text style={[styles.label, { fontSize }, restWeight, styles.text, { color: dimColor }, textStyle, { opacity: fade.off }]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{s.label}</Animated.Text>
+                    <Animated.Text style={[styles.label, { fontSize }, styles.text, activeWeight, { color: labelColor }, textStyle, { opacity: fade.on }]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{s.label}</Animated.Text>
                   </>
                 ) : (
-                  <Text style={[styles.label, { fontSize }, styles.text, { color: active ? labelColor : dimColor }, active && styles.bold, textStyle]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{s.label}</Text>
+                  <Text style={[styles.label, { fontSize }, restWeight, styles.text, { color: active ? labelColor : dimColor }, active && activeWeight, textStyle]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{s.label}</Text>
                 )}
               </View>
               {(Array.isArray(caret) ? (caret as readonly T[]).includes(s.value) : caret === s.value) ? <Icon name="chevron-down" size={14} color={active ? labelColor : dimColor} style={[styles.caret, textStyle]} /> : null}
-              {slide ? null : <View style={[styles.underline, styles.staticUnderline, active ? { backgroundColor: tint, experimental_backgroundImage: tintGradient } : { backgroundColor: "transparent" }]} />}
+              {slide ? null : <View style={[styles.underline, styles.staticUnderline, underlineInset, active ? { backgroundColor: tint, experimental_backgroundImage: tintGradient } : { backgroundColor: "transparent" }]} />}
             </View>
             {badges?.[s.value] ? (
               <View style={styles.badge} pointerEvents="none">

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
-import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, runOnJS, useAnimatedKeyboard, useAnimatedStyle, useSharedValue, withSpring, withTiming, ZoomIn, ZoomOut, type SharedValue } from "react-native-reanimated";
+import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, runOnJS, useAnimatedKeyboard, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming, ZoomIn, ZoomOut, type SharedValue } from "react-native-reanimated";
 import {
   blockUser,
   createLikeSync,
@@ -34,26 +34,26 @@ import { Sheet, SheetHeader } from "@/components/sheet";
 import { alertWithHaptic, hapticLike, hapticSelect, hapticSuccess, hapticTap } from "@/lib/haptics";
 import { errorText } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
-import { OVERLAY_PAD, RAIL_GAP, RAIL_WIDTH, RailButton, WORDS_GAP } from "@/components/home/reel-item";
 import { useColors } from "@/lib/theme-provider";
 import { noteStoryAuthorBlocked, noteStoryDeleted, noteStoryLiked, noteStorySeen, markStoriesStale, setStoryMuted, useStoryMuted } from "@/lib/stories-store";
 import { supabase } from "@/lib/supabase";
 import { VIDEO_AUDIO_MODE } from "@/lib/video-sound";
 
 /**
- * Everyone's stories, playing one person at a time: the picture edge to edge and filling the screen, the overlay a
- * post's (see StoryPage), and a bar for each of that person's stories across the very top, filling as it plays. Both
- * places that show stories draw this: Home's Stories tab, where it plays inline over the bottom bar
- * (components/home/stories-section.tsx), and the full-screen viewer a story's link or a profile opens
- * (app/stories/[id].tsx).
+ * Everyone's stories, playing one person at a time: the picture edge to edge and filling the screen, the bars for each
+ * of that person's stories across the very top filling as it plays, who shared it and when under them, and the rail
+ * and the reply pill below (see StoryPage). The full-screen viewer draws it (app/stories/[id].tsx), opened from a ring
+ * in the row across Orbit's top (components/home/stories-row.tsx), a story's link, a story card in a chat or a profile.
  *
- * The axes are TikTok's (the owner's brief, 2026-11-21): a tap moves within one person — the right side on, the left
- * side back, and neither leaves at the ends — a swipe **up** goes to the next person and down to the one before, and
- * the sideways axis is left entirely alone, so on Home it belongs to the pager of sections and a swipe there moves
- * between Stories, Orbit and Buzz. The clock running out moves on by itself: to this person's next story, and past
- * their last one to the next person. `onDone` is called when the last person's last story runs out, so each place
- * decides what lies beyond (the viewer closes; the tab moves on to Orbit). `onClose` draws the Close button; leave it
- * out where there is nothing to close.
+ * Navigation is Instagram's (the owner's brief, 2026-11-22): a tap on the right goes to the next story — past this
+ * person's last, to the next person — and a tap on the left to the one before — before their first, to the previous
+ * person's last story (or, at the very first, back to the start of it); a swipe **sideways** switches people, the page
+ * turning like a face of a cube (CubeFace); holding the picture pauses the story and its bar, letting go plays on; and
+ * the clock running out moves on by itself, exactly as a tap on the right does. `onDone` is called past the last
+ * person's last story (the viewer closes). For a day
+ * (2026-11-21) people moved up and down instead, TikTok's way, while Stories was a tab of Home whose sideways swipe
+ * belonged to Home's sections; it no longer is, so the sideways axis is the viewer's own again. `onClose` draws the
+ * Close button.
  */
 export function StoryPlayer({ groups, start, width, height, barsTop, bottomInset, active, onDone, onClose }: { groups: StoryGroup[]; start: number; width: number; height: number; barsTop: number; bottomInset: number; active: boolean; onDone: () => void; onClose?: () => void }) {
   const { user } = useSession();
@@ -63,51 +63,109 @@ export function StoryPlayer({ groups, start, width, height, barsTop, bottomInset
   const [index, setIndex] = useState(start);
   const pager = useRef<ScrollViewInstance>(null);
   /** Same object on every render: a new one would send the pager back to the first person. */
-  const initialOffset = useRef({ x: 0, y: start * height });
-  /** The height the pager was last placed at: a rotation puts it back on its page rather than between two. */
-  const placedHeight = useRef(0);
+  const initialOffset = useRef({ x: start * width, y: 0 });
+  /** The width the pager was last placed at: a rotation puts it back on its page rather than between two. */
+  const placedWidth = useRef(0);
   const place = useCallback(() => {
-    if (height <= 0) return;
-    pager.current?.scrollTo({ x: 0, y: index * height, animated: false });
-    placedHeight.current = height;
-  }, [index, height]);
+    if (width <= 0) return;
+    pager.current?.scrollTo({ x: index * width, y: 0, animated: false });
+    placedWidth.current = width;
+  }, [index, width]);
+  /** Where the pager stands, in points, on the UI thread: each face turns by it (see CubeFace). */
+  const scrollX = useSharedValue(start * width);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollX.value = e.contentOffset.x;
+  });
   const go = useCallback(
     (next: number) => {
       if (next >= groups.length) return onDone();
-      pager.current?.scrollTo({ x: 0, y: next * height, animated: true });
+      pager.current?.scrollTo({ x: next * width, y: 0, animated: true });
     },
-    [groups.length, height, onDone],
+    [groups.length, width, onDone],
+  );
+  /**
+   * Where a person's page should stand when it next comes on: set before a tap on the left takes the viewer back to the
+   * person before, so their page turns in on their last story, Instagram's way, rather than wherever it was. A fresh
+   * object each time (`n`), so the same story asked for twice still moves the page.
+   */
+  const [entries, setEntries] = useState<Record<string, { at: number; n: number }>>({});
+  /** Back a person, onto their last story; false at the very first person, where the story starts over instead. */
+  const back = useCallback(
+    (from: number) => {
+      const prev = groups[from - 1];
+      if (!prev) return false;
+      setEntries((e) => ({ ...e, [prev.author.id]: { at: prev.stories.length - 1, n: Date.now() } }));
+      pager.current?.scrollTo({ x: (from - 1) * width, y: 0, animated: true });
+      return true;
+    },
+    [groups, width],
   );
   const onEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (placedHeight.current !== height) return;
-    setIndex(Math.max(0, Math.min(groups.length - 1, Math.round(e.nativeEvent.contentOffset.y / Math.max(height, 1)))));
+    if (placedWidth.current !== width) return;
+    setIndex(Math.max(0, Math.min(groups.length - 1, Math.round(e.nativeEvent.contentOffset.x / Math.max(width, 1)))));
   };
 
   return (
-    <ScrollView
+    <Animated.ScrollView
       ref={pager}
+      horizontal
       pagingEnabled
       bounces={false}
       overScrollMode="never"
-      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       contentOffset={initialOffset.current}
       onContentSizeChange={place}
+      onScroll={onScroll}
       scrollEventThrottle={16}
       onMomentumScrollEnd={onEnd}
       scrollsToTop={false}
       style={{ width, height }}
     >
       {groups.map((group, i) => (
-        /* Only the page on screen and the two beside it are drawn: a plain pager is not virtualized, and a list inside
-           Home's own pager would be a nested VirtualizedList. */
-        <View key={group.author.id} style={{ width, height, backgroundColor: "#000" }}>
+        <CubeFace key={group.author.id} at={i} scrollX={scrollX} width={width} height={height}>
+          {/* Only the page on screen and the two beside it are drawn: a plain pager is not virtualized. */}
           {Math.abs(i - index) <= 1 ? (
-            <StoryPage group={group} active={active && i === index} width={width} height={height} barsTop={barsTop} bottomInset={bottomInset} me={meId} keyboard={keyboard.height} onDone={() => go(i + 1)} onClose={onClose} />
+            <StoryPage group={group} active={active && i === index} width={width} height={height} barsTop={barsTop} bottomInset={bottomInset} me={meId} keyboard={keyboard.height} entry={entries[group.author.id]} onDone={() => go(i + 1)} onBack={() => back(i)} onClose={onClose} />
           ) : null}
-        </View>
+        </CubeFace>
       ))}
-    </ScrollView>
+    </Animated.ScrollView>
+  );
+}
+
+/**
+ * How far a cube turns as the pager moves a whole page: a quarter turn, so the two faces meet at a right angle and the
+ * seam between them never opens. The eye sits this many screen widths in front of the cube.
+ */
+const CUBE_TURN = 90;
+const CUBE_EYE = 1.6;
+/** How dark a face is once it has turned away: the far side of a solid cube, so it reads as one object, not two pictures. */
+const CUBE_SHADE = 0.55;
+
+/**
+ * One person's page as a face of a cube, Instagram's turn between people. The page keeps the place the pager gives it;
+ * this only turns it about the edge it shares with the page coming on — its right edge going left, its left edge coming
+ * back — so the two faces stay joined through the whole swipe and the one turning away darkens as it goes. The rotation
+ * is built from translate · rotate · translate rather than a transform origin, which cannot be animated. Everything
+ * runs on the UI thread from the pager's offset, so a turn never waits on React.
+ */
+function CubeFace({ at, scrollX, width, height, children }: { at: number; scrollX: SharedValue<number>; width: number; height: number; children: React.ReactNode }) {
+  const face = useAnimatedStyle(() => {
+    // -1 a page to the right of the screen, 0 on it, 1 a page to the left.
+    const p = Math.max(-1, Math.min(1, (scrollX.value - at * width) / Math.max(width, 1)));
+    // The hinge: the right edge while this page leaves to the left, the left edge while it comes back from the right.
+    const hinge = (p > 0 ? width : -width) / 2;
+    return {
+      transform: [{ perspective: width * CUBE_EYE }, { translateX: hinge }, { rotateY: `${-p * CUBE_TURN}deg` }, { translateX: -hinge }],
+    };
+  });
+  const shade = useAnimatedStyle(() => ({ opacity: Math.min(1, Math.abs((scrollX.value - at * width) / Math.max(width, 1))) * CUBE_SHADE }));
+  return (
+    <Animated.View style={[{ width, height, backgroundColor: "#000" }, face]}>
+      {children}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "#000" }, shade]} />
+    </Animated.View>
   );
 }
 
@@ -115,10 +173,10 @@ export function StoryPlayer({ groups, start, width, height, barsTop, bottomInset
  * One person's stories, playing while `active` (the page on screen). `barsTop` is exactly where the row of bars sits,
  * so a caller can pin them above whatever else is drawn over the story (Home's tabs sit just under them), and
  * `bottomInset` what the words, the rail and the reply pill keep clear below them: the home indicator
- * in the viewer, the floating bottom bar's room on Home's Stories tab, so the reply sits just above it.
+ * in the viewer, or whatever else a caller keeps clear under the story.
  * `keyboard` is the keyboard's height, for the reply row.
  */
-function StoryPage({ group, active, width, height, barsTop, bottomInset, me, keyboard, onDone, onClose }: { group: StoryGroup; active: boolean; width: number; height: number; barsTop: number; bottomInset: number; me: string | null; keyboard: SharedValue<number>; onDone: () => void; onClose?: () => void }) {
+function StoryPage({ group, active, width, height, barsTop, bottomInset, me, keyboard, entry, onDone, onBack, onClose }: { group: StoryGroup; active: boolean; width: number; height: number; barsTop: number; bottomInset: number; me: string | null; keyboard: SharedValue<number>; entry?: { at: number; n: number }; onDone: () => void; onBack: () => boolean; onClose?: () => void }) {
   // The list of views is a sheet in the app's theme; everything else on this screen is on black.
   const colors = useColors();
   const router = useRouter();
@@ -127,6 +185,8 @@ function StoryPage({ group, active, width, height, barsTop, bottomInset, me, key
   const [at, setAt] = useState(group.startAt);
   const story = group.stories[Math.min(at, group.stories.length - 1)]!;
   const [held, setHeld] = useState(false);
+  /** Paused with the button in the top row, until it is pressed again or the story changes. */
+  const [paused, setPaused] = useState(false);
   /** The viewers sheet: null closed, [] loading, else the list. */
   const [viewers, setViewers] = useState<StoryViewer[] | null>(null);
   /** The reply box has the keyboard, the share sheet is up, or the "⋯" menu (or what it opened) is: the story waits. */
@@ -145,6 +205,8 @@ function StoryPage({ group, active, width, height, barsTop, bottomInset, me, key
   const progress = useSharedValue(0);
   const duration = storyDurationMs(story);
   const elapsedBefore = useRef(0);
+  /** When the bar last started moving (Date.now()), or null while it is still: see the clock below. */
+  const clockSince = useRef<number | null>(null);
   const mine = group.mine && group.author.id === me;
   const author = group.author;
   const firstName = author.full_name.trim().split(/\s+/)[0] || author.full_name;
@@ -158,7 +220,7 @@ function StoryPage({ group, active, width, height, barsTop, bottomInset, me, key
   // buffering. The clock runs only for it; the video is asked to play as soon as the page is on screen.
   const [shown, setShown] = useState<string | null>(null);
   const ready = shown === story.id;
-  const wanted = active && !held && viewers === null && !typing && !sharing && !menuOpen;
+  const wanted = active && !held && !paused && viewers === null && !typing && !sharing && !menuOpen;
   const playing = wanted && ready;
   const storyId = story.id;
   const onPhoto = useCallback(() => setShown(storyId), [storyId]);
@@ -170,22 +232,33 @@ function StoryPage({ group, active, width, height, barsTop, bottomInset, me, key
   }, [active, at, group.stories]);
 
   /**
-   * A tap moves within this person's stories and no further: switching to someone else is what a sideways swipe is for
-   * (the owner's brief, 2026-11-21). A tap on the right at the last story, or on the left at the first, does nothing
-   * and the story plays on.
+   * Instagram's taps (the owner's brief, 2026-11-22). On the right: the next story, and past this person's last, the
+   * next person (onDone, the very thing the clock running out does). On the left: the story before, and before their
+   * first, the previous person's last story (onBack); at the very first story of all it starts over. `restart` re-runs
+   * the clock for that one case, where the story itself does not change.
    */
+  const [restart, setRestart] = useState(0);
   const last = at + 1 >= group.stories.length;
-  const tapNext = useCallback(() => {
-    if (at + 1 < group.stories.length) setAt(at + 1);
-  }, [at, group.stories.length]);
-  const tapBack = useCallback(() => {
-    if (at > 0) setAt(at - 1);
-  }, [at]);
-  /** The clock running out, on the other hand, goes on: past this person's last story to the next person (onDone). */
   const ended = useCallback(() => {
     if (at + 1 < group.stories.length) setAt(at + 1);
     else onDone();
   }, [at, group.stories.length, onDone]);
+  const tapNext = ended;
+  const tapBack = useCallback(() => {
+    if (at > 0) return setAt(at - 1);
+    if (onBack()) return;
+    cancelAnimation(progress);
+    progress.value = 0;
+    elapsedBefore.current = 0;
+    clockSince.current = null;
+    setRestart((n) => n + 1);
+  }, [at, onBack, progress]);
+  // Turned to from the person after by a tap on the left: on their last story (see StoryPlayer's `entries`).
+  useEffect(() => {
+    if (entry) setAt(Math.min(entry.at, group.stories.length - 1));
+  }, [entry, group.stories.length]);
+  // A story that changes plays, whatever the button said about the one before.
+  useEffect(() => setPaused(false), [story.id]);
   const endedRef = useRef(ended);
   endedRef.current = ended;
   const fire = useCallback(() => endedRef.current(), []);
@@ -195,23 +268,37 @@ function StoryPage({ group, active, width, height, barsTop, bottomInset, me, key
     cancelAnimation(progress);
     progress.value = 0;
     elapsedBefore.current = 0;
+    clockSince.current = null;
     if (!active || mine) return;
     noteStorySeen(story.id);
     void markStorySeen(supabase, story.id).catch(() => {});
   }, [story.id, active, mine, progress]);
-  // The clock: runs while playing; held, it keeps its place and goes on from there.
+  /**
+   * The clock: runs while playing; held or paused, it keeps its place and goes on from there. How much of the story has
+   * played is kept here in JS, from the moments the bar started and stopped (`clockSince`), never read back from the
+   * bar's own animated value: on the JS side that value can still be the story before's (1, full) just after the story
+   * changes, and a new story that had to load first was then counted as already over and skipped in 60 ms, with every
+   * story after it (found 2026-11-22: the end of someone's first story ran straight on to the next person).
+   */
   useEffect(() => {
+    if (clockSince.current !== null) {
+      elapsedBefore.current = Math.min(duration, elapsedBefore.current + (Date.now() - clockSince.current));
+      clockSince.current = null;
+    }
     if (!playing) {
       cancelAnimation(progress);
-      elapsedBefore.current = progress.value * duration;
+      // The bar holds exactly where the clock stopped.
+      progress.value = elapsedBefore.current / duration;
       return;
     }
     const remaining = Math.max(60, duration - elapsedBefore.current);
+    progress.value = elapsedBefore.current / duration;
+    clockSince.current = Date.now();
     progress.value = withTiming(1, { duration: remaining, easing: Easing.linear }, (finished) => {
       if (finished) runOnJS(fire)();
     });
     return () => cancelAnimation(progress);
-  }, [playing, story.id, duration, progress, fire]);
+  }, [playing, story.id, duration, progress, fire, restart]);
 
   // A page swiped away gives up the keyboard: the next person's story plays.
   useEffect(() => {
@@ -225,6 +312,8 @@ function StoryPage({ group, active, width, height, barsTop, bottomInset, me, key
 
   // The reply row sits on the keyboard while it is up, and just above the home indicator otherwise.
   const replyRowStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.max(0, keyboard.value - bottomInset) }] }));
+  const heartScale = useSharedValue(1);
+  const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
 
   /**
    * The heart: shows at once, and the database follows the last tap (two quick taps never leave it the other way). If the
@@ -239,7 +328,7 @@ function StoryPage({ group, active, width, height, barsTop, bottomInset, me, key
     // Felt before anything else happens, TikTok's way: then the heart, then the server.
     if (next) hapticLike();
     else hapticTap();
-    // The bounce is the rail's own, the same one a post's heart gives (RailButton bounces whenever `selected` turns on).
+    if (next) heartScale.value = withSequence(withTiming(1.3, { duration: 110 }), withSpring(1, { damping: 9, stiffness: 260 }));
     setLikedNow((m) => ({ ...m, [id]: next }));
     noteStoryLiked(id, next);
     let sync = likeSyncs.current.get(id);
@@ -408,8 +497,11 @@ function StoryPage({ group, active, width, height, barsTop, bottomInset, me, key
     ]);
   }
 
-  // The action bar just above the home indicator, over the picture; the controls fade away while the story is held to be looked at.
+  // The action bar just above the home indicator, on black under the picture; the controls fade away while the story is
+  // held to be looked at.
   const barBottom = bottomInset + 4;
+  /** Where the picture ends: the top of the bottom row (the screen's bottom when there is none). */
+  const mediaBottom = me ? barBottom + STORY_ACTION_BAR : 0;
   const chrome = useSharedValue(1);
   useEffect(() => {
     chrome.value = withTiming(held ? 0 : 1, { duration: held ? 160 : 240, easing: Easing.out(Easing.quad) });
@@ -421,10 +513,11 @@ function StoryPage({ group, active, width, height, barsTop, bottomInset, me, key
 
   return (
     <View style={{ width, height, backgroundColor: "#000" }}>
-      {/* The picture fills the screen edge to edge, behind everything drawn over it (the owner's brief, 2026-11-21):
-          a story is shot for the phone, so it is drawn to the frame and the little it overflows is cropped, rather
-          than fitted whole with black bands as a post is on Orbit — there would be nothing behind the tabs then. */}
-      <View style={StyleSheet.absoluteFill}>
+      {/* The picture fills its frame edge to edge (a story is shot for the phone, so the little it overflows is cropped
+          rather than fitted with black bands), from the very top of the screen down to the top of the bottom row with
+          the reply field (the owner's brief, 2026-11-22), its bottom corners rounded, Instagram's: the row sits on
+          black below it. With no bottom row (signed out) it runs to the screen's bottom. */}
+      <View style={[styles.media, { bottom: mediaBottom }, me ? styles.mediaCard : null]}>
         {story.kind === "photo" && story.photo ? <Image key={story.id} source={{ uri: story.photo.url }} placeholder={story.photo.blur ? { blurhash: story.photo.blur } : undefined} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} onLoad={onPhoto} onError={onPhoto} accessibilityIgnoresInvertColors /> : null}
         {story.kind === "video" && story.video ? <StoryVideo key={story.id} playbackId={story.video.playback_id} playing={wanted} onReady={onVideo} /> : null}
         {/* Only when loading takes a moment: a cached photo shows before this would. */}
@@ -438,9 +531,12 @@ function StoryPage({ group, active, width, height, barsTop, bottomInset, me, key
         <Animated.View pointerEvents="none" style={[styles.bottomShade, chromeStyle]} />
 
         {/* The taps: the left third goes back, the rest goes on; a hold anywhere pauses. Never under the action bar. */}
-        <View style={[StyleSheet.absoluteFill, { bottom: barBottom + STORY_ACTION_BAR }]} pointerEvents="box-none">
-          <Pressable style={styles.leftZone} onPress={onTapBack} onLongPress={() => setHeld(true)} onPressOut={() => setHeld(false)} delayLongPress={180} accessibilityRole="button" accessibilityState={{ disabled: at === 0 }} accessibilityLabel="Previous story" />
-          <Pressable style={styles.rightZone} onPress={onTapNext} onLongPress={() => setHeld(true)} onPressOut={() => setHeld(false)} delayLongPress={180} accessibilityRole="button" accessibilityState={{ disabled: last }} accessibilityLabel="Next story" />
+        {/* The taps start under the top row and stop over the bottom row: a near miss on pause, "⋯", Close, the heart or
+            the field never moves the story on. Held, the story and its bar stop; let go, both go on from there, and a
+            hold never counts as a tap. */}
+        <View style={[StyleSheet.absoluteFill, { top: barsTop + HEADER_ROOM, bottom: barBottom + STORY_ACTION_BAR + (mine ? VIEWS_ROOM : 0) }]} pointerEvents="box-none">
+          <Pressable style={styles.leftZone} onPress={onTapBack} onLongPress={() => setHeld(true)} onPressOut={() => setHeld(false)} delayLongPress={180} accessibilityRole="button" accessibilityLabel={at > 0 ? "Previous story" : "Previous person's stories"} />
+          <Pressable style={styles.rightZone} onPress={onTapNext} onLongPress={() => setHeld(true)} onPressOut={() => setHeld(false)} delayLongPress={180} accessibilityRole="button" accessibilityLabel={last ? "Next person's stories" : "Next story"} />
         </View>
         {/* Typing a reply dims the story, as Instagram does. */}
         {typing ? <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(150)} pointerEvents="none" style={styles.typingShade} /> : null}
@@ -451,48 +547,81 @@ function StoryPage({ group, active, width, height, barsTop, bottomInset, me, key
               <Bar key={s.id} state={i < at ? 1 : i > at ? 0 : null} progress={progress} />
             ))}
           </View>
-          {/* Only Close up here, and only where there is something to close: who shared it reads at the bottom left
-              and "⋯" sits on the rail, as on a post. Home's Stories tab draws no Close: the tabs are right there. */}
-          {onClose ? (
-            <View style={styles.closeRow} pointerEvents="box-none">
-              <ChromeButton icon="close" label="Close" onPress={onClose} />
+          {/* Instagram's top row (the owner's brief and screenshot, 2026-11-22): the photo, the name and how long ago, then
+              at the far end pause or play, "⋯" (Delete on your own; Report, Mute and Block on someone else's) and Close
+              where there is something to close. On someone else's story, until you follow them, a "+" on their photo
+              follows them (the owner's ask of 2026-11-21, here rather than on a rail the layout no longer has). */}
+          <View style={styles.who} pointerEvents="box-none">
+            <View>
+              <Avatar name={author.full_name} url={author.avatar_url} size={32} online={false} />
+              {!mine && me && !follow.followedByMe ? (
+                <Animated.View exiting={FadeOut.duration(220)} style={styles.followPlusAt}>
+                  <Pressable
+                    onPress={() => void follow.toggle()}
+                    disabled={follow.pending}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Follow ${author.full_name}`}
+                    accessibilityState={{ disabled: follow.pending, busy: follow.pending }}
+                    style={({ pressed }) => [styles.followPlus, pressed && styles.pressed]}
+                  >
+                    <Icon name="add" size={11} weight="bold" color="#fff" />
+                  </Pressable>
+                </Animated.View>
+              ) : null}
             </View>
-          ) : null}
+            <View style={styles.whoText} accessible accessibilityLabel={`${mine ? "Your story" : author.full_name}, ${storyAge(story.createdAt)}${audienceNote ? `, ${audienceNote}` : ""}`}>
+              <Text style={styles.author} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                {mine ? "Your story" : author.full_name}
+              </Text>
+              <Text style={styles.when} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                {storyAge(story.createdAt)}
+                {audienceNote ? ` · ${audienceNote}` : ""}
+              </Text>
+            </View>
+            <ChromeButton icon={paused ? "play" : "pause"} label={paused ? "Play" : "Pause"} onPress={() => setPaused((v) => !v)} />
+            {me ? <ChromeButton icon="ellipsis-horizontal" label="More options" onPress={mine ? mineMore : more} /> : null}
+            {onClose ? <ChromeButton icon="close" label="Close" onPress={onClose} /> : null}
+          </View>
         </Animated.View>
       </View>
 
-      {/* The words and the rail side by side, laid out exactly as Orbit lays a post out (OVERLAY_PAD, WORDS_GAP and the
-          rail's column come from reel-item.tsx): who shared it and when at the bottom left, the actions down the right.
-          Only the left column rides the keyboard, so the rail stays where it is while a reply is typed. */}
-      <Animated.View pointerEvents="box-none" style={[styles.overlay, { paddingBottom: WORDS_GAP + barBottom }, chromeStyle]}>
-        <Animated.View style={[styles.info, replyRowStyle]} pointerEvents="box-none">
-          <View style={styles.who} accessible accessibilityLabel={`${mine ? "Your story" : author.full_name}, ${storyAge(story.createdAt)}${audienceNote ? `, ${audienceNote}` : ""}`}>
-            <Avatar name={author.full_name} url={author.avatar_url} size={24} online={false} />
-            <Text style={styles.author} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-              {mine ? "Your story" : author.full_name}
-            </Text>
-            <Text style={styles.when} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-              {storyAge(story.createdAt)}
-              {audienceNote ? ` · ${audienceNote}` : ""}
-            </Text>
-          </View>
-          {!mine && me ? (
-            <View style={styles.replyRow}>
-              {sentAt ? (
-                <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(220)} pointerEvents="none" style={styles.sent}>
-                  <Icon name="checkmark-circle" size={16} color="#fff" />
-                  <Text style={styles.sentText}>Sent to {firstName}</Text>
-                </Animated.View>
-              ) : null}
-              <View style={[styles.replyField, styles.replyFieldOver, typing && styles.replyFieldActive]}>
+      {/* Instagram's bottom row, on every story, your own included (the owner's brief, 2026-11-22): the "Reply to…"
+          field, then the heart and the paper plane. On your own story the field cannot reply to yourself (a reply is a
+          message to the author, and sendStoryReply refuses your own), so it sends the story to friends and groups
+          instead, through the share sheet, and the eye with its count sits just above it, opening who has seen it. The
+          whole row rides the keyboard; the heart and the plane step aside while a reply is typed. */}
+      {me ? (
+        <Animated.View pointerEvents="box-none" style={[styles.bottom, { bottom: barBottom }, replyRowStyle, chromeStyle]}>
+          {mine ? (
+            <Pressable onPress={() => void openViewers()} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Activity: ${views}${likes}`} accessibilityHint="Shows who has seen it" style={({ pressed }) => [styles.views, pressed && styles.pressed]}>
+              <Icon name="eye-outline" size={17} color="#fff" style={styles.iconShadow} />
+              <Text style={styles.viewsText}>{story.views}</Text>
+            </Pressable>
+          ) : null}
+          {sentAt ? (
+            <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(220)} pointerEvents="none" style={styles.sent}>
+              <Icon name="checkmark-circle" size={16} color="#fff" />
+              <Text style={styles.sentText}>Sent to {firstName}</Text>
+            </Animated.View>
+          ) : null}
+          <View style={styles.bottomRow}>
+            {mine ? (
+              <Pressable onPress={share} accessibilityRole="button" accessibilityLabel="Send your story to friends and groups" style={({ pressed }) => [styles.replyField, pressed && styles.pressed]}>
+                <Text style={styles.replyPlaceholder} numberOfLines={1}>
+                  Send to friends…
+                </Text>
+              </Pressable>
+            ) : (
+              <View style={[styles.replyField, typing && styles.replyFieldActive]}>
                 <TextInput
                   ref={input}
                   value={draft}
                   onChangeText={setDraft}
                   onFocus={() => setTyping(true)}
                   onBlur={() => setTyping(false)}
-                  placeholder={`Reply to ${firstName}…`}
-                  placeholderTextColor="rgba(255,255,255,0.62)"
+                  placeholder="Send message…"
+                  placeholderTextColor={PLACEHOLDER}
                   keyboardAppearance="dark"
                   returnKeyType="send"
                   onSubmitEditing={() => void sendReply()}
@@ -510,58 +639,28 @@ function StoryPage({ group, active, width, height, barsTop, bottomInset, me, key
                   </Animated.View>
                 ) : null}
               </View>
-            </View>
-          ) : null}
-        </Animated.View>
-        {/* The rail, the same shape on either story (the owner's brief, 2026-11-21): the heart, Share, then "⋯". Your
-            own adds the eye and its count under Share, which opens the list of who has seen it, and its "⋯" holds
-            Delete; someone else's puts the follow button over the heart and keeps Report, Mute and Block behind "⋯".
-            While a reply is being typed the whole rail steps aside, as the heart and the plane always did. */}
-        {me && !typing ? (
-          <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)} style={styles.rail} pointerEvents="box-none">
-            {mine ? (
-              <>
-                <RailButton icon={liked ? "heart" : "heart-outline"} tint={liked ? LIKE_RED : undefined} label={story.likes > 0 ? String(story.likes) : undefined} selected={liked} onPress={() => void toggleLike()} a11y={liked ? "Unlike" : "Like"} />
-                <RailButton icon="paper-plane-outline" label="Share" onPress={share} a11y="Send your story to friends and groups" />
-                <RailButton icon="eye-outline" label={String(story.views)} onPress={() => void openViewers()} a11y={`Activity: ${views}${likes}, who has seen it`} />
-                <RailButton icon="ellipsis-horizontal" small onPress={mineMore} a11y="More options" />
-              </>
-            ) : (
-              <>
-                {/* TikTok's: the creator's photo with a "+" on it, over the heart, and gone the moment they are followed. */}
-                {follow.followedByMe ? null : (
-                  <Animated.View exiting={FadeOut.duration(220)}>
-                    <Pressable
-                      onPress={() => void follow.toggle()}
-                      disabled={follow.pending}
-                      hitSlop={6}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Follow ${author.full_name}`}
-                      accessibilityState={{ disabled: follow.pending, busy: follow.pending }}
-                      style={({ pressed }) => [styles.followButton, pressed && styles.pressed]}
-                    >
-                      <View style={styles.followRing}>
-                        <Avatar name={author.full_name} url={author.avatar_url} size={FOLLOW_PHOTO} online={false} />
-                      </View>
-                      <View style={styles.followPlus}>
-                        <Icon name="add" size={13} weight="bold" color="#fff" />
-                      </View>
-                    </Pressable>
-                  </Animated.View>
-                )}
-                <RailButton icon={liked ? "heart" : "heart-outline"} tint={liked ? LIKE_RED : undefined} selected={liked} onPress={() => void toggleLike()} a11y={liked ? "Unlike" : "Like"} />
-                <RailButton icon="paper-plane-outline" label="Share" onPress={share} a11y="Share story" />
-                <RailButton icon="ellipsis-horizontal" small onPress={more} a11y="More options" />
-              </>
             )}
-          </Animated.View>
-        ) : null}
-      </Animated.View>
+            {!typing ? (
+              <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)} style={styles.actions}>
+                <Pressable onPress={() => void toggleLike()} hitSlop={4} accessibilityRole="button" accessibilityLabel={liked ? "Unlike" : "Like"} accessibilityState={{ selected: liked }} style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+                  <Animated.View style={heartStyle}>
+                    <Icon name={liked ? "heart" : "heart-outline"} size={28} weight="regular" color={liked ? LIKE_RED : "#fff"} />
+                  </Animated.View>
+                </Pressable>
+                <Pressable onPress={share} hitSlop={4} accessibilityRole="button" accessibilityLabel={mine ? "Send your story to friends and groups" : "Share story"} style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+                  <Icon name="paper-plane-outline" size={26} weight="regular" color="#fff" style={styles.plane} />
+                </Pressable>
+              </Animated.View>
+            ) : null}
+          </View>
+        </Animated.View>
+      ) : null}
 
-      <Sheet visible={viewers !== null} onClose={() => setViewers(null)} closeLabel="Close the list of views">
+      {/* Full width, edge to edge and down to the screen's bottom (the owner's brief, 2026-11-23), as the share sheet is. */}
+      <Sheet visible={viewers !== null} onClose={() => setViewers(null)} closeLabel="Close the list of views" edge="full">
         <SheetHeader title={viewers && viewers.length > 0 ? `${viewers.length} ${viewers.length === 1 ? "view" : "views"}` : "Views"} onClose={() => setViewers(null)} />
         {viewers && viewers.length === 0 ? (
-          <Text style={[styles.noViews, { color: colors.muted }]}>No views yet</Text>
+          <Text style={[styles.noViews, { color: colors.muted, paddingBottom: 32 + bottomInset }]}>No views yet</Text>
         ) : (
           <FlatList
             data={viewers ?? []}
@@ -629,9 +728,14 @@ function StoryVideo({ playbackId, playing, onReady }: { playbackId: string; play
 const shadow = { textShadowColor: "rgba(0,0,0,0.5)", textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } } as const;
 /** Instagram's like red: the heart reads the same over any picture, and the "+" on the follow button takes it too. */
 const LIKE_RED = "#ff3040";
-/** The creator's photo on the rail, TikTok's size, with the "+" hanging off its bottom edge. */
-const FOLLOW_PHOTO = 40;
-const FOLLOW_PLUS = 20;
+/** The bar's placeholder words: white, a touch soft. */
+const PLACEHOLDER = "rgba(255,255,255,0.92)";
+/** How tall the bars and the top row are together: the taps start under them. */
+const HEADER_ROOM = 58;
+/** The eye and its count over the bottom row on your own story: the taps stop above it too. */
+const VIEWS_ROOM = 42;
+/** The "+" on the creator's photo in the top row, until they are followed. */
+const FOLLOW_PLUS = 18;
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
@@ -645,36 +749,45 @@ const styles = StyleSheet.create({
   leftZone: { position: "absolute", top: 0, bottom: 0, left: 0, width: "32%" },
   rightZone: { position: "absolute", top: 0, bottom: 0, right: 0, width: "68%" },
   typingShade: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.5)" },
-  // The header: the bars across the very top, then Close at the right.
+  // The header: the bars across the very top, then who shared it and when.
   header: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 10, gap: 8 },
   bars: { flexDirection: "row", gap: 3, paddingHorizontal: 2 },
   bar: { flex: 1, height: 2, borderRadius: 1, backgroundColor: "rgba(255,255,255,0.32)", overflow: "hidden" },
   barFill: { height: "100%", borderRadius: 1, backgroundColor: "#fff" },
-  closeRow: { flexDirection: "row", justifyContent: "flex-end" },
-  // The bottom overlay, a post's geometry exactly (reel-item.tsx): the words' column and the rail side by side.
-  overlay: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "flex-end", paddingLeft: 14, paddingRight: 8, gap: 10 },
-  info: { flex: 1, gap: 6 },
-  who: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "flex-start", maxWidth: "100%" },
-  author: { color: "#fff", fontSize: 16, fontWeight: "700", flexShrink: 1, ...shadow },
-  when: { color: "rgba(255,255,255,0.85)", fontSize: 14, lineHeight: 19, flexShrink: 0, ...shadow },
-  // Lifted from the words' line to its own, so the rail's last button stays OVERLAY_PAD over the bottom inset.
-  rail: { width: RAIL_WIDTH, alignItems: "center", gap: RAIL_GAP, marginBottom: OVERLAY_PAD - WORDS_GAP },
-  // The follow button: the photo in a white ring, the "+" centred on its bottom edge. Its own room under it, so the
-  // "+" never crowds the heart.
-  followButton: { alignItems: "center", paddingBottom: FOLLOW_PLUS / 2 },
-  followRing: { width: FOLLOW_PHOTO + 3, height: FOLLOW_PHOTO + 3, borderRadius: (FOLLOW_PHOTO + 3) / 2, borderWidth: 1.5, borderColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" },
-  followPlus: { position: "absolute", bottom: 0, width: FOLLOW_PLUS, height: FOLLOW_PLUS, borderRadius: FOLLOW_PLUS / 2, backgroundColor: LIKE_RED, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "rgba(0,0,0,0.25)" },
-  replyRow: { alignSelf: "stretch" },
+  // Under the bars: the photo, the name and how long ago, then pause, "⋯" and Close at the far end.
+  who: { flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 4 },
+  whoText: { flex: 1, flexDirection: "row", alignItems: "baseline", gap: 8 },
+  author: { color: "#fff", fontSize: 15, fontWeight: "700", flexShrink: 1, ...shadow },
+  when: { color: "rgba(255,255,255,0.78)", fontSize: 13, fontWeight: "500", flexShrink: 0, ...shadow },
+  // The "+" on the creator's photo until they are followed: small, red, on the photo's bottom right edge.
+  followPlusAt: { position: "absolute", right: -5, bottom: -4 },
+  followPlus: { width: FOLLOW_PLUS, height: FOLLOW_PLUS, borderRadius: FOLLOW_PLUS / 2, backgroundColor: LIKE_RED, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#000" },
+  // Instagram's bottom row: the field, then the heart and the paper plane; your own story's views just above it.
+  bottom: { position: "absolute", left: 0, right: 0, paddingLeft: 16, paddingRight: 8, gap: 10 },
+  // Instagram's story bar (the owner's reference, 2026-11-23): the outlined field, then the heart and the plane.
+  bottomRow: { height: STORY_ACTION_BAR, flexDirection: "row", alignItems: "center", gap: 12 },
+  // The heart and the plane: the same 44-point square each, side by side, the same weight (2026-11-22).
+  actions: { flexDirection: "row", alignItems: "center", gap: 0 },
+  action: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  // The paper plane's glyph leans right of its box: nudged back so the two sit as a pair.
+  plane: { marginLeft: -2, marginTop: 1 },
+  // The picture's frame, from the screen's top to the bottom row; a card with rounded bottom corners over it.
+  media: { position: "absolute", top: 0, left: 0, right: 0, overflow: "hidden" },
+  mediaCard: { borderBottomLeftRadius: 14, borderBottomRightRadius: 14, borderCurve: "continuous" },
+  views: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: 16, borderCurve: "continuous", backgroundColor: "rgba(0,0,0,0.32)" },
+  viewsText: { color: "#fff", fontSize: 14, fontWeight: "700", fontVariant: ["tabular-nums"], ...shadow },
+  replyPlaceholder: { flex: 1, color: PLACEHOLDER, fontSize: 16 },
   chromeButton: { width: 40, height: 44, alignItems: "center", justifyContent: "center" },
   iconShadow: shadow,
   pressed: { opacity: 0.55, transform: [{ scale: 0.92 }] },
-  replyField: { flex: 1, height: 44, flexDirection: "row", alignItems: "center", paddingLeft: 18, paddingRight: 6, borderRadius: 22, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.08)" },
+  // No fill, a soft grey edge one point wide, white words: Instagram's "Send message…" field on black.
+  replyField: { flex: 1, height: 44, flexDirection: "row", alignItems: "center", paddingLeft: 20, paddingRight: 6, borderRadius: 22, borderCurve: "continuous", borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", backgroundColor: "transparent" },
   replyFieldOver: { borderColor: "rgba(255,255,255,0.45)", backgroundColor: "rgba(0,0,0,0.28)" },
   replyFieldActive: { borderColor: "rgba(255,255,255,0.5)", backgroundColor: "rgba(28,28,30,0.92)" },
   replyInput: { flex: 1, height: 44, color: "#fff", fontSize: 16, paddingVertical: 0 },
   sendButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
-  // "Sent to Leo" for a moment, just over the reply pill.
-  sent: { position: "absolute", left: 0, right: 0, bottom: 48, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6 },
+  // "Sent to Leo" for a moment, just over the bottom row.
+  sent: { position: "absolute", left: 0, right: 0, bottom: STORY_ACTION_BAR + 6, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6 },
   sentText: { color: "#fff", fontSize: 14, fontWeight: "600", ...shadow },
   noViews: { textAlign: "center", paddingVertical: 32, fontSize: 15 },
   viewerRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 10 },

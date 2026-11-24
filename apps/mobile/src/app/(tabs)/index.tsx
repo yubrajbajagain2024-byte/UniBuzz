@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BuzzSection } from "@/components/home/buzz-section";
 import { createOverVideoStore, HOME_TOP_BAR_HEIGHT, HomeTopTabs, useOverVideo, type OverVideoStore } from "@/components/home/home-top-tabs";
 import { OrbitSection } from "@/components/home/orbit-section";
-import { StoriesSection } from "@/components/home/stories-section";
 import { APP_HOME_START, APP_HOME_TABS, type AppHomeSection } from "@/lib/home-tabs";
 import { useCollapsingHeader } from "@/lib/collapsing-header";
 import { tabBarInset } from "@/lib/tab-bar";
@@ -20,7 +19,6 @@ import { useAppTheme } from "@/lib/theme-provider";
 const ORDER = APP_HOME_TABS.map((s) => s.value);
 const START = Math.max(0, ORDER.indexOf(APP_HOME_START));
 const LAST = ORDER.length - 1;
-const STORIES = ORDER.indexOf("stories");
 const POSTS = ORDER.indexOf("posts");
 const FOR_YOU = ORDER.indexOf("foryou");
 const BUZZ = ORDER.indexOf("buzz");
@@ -60,10 +58,10 @@ const HomeStatusBar = memo(function HomeStatusBar({ overVideo, isDark }: { overV
 });
 
 /**
- * Home: the three pages of APP_HOME_TABS (Stories | Orbit | Buzz) side by side in a horizontal pager under the floating
+ * Home: the two pages of APP_HOME_TABS (Orbit | Buzz) side by side in a horizontal pager under the floating
  * top bar, whose tabs sit along its left and whose three icons (Explore, Notifications, Search) sit at its right. Opens
- * on Orbit, the campus's posts and reels full screen, one to a page, TikTok's way; Stories plays the campus's stories
- * themselves, full screen and in turn, where the row across the top of the feed used to be; Buzz is unchanged. Posts and Reels have no page here (Orbit
+ * on Orbit, the campus's posts and reels full screen, one to a page, TikTok's way, with the campus's stories as a row
+ * of rings across its top (2026-11-22); Buzz is unchanged. Posts and Reels have no page here (Orbit
  * carries both, and Posts' Following filter is on the website's /?tab=posts).
  *
  * Swipes feel like X's: nothing in React changes while the finger drags or the page glides. The underline, the labels and
@@ -114,18 +112,18 @@ export default function HomeScreen() {
   /** The pager's offset, kept up to date on the native side so the underline, the labels and the bar's background follow the finger. */
   const scrollX = useRef(new Animated.Value(START * width)).current;
   /** The top bar's white look over the full-screen feed: flipped by the scroll listener halfway in or out of Orbit, read only by the bar and the status bar. */
-  const [overVideo] = useState(() => createOverVideoStore(START === FOR_YOU || START === STORIES));
+  const [overVideo] = useState(() => createOverVideoStore(START === FOR_YOU));
   /** Whether the page under the finger is Posts, flipped halfway like overVideo: the bar's "Following" title reads it. */
   const [onPosts] = useState(() => createOverVideoStore(START === POSTS));
   const [barHeight, setBarHeight] = useState(insets.top + HOME_TOP_BAR_HEIGHT);
   /**
    * The bottom bar collapses to its Home button on a flick down Buzz and comes back as it scrolls back, like Reddit's
-   * (lib/tab-bar-collapse.ts); Stories and Orbit, which both fill the screen, keep the whole bar. Another section, or
-   * leaving Home, brings the whole bar back.
+   * (lib/tab-bar-collapse.ts); Orbit, which fills the screen, keeps the whole bar. Another section, or leaving Home,
+   * brings the whole bar back.
    */
   const feedOn = focused && ORDER[index] === "buzz";
   const trackTabBar = useCollapseOnScroll(feedOn);
-  /** The bar slides away as the page on screen scrolls down and back as soon as it scrolls up (Instagram): only Buzz feeds it its scroll; Stories and Orbit (both full-screen media) never move it. */
+  /** The bar slides away as the page on screen scrolls down and back as soon as it scrolls up (Instagram): only Buzz feeds it its scroll; Orbit (full-screen media) never moves it. */
   const { translateY: barShift, select: followPage, reveal: revealBar, onScroll: onPageScroll, scrollValue, hidden: barHidden } = useCollapsingHeader(ORDER.length, barHeight, START === FOR_YOU ? -1 : START, trackTabBar);
   /**
    * Between the top bar (as far as it has slid away) and the floating tab bar: what a tapped picture zooms open from. Up
@@ -170,9 +168,9 @@ export default function HomeScreen() {
   const commit = useCallback(
     (i: number) => {
       under.current = i;
-      overVideo.set(i === FOR_YOU || i === STORIES);
+      overVideo.set(i === FOR_YOU);
       onPosts.set(i === POSTS);
-      followPage(i === FOR_YOU || i === STORIES ? -1 : i);
+      followPage(i === FOR_YOU ? -1 : i);
       // A page uncovered before it was mounted (a very fast double swipe) mounts now, in the same commit.
       mount([i]);
       if (i === indexRef.current) return;
@@ -326,11 +324,11 @@ export default function HomeScreen() {
       const x = e.nativeEvent.contentOffset.x;
       lastX.current = x;
       const pos = x / width;
-      // The bar's text turns white over the two full-screen pages (Stories and Orbit) at the halfway point, whoever
-      // moves the pager: a tiny store, only the bar re-renders.
-      const overMedia = Math.min(Math.abs(pos - FOR_YOU), Math.abs(pos - STORIES));
-      if (overMedia < 0.5 - MARGIN) overVideo.set(true);
-      else if (overMedia > 0.5 + MARGIN) overVideo.set(false);
+      // The bar's text turns white over Orbit, the full-screen page, at the halfway point, whoever moves the pager:
+      // a tiny store, only the bar re-renders.
+      const fromOrbit = Math.abs(pos - FOR_YOU);
+      if (fromOrbit < 0.5 - MARGIN) overVideo.set(true);
+      else if (fromOrbit > 0.5 + MARGIN) overVideo.set(false);
       const fromPosts = Math.abs(pos - POSTS);
       if (fromPosts < 0.5 - MARGIN) onPosts.set(true);
       else if (fromPosts > 0.5 + MARGIN) onPosts.set(false);
@@ -379,22 +377,23 @@ export default function HomeScreen() {
   );
 
   const page = pageHeight > 0 ? { width, height: pageHeight } : { width, flex: 1 };
-  const storiesOn = focused && section === "stories";
   const orbitOn = focused && section === "foryou";
   const buzzOn = focused && section === "buzz";
   // Next to the page on screen, Orbit loads its first posts ahead of time (nothing plays until it is active).
   const orbitPreload = FOR_YOU >= 0 && Math.abs(index - FOR_YOU) === 1;
   // Each page keeps its element while its own props stay the same, so a settle re-renders the section that was left and
   // the one that was reached, not all three.
-  const stories = useMemo(() => (STORIES >= 0 && pageHeight > 0 ? <StoriesSection active={storiesOn} topInset={barHeight} height={pageHeight} /> : null), [storiesOn, barHeight, pageHeight]);
-  const orbit = useMemo(() => (pageHeight > 0 ? <OrbitSection active={orbitOn} preload={orbitPreload} topInset={barHeight} height={pageHeight} /> : null), [orbitOn, orbitPreload, barHeight, pageHeight]);
+  // On Orbit the top bar steps away while its post on screen is clear (a pinch, TikTok's clear mode), and comes back
+  // with it. (Scrolling the feed down takes only the stories pill away, not the bar.)
+  const [orbitTopHidden, setOrbitTopHidden] = useState(false);
+  const orbit = useMemo(() => (pageHeight > 0 ? <OrbitSection active={orbitOn} preload={orbitPreload} topInset={barHeight} height={pageHeight} onTopHidden={setOrbitTopHidden} /> : null), [orbitOn, orbitPreload, barHeight, pageHeight]);
   const buzzScroll = useMemo(() => ({ onScroll: onPageScroll(BUZZ), scrollY: scrollValue(BUZZ), barShift }), [onPageScroll, scrollValue, barShift]);
   const buzz = useMemo(() => <BuzzSection active={buzzOn} topInset={barHeight} scroll={buzzScroll} />, [buzzOn, barHeight, buzzScroll]);
   // Posts and Reels have no page here: Orbit carries both (see lib/home-tabs.ts).
-  const content: Record<AppHomeSection, ReactNode> = { stories, foryou: orbit, buzz, posts: null, reels: null };
+  const content: Record<AppHomeSection, ReactNode> = { foryou: orbit, buzz, posts: null, reels: null };
 
   return (
-    <View style={{ flex: 1, backgroundColor: section === "foryou" || section === "stories" ? colors.mediaBg : colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: section === "foryou" ? colors.mediaBg : colors.bg }}>
       {focused ? <HomeStatusBar overVideo={overVideo} isDark={isDark} /> : null}
       <OpeningBandContext.Provider value={openingBand}>
       <View style={{ flex: 1 }} onLayout={(e) => setPageHeight(Math.round(e.nativeEvent.layout.height))}>
@@ -417,14 +416,14 @@ export default function HomeScreen() {
         >
           {ORDER.map((s, i) => (
             // A page not mounted yet is just its background, so one uncovered early (a very fast double swipe) is never a hole.
-            <View key={s} style={[page, { backgroundColor: s === "foryou" || s === "stories" ? colors.mediaBg : colors.bg }]}>
+            <View key={s} style={[page, { backgroundColor: s === "foryou" ? colors.mediaBg : colors.bg }]}>
               {mounted.has(i) ? <SectionPagerContext.Provider value={sectionPagers[i]!}>{content[s]}</SectionPagerContext.Provider> : null}
             </View>
           ))}
         </Animated.ScrollView>
       </View>
       </OpeningBandContext.Provider>
-      <HomeTopTabs section={section} onSelect={select} overVideo={overVideo} onPosts={onPosts} scrollX={scrollX} pageWidth={width} onLayout={onBarLayout} translateY={barShift} />
+      <HomeTopTabs section={section} onSelect={select} overVideo={overVideo} onPosts={onPosts} scrollX={scrollX} pageWidth={width} onLayout={onBarLayout} translateY={barShift} hidden={orbitTopHidden} />
     </View>
   );
 }

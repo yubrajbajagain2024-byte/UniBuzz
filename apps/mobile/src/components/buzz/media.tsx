@@ -1,9 +1,11 @@
-import { createContext, memo, useContext, useRef } from "react";
-import { Pressable, StyleSheet, View, type StyleProp, type ViewInstance, type ViewStyle } from "react-native";
+import { createContext, memo, useContext, useEffect, useRef } from "react";
+import { Pressable, StyleSheet, View, type GestureResponderEvent, type StyleProp, type ViewInstance, type ViewStyle } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { muxPosterUrl, type Buzz, type BuzzMedia } from "@apartment-book/shared";
+import { DOUBLE_TAP_MS, HeartBursts, type HeartBurstsHandle } from "@/components/heart-burst";
 import { Icon } from "@/components/icon";
+import { upvoteBuzz } from "@/lib/buzz-actions";
 import { buzzAfter, buzzViewerEntry, entryOf, measureOrigin, openViewer, viewerItemFromBuzz, type BuzzViewerPages, type ViewerEntry, type ViewerSource } from "@/lib/reel-viewer";
 import { OpeningBandContext } from "@/lib/viewer-chrome";
 import { P, R } from "./ui";
@@ -32,7 +34,9 @@ function aspectOf(m: { width: number | null; height: number | null }, fallback: 
  * tile grows to the screen, a sideways swipe moves between the photos with the finger, a swipe up or down moves to the
  * next or the last buzz of the list with media (BuzzViewerList), a swipe back (or Back) shrinks the page into the tile of
  * the photo on screen (from another buzz, fading into it), and the list behind stays exactly where it was. The page is anonymous (see
- * viewerItemFromBuzz): the alias, the words and Buzz's own votes, replies and share, never a name or a profile.
+ * viewerItemFromBuzz): the alias, the words and Buzz's own votes, replies and share, never a name or a profile. A double
+ * tap on it upvotes the buzz instead, TikTok's double tap to like (the owner's brief, 2026-11-22), with a heart where the
+ * finger landed, so a lone tap opens the viewer once a second tap is ruled out (at once on a buzz that takes no votes).
  * `repliesBehind`: shown on the thread's own screen, whose replies the viewer then closes back onto.
  */
 export const BuzzMediaView = memo(function BuzzMediaView({ buzz, repliesBehind = false, style }: { buzz: Buzz; repliesBehind?: boolean; style?: StyleProp<ViewStyle> }) {
@@ -41,6 +45,17 @@ export const BuzzMediaView = memo(function BuzzMediaView({ buzz, repliesBehind =
   const listPages = useContext(BuzzViewerList);
   /** Each tile as laid out, to measure where the viewer opens from and lands. */
   const tiles = useRef<(ViewInstance | null)[]>([]);
+  /** The frame the hearts are drawn over, the hearts, and the tap a second one would make a double tap of. */
+  const frame = useRef<ViewInstance | null>(null);
+  const hearts = useRef<HeartBurstsHandle>(null);
+  const lastTap = useRef(0);
+  const pendingOpen = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (pendingOpen.current) clearTimeout(pendingOpen.current);
+    },
+    [],
+  );
   const media = buzz.media;
   if (media.length === 0) return null;
   const video = media.find((m): m is Video => m.type === "video");
@@ -80,11 +95,41 @@ export const BuzzMediaView = memo(function BuzzMediaView({ buzz, repliesBehind =
     openViewer(router, { entries, index: at, then, origin: origins[index], origins: n > 1 ? origins : undefined, repliesBehind });
   }
 
+  const takesVotes = !buzz.isMine && buzz.status === "active";
+  /**
+   * A tap on a tile: two in quick succession upvote (never taking it back) with a heart where the second landed, each
+   * further quick tap adding a heart; a lone tap opens the viewer once no second tap has come.
+   */
+  function onTilePress(index: number, e: GestureResponderEvent) {
+    const { pageX, pageY } = e.nativeEvent;
+    const now = Date.now();
+    if (pendingOpen.current) {
+      clearTimeout(pendingOpen.current);
+      pendingOpen.current = null;
+    }
+    if (takesVotes && now - lastTap.current < DOUBLE_TAP_MS) {
+      lastTap.current = now;
+      if (upvoteBuzz(buzz.id)) frame.current?.measureInWindow((x, y) => hearts.current?.burst(pageX - x, pageY - y));
+      return;
+    }
+    lastTap.current = now;
+    if (!takesVotes) return void open(index);
+    pendingOpen.current = setTimeout(() => {
+      pendingOpen.current = null;
+      void open(index);
+    }, DOUBLE_TAP_MS);
+  }
+  /** VoiceOver's way to the double tap: an Upvote action on every tile. */
+  const upvoteAction = takesVotes ? [{ name: "upvote", label: "Upvote" }] : undefined;
+  const onAction = (e: { nativeEvent: { actionName: string } }) => {
+    if (e.nativeEvent.actionName === "upvote") upvoteBuzz(buzz.id);
+  };
+
   if (video) {
     const poster = video.posterUrl ?? muxPosterUrl(video.playbackId);
     return (
-      <View style={[styles.frame, { aspectRatio: aspectOf(video, 16 / 9) }, style]}>
-        <Pressable ref={(v) => void (tiles.current[0] = v)} onPress={() => void open(0)} accessibilityRole="button" accessibilityLabel="Play video" accessibilityHint="Opens it full screen" style={styles.fill}>
+      <View ref={frame} style={[styles.frame, { aspectRatio: aspectOf(video, 16 / 9) }, style]}>
+        <Pressable ref={(v) => void (tiles.current[0] = v)} onPress={(e) => onTilePress(0, e)} accessibilityRole="button" accessibilityLabel="Play video" accessibilityHint="Opens it full screen" accessibilityActions={upvoteAction} onAccessibilityAction={onAction} style={styles.fill}>
           <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} recyclingKey={poster} />
           <View style={styles.playWrap} pointerEvents="none">
             <View style={styles.play}>
@@ -92,6 +137,7 @@ export const BuzzMediaView = memo(function BuzzMediaView({ buzz, repliesBehind =
             </View>
           </View>
         </Pressable>
+        <HeartBursts ref={hearts} size={84} />
       </View>
     );
   }
@@ -102,10 +148,12 @@ export const BuzzMediaView = memo(function BuzzMediaView({ buzz, repliesBehind =
       <Pressable
         key={p.url}
         ref={(v) => void (tiles.current[i] = v)}
-        onPress={() => void open(i)}
+        onPress={(e) => onTilePress(i, e)}
         accessibilityRole="imagebutton"
         accessibilityLabel={`Photo ${i + 1} of ${n}`}
         accessibilityHint="Opens it full screen"
+        accessibilityActions={upvoteAction}
+        onAccessibilityAction={onAction}
         style={[styles.tile, tileStyle]}
       >
         <Image source={{ uri: p.url }} placeholder={p.blur ? { blurhash: p.blur } : undefined} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} recyclingKey={p.url} />
@@ -146,7 +194,12 @@ export const BuzzMediaView = memo(function BuzzMediaView({ buzz, repliesBehind =
       </View>
     );
 
-  return <View style={[styles.frame, style]}>{grid}</View>;
+  return (
+    <View ref={frame} style={[styles.frame, style]}>
+      {grid}
+      <HeartBursts ref={hearts} size={84} />
+    </View>
+  );
 });
 
 const styles = StyleSheet.create({

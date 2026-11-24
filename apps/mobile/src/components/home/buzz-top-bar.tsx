@@ -75,9 +75,8 @@ export function useBuzzBar(scrollX: Animated.Value, pageWidth: number, section: 
   useEffect(() => {
     const next = flagsFor(distanceOf(section));
     setFlags((f) => (f.near === next.near && f.atRest === next.atRest ? f : next));
-    // Remember the last section that was not Buzz: the guidelines gate's "Not now" goes back there. Stories is the app's
-    // own page, not one of the shared sections the gate knows, so Orbit stands for it.
-    if (section !== "buzz") buzzState.setPreviousSection(section === "stories" ? "foryou" : section);
+    // Remember the last section that was not Buzz: the guidelines gate's "Not now" goes back there.
+    if (section !== "buzz") buzzState.setPreviousSection(section);
   }, [section]);
 
   // While the pager moves: flip only at the thresholds (a native-driven value still reports to JS listeners).
