@@ -1,8 +1,10 @@
 # `mobile-ui-beauty-filters`
 
-Sunil's mobile line since 2026-11-16, branched from `main` after PR #112 (`chat-redesign`). **Not merged**;
-no PR open yet as of 2026-11-24. The work of 2026-11-22 and 2026-11-23 below is in one commit after `c9a1f4f`, pushed
-on 2026-11-24. The card feed's return and the viewer losing its top shade (2026-11-24, below) are in one commit after `8eea329`, pushed on 2026-11-24. The website is untouched; the one database change is migration 68, applied nowhere yet (below).
+Sunil's mobile line since 2026-11-16, branched from `main` after PR #112 (`chat-redesign`). **Merged** in PRs #113
+(`84b8c4a`), #114 (`147e27d`, `828e0a4`), #115 (`72b6745`, `7e75ea9`), #116 (`c9a1f4f`, `8eea329`: the work of
+2026-11-22 and 11-23) and #117 (`75b1f33`, `46959ab`: the card feed's return and the viewer losing its top shade), the
+last on 2026-11-24 22:13 UTC; the branch stays in use for the next PRs. The website is untouched; the one database
+change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
 
 ## What is on it
 
@@ -200,9 +202,11 @@ on 2026-11-24. The card feed's return and the viewer losing its top shade (2026-
   reaches `d30b8306` only, and an iPhone still on `8f77d85f` has to install `d30b8306` first. `fingerprint:compare`
   against `d30b8306` still matched at `75b1f33` (2026-11-24).
 - An EAS preview update (`da62c538-1b0c-4127-8773-c35f94fb7a17`) was published to the preview channel on 2026-11-21
-  from `7e75ea9`, with the owner's approval. **Nothing since then has been published** (as of 2026-11-24): the owner
-  asked for `75b1f33` on their iPhone, but the session's permission check refused `eas update`, so the testers' build
-  still has neither the card feed's return nor the viewer without its top shade.
+  from `7e75ea9`, with the owner's approval. The next, **group `7da591cf-31e1-468d-a8d6-869f1da00a8d`** (iOS, runtime
+  `a98395a2…`), on 2026-11-24 at the owner's request, carries `main` at `28f2b10`: everything above, the card feed's
+  return and the viewer without its top shade included. The Mac's disk was full, so it was exported by hand without
+  source maps (`npx expo export --platform ios --dump-assetmap`, the `.env` values matching EAS's `preview` ones by hash)
+  and published with `--skip-bundler`; crash reports from it are not symbolicated. Not yet seen on a phone.
 
 ## Pending
 

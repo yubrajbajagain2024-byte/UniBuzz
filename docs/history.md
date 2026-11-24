@@ -61,6 +61,11 @@ open work is in [status.md](status.md).
   every tab row, Home without dividers, photo zoom in the full-screen viewer, the video timeline and 2× hold, and the
   chat's message bar riding the keyboard (no migration; the website and CampConnect Admin deploy with only docs changed).
   The app reaches testers only with an EAS update.
+- **2026-11-17 – 11-24:** PRs #113 to #117 merge `mobile-ui-beauty-filters` (the last 2026-11-24 22:13 UTC): the bottom
+  bar and camera, beauty filters for photos (expo-gl, so iPhone build `d30b8306` of 2026-11-21), black full-screen viewers,
+  Home as Orbit | Buzz, stories as a post's page, Orbit a card feed again (2026-11-24) and the viewer without its top
+  shade. PR #116 brought migration 68 (a like on one's own story), not on production when it merged. The iOS EAS update
+  `7da591cf` (2026-11-24) took `main` at `28f2b10` to build `d30b8306` on the testers' iPhones.
 
 ## The AI documentation
 
