@@ -46,6 +46,13 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 
 ## Open work, in priority order
 
+- **The app's redesign of 2026-11-17 to 11-24** (`mobile-ui-beauty-filters`, PRs #113 to #117; branch file
+  [branches/mobile-ui-beauty-filters.md](branches/mobile-ui-beauty-filters.md)): the bottom bar and camera, beauty filters
+  for photos, black full-screen viewers, Home as Orbit (a card feed under the story tray, a tap opening the viewer) |
+  Buzz, stories as a post's page. On testers' iPhones with the EAS update of 2026-11-24 (group `7da591cf`, build
+  `d30b8306`). **Migration 68** (a like on one's own story) is on `main` but on no project yet (as of 2026-11-24): until
+  it is, that heart is refused with the reason. It waits on a Supabase access token (staging first, then a full backup
+  and production) and on free disk space for the backup. **Still to check:** the update on a real iPhone; Android.
 - **Chat redesign, media viewing and the keyboard (app)** (merged as PR #112, 2026-11-15 21:51 UTC; on `main`, summary in
   [history.md](history.md)): an Apple-style chat, tab labels side by side in every tab row, Home without lines between
   the tabs, the story tray and the feed, photos that pinch and double tap to zoom in the full-screen viewer, a video
@@ -372,10 +379,11 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | Supabase CDN may serve a just-deleted Snap to the same viewer for ~1 minute | README §"Snaps" |
 | Supabase free projects pause after a week idle (Pro, USD 25/mo, before real users); built-in auth email is rate-limited (custom SMTP needed) | README §"Production checklist" |
 | Vercel Hobby optimizes 5,000 source images a month | README §"Photos" |
-| Testers' app: EAS updates reach only builds with the same native fingerprint (since `828b9d3`); today that is Android build `0493abcf` alone (update of 2026-11-05 03:13 UTC), whose install link stops working on 2026-11-17 (installed apps keep working); the old Android build gets no more updates; the iPhone build is `preview` build `8f77d85f` (2026-11-11, internal distribution to the four iPhones registered so far: the owner's and three testers', team `H7F8K4XUB4`, install link valid until 2026-11-25; built from `main`'s code, so without the `chat-redesign` work; same fingerprint as the first, owner-only build `b2aaee9d`); more testers' iPhones need `eas device:create` and a new build and no store build (the last Play Store build is on SDK 57) | "Ads refresh with the feed" above |
+| Testers' app: EAS updates reach only builds with the same native fingerprint (since `828b9d3`); today that is Android build `0493abcf` alone (update of 2026-11-05 03:13 UTC), whose install link stops working on 2026-11-17 (installed apps keep working); the old Android build gets no more updates; the iPhone build is `preview` build `d30b8306` (2026-11-21, from `828e0a4`, internal distribution to the four iPhones registered so far: the owner's and three testers', team `H7F8K4XUB4`, install link valid until 2026-12-05; it has expo-gl for the beauty filters, so updates from `main` since then reach it alone, and the older iPhone builds `8f77d85f` (2026-11-11) and `b2aaee9d` (2026-11-10) get no more); more testers' iPhones need `eas device:create` and a new build and no store build (the last Play Store build is on SDK 57) | "Ads refresh with the feed" above |
 | Production has no listings and no For You or Reels campaigns (read-only, 2026-11-05): Housing is empty everywhere and no student sees an ad until listings and campaigns exist | "Production's one live campaign is not visible yet" above |
 | Test records on production (read-only, 2026-11-05): four test Housing ads with two test payments (one ad scheduled from 2026-11-05 09:00 CST), and three accounts from the calls end-to-end test of 2026-10-24 whose passwords sit in a local, world-readable `apps/mobile/e2e/.call-partners.json` | "Test ads on production" above |
-| The staging access token (a Supabase personal access token, in `~/.config/unibuzz/staging.env`) reaches every project in the account, production included: revoke it in the dashboard and delete the file once testing is done | docs/environment.md |
+| No backup of production on the owner's Mac as of 2026-11-24: no `~/CampConnect-backups` folder and no daily backup job in `launchctl list` (`scripts/backup-daily.sh` not loaded); the disk was full (about 200 MB free) | supabase/CLAUDE.md ("Production") |
+| The staging access token (a Supabase personal access token, in `~/.config/unibuzz/staging.env`) reaches every project in the account, production included: revoke it in the dashboard and delete the file once testing is done. The file is gone as of 2026-11-24; whether the token was revoked is not checked | docs/environment.md |
 
 ## Future plans
 

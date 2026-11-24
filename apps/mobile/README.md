@@ -928,8 +928,10 @@ Haptics and tap-to-top are covered with the comments above.
   Apple, associated domains, location or App Groups.
 - iOS credentials on EAS (2026-11-10): the distribution certificate (expires 2027-11-09), the App Store profile, the
   push key, and an ad hoc profile (2026-11-11) holding four iPhones (the owner's and three registered through an
-  `eas device:create` link on 2026-11-11). The iPhone build for all four is `preview` build `8f77d85f` (internal, 1.0.0
-  (1), 2026-11-11, install link valid until 2026-11-25); `b2aaee9d` (2026-11-10) was the owner's iPhone alone. See
+  `eas device:create` link on 2026-11-11). The iPhone build for all four is `preview` build `d30b8306` (internal, 1.0.0
+  (1), 2026-11-21, from `828e0a4`, install link valid until 2026-12-05): it carries expo-gl for the beauty filters, so
+  updates from `main` since then reach it and not the older `8f77d85f` (2026-11-11) or `b2aaee9d` (2026-11-10, the
+  owner's iPhone alone). See
   "Set up Apple signing" below.
 - Build profiles: `eas.json` (`production` auto-increments build numbers on EAS)
 - Workflow: `.eas/workflows/create-production-builds.yml` builds both platforms on push to `main`
