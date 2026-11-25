@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { getPostEngagement, likePost, toggleSaved, unlikePost, type PostEngagement, type PostTargetType } from "@apartment-book/shared";
+import { getPostEngagement, likePost, toggleSaved, unlikePost, type PostEngagement, type PostTargetType, type EngagementTargetType } from "@apartment-book/shared";
 import { hapticLike, hapticSelect, hapticTap } from "@/lib/haptics";
 import { onPostEngagement } from "@/lib/posts-events";
 import { supabase } from "@/lib/supabase";
@@ -14,7 +14,7 @@ import { Icon } from "@/components/icon";
  * dropped), and its count wins once it has caught up. A failure puts back what the server last confirmed.
  * `likeNow` is a double tap's: it always ticks and shows the like, and never unlikes.
  */
-export function useLike(targetType: PostTargetType, targetId: string, initial: PostEngagement | undefined, userId: string | null, onNeedLogin: () => void) {
+export function useLike(targetType: EngagementTargetType, targetId: string, initial: PostEngagement | undefined, userId: string | null, onNeedLogin: () => void) {
   const [state, setState] = useState({ liked: initial?.likedByMe ?? false, likes: initial?.likes ?? 0 });
   const [pending, setPending] = useState(false);
   /** The heart as last shown, read by taps that come faster than renders. */

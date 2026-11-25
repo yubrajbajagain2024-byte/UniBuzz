@@ -5,13 +5,14 @@ import { ErrorBanner, Loading, useAppearingCells } from "@/components/ui";
 import { AnimatedFlatList, listInset } from "@/lib/collapsing-header";
 import { savedEvents } from "@/lib/event-saves-store";
 import { refreshWithHaptic } from "@/lib/haptics";
-import { useFeed } from "@/lib/hooks";
+import { useFeed, useKeepRows } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useTabBarInset } from "@/lib/tab-bar";
 import { useTabReselect } from "@/lib/tab-reselect";
 import { useColors } from "@/lib/theme-provider";
 import { EventCard, useToggleSavedEvent } from "./event-card";
+import { useEventCards } from "./use-event-cards";
 import { DayHeader, EventsEmpty, iso, RowGap, type EventsPageProps } from "./events-page";
 
 type Row = { type: "day"; key: string; label: string } | { type: "event"; key: string; event: EventSummary };
@@ -35,6 +36,7 @@ export function AllEventsSection({ active, topInset, onScroll, universityId, tim
     },
     [universityId, timeZone, q, dateFilter, categories],
   );
+  useKeepRows("event", feed.items);
   const inset = useMemo(() => listInset(topInset), [topInset]);
   const listRef = useRef<FlatList<Row>>(null);
   const appearCells = useAppearingCells();
@@ -49,7 +51,18 @@ export function AllEventsSection({ active, topInset, onScroll, universityId, tim
     }
     return out;
   }, [feed.items, timeZone]);
-  const renderItem = useCallback(({ item }: { item: Row }) => (item.type === "day" ? <DayHeader label={item.label} /> : <EventCard event={item.event} timeZone={timeZone} withDay={false} saved={saved.has(item.event.id)} onToggleSave={toggleSave} />), [timeZone, saved, toggleSave]);
+  // Like, comments and Going under each event (migration 69).
+  const cards = useEventCards(feed.items, user?.id ?? null);
+  const { engaged, engagementOf, goingOf, onComments } = cards;
+  const renderItem = useCallback(
+    ({ item }: { item: Row }) =>
+      item.type === "day" ? (
+        <DayHeader label={item.label} />
+      ) : (
+        <EventCard event={item.event} timeZone={timeZone} withDay={false} saved={saved.has(item.event.id)} onToggleSave={toggleSave} engaged={engaged} engagement={engagementOf(item.event.id)} going={goingOf(item.event.id)} onComments={onComments} />
+      ),
+    [timeZone, saved, toggleSave, engaged, engagementOf, goingOf, onComments],
+  );
   const filtered = Boolean(q) || categories.length > 0 || dateFilter !== "any";
 
   return (
@@ -70,12 +83,15 @@ export function AllEventsSection({ active, topInset, onScroll, universityId, tim
         maxToRenderPerBatch={8}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        ListEmptyComponent={feed.loading ? <Loading /> : feed.error ? <View style={{ paddingHorizontal: 16 }}><ErrorBanner message={feed.error} onRetry={feed.refresh} /></View> : <EventsEmpty filtered={filtered} campus={Boolean(universityId)} />}
+        // The spinner only before the first result: a new filter keeps the last result (or "nothing here") until the new one
+        // arrives, so a tap on Today no longer swaps it for a spinner and back (the owner saw it blink, 2026-11-25).
+        ListEmptyComponent={feed.loading && feed.round === 0 ? <Loading /> : feed.error ? <View style={{ paddingHorizontal: 16 }}><ErrorBanner message={feed.error} onRetry={feed.refresh} /></View> : <EventsEmpty filtered={filtered} campus={Boolean(universityId)} />}
         ListFooterComponent={feed.items.length > 0 && feed.hasMore ? <Text style={{ textAlign: "center", color: colors.faint, padding: 12 }}>Loading more…</Text> : undefined}
         onEndReached={feed.loadMore}
         onEndReachedThreshold={0.6}
         refreshControl={<RefreshControl refreshing={feed.refreshing} onRefresh={refreshWithHaptic(feed.refresh)} progressViewOffset={inset.progressViewOffset} />}
       />
+      {cards.sheet}
     </View>
   );
 }

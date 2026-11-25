@@ -128,6 +128,8 @@ export type GenderPref = Enums<"gender_pref">;
 export type SavedTargetType = "apartment" | "item" | "roommate";
 /** Everything that can be liked, commented on, saved or viewed: listings plus Home-feed posts and reels. */
 export type PostTargetType = SavedTargetType | "post";
+/** What can be liked and commented on: PostTargetType, and events since migration 69 (saved through event_saves instead). */
+export type EngagementTargetType = PostTargetType | "event";
 
 /** The small slice of a profile shown next to listings and messages. */
 export type ProfileSummary = Pick<Profile, "id" | "full_name" | "avatar_url">;

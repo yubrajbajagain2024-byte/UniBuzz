@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import type { FeedMedia, PostEngagement, PostTargetType } from "@apartment-book/shared";
 import { shortDate } from "@/lib/short-date";
 import { makeStyles } from "@/lib/theme-provider";
+import { ExpandableText } from "./expandable-text";
 import { useListingActions } from "./listing-actions";
 import { PhotoCarousel } from "./photo-carousel";
 import { POST_GUTTER, PostActions, PostFrame, PostHeader } from "./post-bits";
@@ -39,12 +40,12 @@ export type PostCardProps = {
 /** Side padding for a feed's header (search, chips, composer): the posts keep their own gutter. */
 export const FEED_HEADER_PADDING = 12;
 
-/** How much of the description a feed shows, as a Buzz post does: three lines, then "…" (the rest is on the post's page). */
-const PREVIEW_LINES = 3;
+/** How much of the description a feed shows: two lines, "… more" at the end of the second opening the rest (2026-11-25). */
+const PREVIEW_LINES = 2;
 
 /**
  * A roommate post or a Marketplace item in a feed, captioned the way a Buzz post is: the header (the poster, what kind of
- * post it is or the price, and its age) → the title in bold and the start of the description, muted, three lines at most
+ * post it is or the price, and its age) → the title in bold and the start of the description, muted, two lines and "… more"
  * → the photos or video in a rounded frame → heart, comment and share with their counts, the chat pill (not on your own
  * post) and the bookmark. Nothing else: the budget, the place, the dates and the details are on the post's own page. No
  * card box: posts follow each other on the screen with room between them. (Apartments have their own card:
@@ -68,9 +69,9 @@ export function PostCard(props: PostCardProps) {
       <Pressable onPress={() => openDetail()} style={styles.body}>
         {title ? <Text style={styles.title}>{title}</Text> : null}
         {text ? (
-          <Text style={styles.description} numberOfLines={PREVIEW_LINES}>
+          <ExpandableText style={styles.description} lines={PREVIEW_LINES}>
             {text}
-          </Text>
+          </ExpandableText>
         ) : null}
       </Pressable>
 

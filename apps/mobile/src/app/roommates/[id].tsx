@@ -8,6 +8,7 @@ import { Fact, ListingDetail, useDetailStyles } from "@/components/listing-detai
 import { listingPoster } from "@/lib/listing-poster";
 import { Badge, Button, EmptyState, Loading } from "@/components/ui";
 import { useQuery } from "@/lib/hooks";
+import { rowKey } from "@/lib/query-cache";
 import { supabase } from "@/lib/supabase";
 import { useColors } from "@/lib/theme-provider";
 import { alertWithHaptic } from "@/lib/haptics";
@@ -15,10 +16,11 @@ import { alertWithHaptic } from "@/lib/haptics";
 export default function RoommateScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { data: p, loading } = useQuery(() => getRoommatePost(supabase, id), [id]);
+  // The Roommate list hands its row over (useKeepRows): the post shows at once.
+  const { data: p, loading } = useQuery(() => getRoommatePost(supabase, id), [id], { key: rowKey("roommate", id) });
   const colors = useColors();
   const detailStyles = useDetailStyles();
-  if (loading) return <Loading />;
+  if (loading && !p) return <Loading />;
   if (!p) return <EmptyState icon="people-outline" title="This post is no longer available" />;
   const budget = budgetLabel(p);
   const prefs: { icon: IconName; label: string; value: string }[] = [

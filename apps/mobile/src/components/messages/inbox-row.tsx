@@ -55,7 +55,7 @@ export function InboxAvatar({ conversation: c, size = INBOX_AVATAR }: { conversa
  * between rows: the spacing alone sets them apart. Long press (or the screen reader's action) opens `onMenu`.
  * The label stays "Chat with <name>": the end-to-end flows tap rows by it.
  */
-export const InboxRow = memo(function InboxRow({ conversation: c, muted = false, now, onOpen, onMenu }: { conversation: ConversationSummary; muted?: boolean; now: number; onOpen: (c: ConversationSummary) => void; onMenu?: (c: ConversationSummary) => void }) {
+export const InboxRow = memo(function InboxRow({ conversation: c, muted = false, now, onOpen, onWarm, onMenu }: { conversation: ConversationSummary; muted?: boolean; now: number; onOpen: (c: ConversationSummary) => void; /** A finger touched the row: the chat's messages can start loading. */ onWarm?: (c: ConversationSummary) => void; onMenu?: (c: ConversationSummary) => void }) {
   const styles = useStyles();
   const colors = useColors();
   const unread = c.unreadCount > 0;
@@ -64,6 +64,7 @@ export const InboxRow = memo(function InboxRow({ conversation: c, muted = false,
   const count = c.unreadCount > 99 ? "99+" : String(c.unreadCount);
   return (
     <Pressable
+      onPressIn={onWarm ? () => onWarm(c) : undefined}
       onPress={() => onOpen(c)}
       onLongPress={onMenu ? () => onMenu(c) : undefined}
       delayLongPress={350}

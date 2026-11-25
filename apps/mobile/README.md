@@ -180,11 +180,12 @@ Home opens on **Orbit**, a blend of posts and reels (anonymous Buzz threads stay
 lives in `packages/shared/src/for-you.ts` and is shared with the website), as a feed of cards under the story tray
 (`src/components/home/for-you-section.tsx`, each row the Instagram-style `InstaPost`; a post of nothing but words has
 its card too). Each card's picture is laid out as Instagram's Home feed lays one out (the owner's brief, 2026-11-24): the
-header, the title and the caption under the name (2026-11-25; two lines before "more…", three on a post of words alone),
+header, the title and the caption under the name (2026-11-25; two lines with "… more" at the end of the second, Instagram's,
+the same fold as the descriptions on Housing, Roommate and Marketplace: `ExpandableText`),
 then the photo or video across the whole width with no corners, keeping its shape between 3:4 and 1.91:1 and cropped to
 that when it is taller or wider (`frameAspect`; a reel's 9:16 shows at 3:4 here, whole in the viewer; a carousel's
-slides all fill the first one's frame, its "1/3" at the top right and its dots in the middle of the row of buttons
-under it), then the buttons, "Liked by …" and the newest comments. Sponsored cards already had that shape (4:5, edge to edge). A tap on a post's photo or video opens it full screen in the viewer (`openViewer`, `src/app/reels/[id].tsx`),
+slides all fill the first one's frame, its "1/3" at the top right and, at the bottom of the picture, a white pill for the
+slide showing and dots for the rest, as on Roommate and Marketplace: 2026-11-25), then the buttons, "Liked by …" and the newest comments. Sponsored cards already had that shape (4:5, edge to edge). A tap on a post's photo or video opens it full screen in the viewer (`openViewer`, `src/app/reels/[id].tsx`),
 TikTok's way: edge to edge on black, its photos swiping sideways with dots at the bottom, its video going on from where
 it was with its sound on, the rail (like, comments, save, share, "…") up the right and the name and caption at the
 bottom left; a swipe up goes on down Orbit's posts with pictures, their next pages loading as needed. A reel opens on its
@@ -657,8 +658,9 @@ screen that shows nothing until there is something to show, so closing the camer
 re-encoded as a JPEG at most 1920 px long, without its metadata. The take fills the screen on black (a photo over a blurred
 copy of itself) with close and "take another" (the camera again; it waits for Send To to be fully gone, since iOS presents
 nothing over a sheet that is still leaving) and the Aurora "Send To". That starts the upload (straight from the file, with
-progress) and raises the Send To sheet (`send-to-sheet.tsx`): your direct chats, the most recent first, then your friends,
-a search over both, a ring per person that fills with the Aurora when picked (only what turns on bounces), and a bar that
+progress) and slides up Send To, a full page since 2026-11-25 (`send-to-sheet.tsx`, a full-screen modal; the owner's brief:
+a whole page as camera apps have, not a sheet): the chevron that closes it beside a search field, All | Recent | Friends
+pills, your direct chats, the most recent first, then your friends, in full-width rows, a ring per person that fills with the Aurora when picked (only what turns on bounces), and a bar that
 rises with who it goes to and the round send button: a spinner and "Sending… 42%", then the plane flies off and a tick
 lands on green, and the Snap fades away. In a chat (`snap-bubble.tsx`) a Snap is the same large bubble as a sent photo, at the Snap's own shape, and never its picture: it
 shows only its 32-pixel preview (of the photo, or the first frame of the video) in its own colours, lightly softened under a
@@ -764,6 +766,10 @@ opened from a calendar in Home's top bar, between 2026-11-15 and 2026-11-21): th
 Saved at its right,
 For you | All events above a pager, with Explore's three levels (DiscoveryBar: the labels, one search field with the
 filter button, one row of chips, all sliding up under the title as a page scrolls), and the floating "+" to publish.
+Since 2026-11-25 Events' top is drawn exactly as Messages' is (the owner's brief; DiscoveryBar's `look="messages"`, its
+measures `INBOX_MEASURES` from `src/components/messages/inbox-header.tsx`): the same title row, no line under the
+labels, the inbox's 46-point search field, the filter button bare like the inbox's pencil, and filled pills as All |
+Unread | Requests are (blue when on). Explore keeps its own look.
 The quick filters narrow both pages with a tap: Today, This week, Weekend (`eventDateRange` in packages/shared, on the
 campus's clock; Upcoming is none of them), then a chip for each event type in force, a tap from being dropped, and
 Clear. The filter button counts the choices in force and opens a sheet (`src/components/events/event-filter-sheet.tsx`)
@@ -775,9 +781,15 @@ in a single line that opens `src/app/events/interests.tsx` and can be dismissed 
 `src/lib/event-interests.ts`; the filter sheet's Your interests stays; a save re-ranks at once), and suggests
 organizations to follow while they follow few. **All events** (`all-events-section.tsx`) is time order under day headings ("Today", "Tomorrow", "Thu,
 Nov 12"), a page at a time. Each row (`event-card.tsx`) is the picture or the category's glyph, the title, when, where,
-who is holding it and the category, with the bookmark; cancelled events stay, greyed and marked. An event's page
-(`src/app/events/[id].tsx`) adds the organization with a Follow pill, Save | Share | Directions, the registration link
-as the one big button and, for the organization's members, Edit, Cancel and Delete. Saved events are
+who is holding it and the category, then a row of buttons as under a post (2026-11-25): the heart and the comments
+with their counts, Share, a Going pill with how many are going (blue once you are) and the bookmark; cancelled events
+stay, greyed and marked. An event's page (`src/app/events/[id].tsx`) adds the organization with a Follow pill, Like |
+Comment | Share | Going | Save, who is going (their faces and first names, a tap opening a profile; everyone signed in
+who may see the event sees every name, the owner's choice), the registration link as the one big button and, for the
+organization's members, Edit, Cancel and Delete. Comments open the same sheet as a post's. Likes, comments and Going
+need migration 69 (`20261121000000_event_engagement.sql`): on a server without it the app shows Save | Share |
+Directions as before (`useEventEngagementReady`, `src/lib/event-engagement.ts`). Nobody is notified of a like or a
+comment on an event (it has no owner); a reply to a comment there notifies its writer. Saved events are
 `src/app/events/saved.tsx` and a group on Saved; interests `src/app/events/interests.tsx`.
 
 Events come from two places (migration 61, `supabase/migrations/20261113000000_events.sql`): the university's own
@@ -823,7 +835,9 @@ Buzz, so nothing on the Buzz page shows who is looking) and the Buzz label carri
   Classes"; nothing when none). A day's prompt thread shows "✦ Daily prompt" where the alias
   would be and counts answers; an answer posted as its own buzz has the prompt as its title and "Daily prompt · See all
   answers" linking to that thread. The FAB (a pen with the mask, at the bottom right; it stays while the feed scrolls and
-  becomes the collapsed bottom bar's twin, opposite it) and the camera's BUZZ open the composer.
+  becomes the collapsed bottom bar's twin, opposite it) and the camera's BUZZ open the composer (the camera's since
+  2026-11-25: the same sheet over the paused camera, photos and video included, its X back to the camera's mode; the
+  camera had a words-only composer of its own before, `buzz-stage.tsx`, which now shows only the guidelines gate).
 - **Composer.** A full-height sheet (the system's page sheet on iPhone): "You're anonymous", Campus | Global with what
   each means, a category (one row of chips, `BUZZ_CATEGORIES`; optional, tap the chosen one again for none; the line
   under it says what belongs there; a database without `supabase/migrations/20261108000300_buzz_categories.sql` does
@@ -896,6 +910,15 @@ feel native:
 - **Buttons.** One `Button` (`src/components/ui.tsx`), an iOS 26 capsule in three sizes: compact (34pt) in list rows,
   regular (44pt) for most actions, large (50pt) for the action that ends a form or a sheet. Semibold labels, a spring
   press and a soft haptic on the primary ones.
+- **No waiting on what is already known (2026-11-25).** `useQuery`'s `key` (`src/lib/query-cache.ts`) keeps a
+  screen's result for the session, in memory, per reader, emptied when the account changes: a screen opened again
+  shows it at once and reads it again behind it (not at all while it is under 15 seconds old), and a load already
+  running for the key is joined. The inbox hands each chat to the chat screen (`src/lib/chat-warm.ts`), a finger on a
+  row starts its newest messages loading, and a chat keeps its newest page when left; a one-to-one chat loads the other
+  person's profile behind it (`warmProfile`). The Housing, Roommate, Marketplace and Events lists hand their rows to the
+  screens they open (`useKeepRows`), which show them at once; a post's page asks for everything in one round trip.
+  Events, Messages and Profile render behind Home 1.2 seconds after it opens (`lazy: false` from then), so switching to
+  them finds them loaded.
 - **Sheets.** One `Sheet` (`src/components/sheet.tsx`) under the comments, share, filter and share-profile sheets: the
   screen dims as the sheet rises on UIKit's presentation spring, the header (or the whole sheet when nothing in it
   scrolls) pulls it down on the UI thread, and a flick or a long pull closes it. Every sheet has the same grabber,

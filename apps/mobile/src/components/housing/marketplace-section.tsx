@@ -9,7 +9,7 @@ import { categoryIcon, priceText } from "@/components/marketplace/item-text";
 import { PostCard } from "@/components/post-card";
 import { Button, EmptyState, ErrorBanner, Loading, useAppearingCells } from "@/components/ui";
 import { AnimatedFlatList, listInset } from "@/lib/collapsing-header";
-import { useFeed } from "@/lib/hooks";
+import { useFeed, useKeepRows } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useTabBarInset } from "@/lib/tab-bar";
@@ -126,6 +126,7 @@ export function MarketplaceSection({
   // Another category, campus or search empties the feed at once (its spinner shows) instead of keeping the old posts.
   const feed = useFeed<ItemWithSeller>((page) => listItems(supabase, { q: settled || undefined, universityId, category: category ?? undefined, page, pageSize: PAGE_SIZE, sort: filters.sort, condition: filters.condition, minPrice: filters.minPrice, maxPrice: filters.maxPrice }), [settled, universityId, category, filters.sort, filters.condition, filters.minPrice, filters.maxPrice], { clearOnChange: true });
   const { savedIds, engagement, refresh: refreshEngagement } = useEngagement("item", feed.items, userId);
+  useKeepRows("item", feed.items);
   // The feed starts under the floating labels and pills and scrolls beneath them as they slide away.
   const inset = useMemo(() => listInset(topInset), [topInset]);
   const tabBar = useTabBarInset();

@@ -53,7 +53,9 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   `d30b8306`, from the branch at `d732bbc`: also Orbit's Instagram-style cards, bold white buttons, a commenter's
   profile closing the comments and the profile tabs' short underline, not on `main` yet). **Migration 68** (a like on one's own story) is on `main` but on no project yet (as of 2026-11-24): until
   it is, that heart is refused with the reason. It waits on a Supabase access token (staging first, then a full backup
-  and production) and on free disk space for the backup. **Still to check:** the update on a real iPhone; Android.
+  and production) and on free disk space for the backup. **Migration 69** (likes, comments and who is going on
+  events, 2026-11-25, on the branch) is on no project either; until it is, events show Save and Share alone. **Still to
+  check:** the update on a real iPhone; Android.
 - **Chat redesign, media viewing and the keyboard (app)** (merged as PR #112, 2026-11-15 21:51 UTC; on `main`, summary in
   [history.md](history.md)): an Apple-style chat, tab labels side by side in every tab row, Home without lines between
   the tabs, the story tray and the feed, photos that pinch and double tap to zoom in the full-screen viewer, a video

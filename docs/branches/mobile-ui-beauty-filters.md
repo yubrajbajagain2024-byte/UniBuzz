@@ -213,6 +213,82 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   underline under the open tab, posts or reels, was too long): `profile-tabs.tsx` draws it 32 points wide (`UNDERLINE_WIDTH`,
   was the whole tab), 2.5 high with rounded ends, centred under the icon, sliding with the pager as before; every
   profile, your own included. Seen in the Simulator on a profile: under the grid, then slid under Reels. `npm run check` 9/9.
+- **Two lines and "… more" at the end of the second** (2026-11-25; the owner's brief, for Orbit, Housing, Roommate and
+  Marketplace: "more…" not on a third line): `ExpandableText` now folds inline, Instagram's way. A hidden copy at full
+  length gives the laid-out lines; the second is cut where "… more" (measured in the same style) fits after it, the
+  hashtags and mentions keeping their spans (`sliceInline`), never mid-space or mid-emoji; a hidden copy of the folded
+  text checks it keeps to two lines and pulls the cut back two characters at a time if not. "more" opens the rest in
+  place, "less" under it folds it again. Orbit's captions (every post, words-only ones too, were three), Roommate and
+  Marketplace (`post-card.tsx`, were three lines and "…") and Housing (`housing-card.tsx`, two and "…") all use it.
+  Seen in the Simulator: Roommate's long description in two lines ending "… more", opened in place; Marketplace's
+  one-line description without it; on a temporary dev route (deleted), a long Orbit caption with hashtags and an emoji
+  in two lines, then opened with its hashtags blue. Housing has no listings on production to show. `npm run check` 9/9.
+- **The carousel's pill and dots on Orbit** (2026-11-25; the owner's screenshot of a Roommate post's indicator): a
+  post's photos and videos show their position as Roommate and Marketplace do, over the bottom of the picture (a white
+  pill for the one showing, soft dots for the rest: `PhotoCarousel`'s own dots), instead of grey dots in the row of
+  buttons; `PostActions`' `center` slot, which only they used, is gone. Seen in the Simulator on a temporary dev route
+  (deleted) with a three-photo sample post. `npm run check` 9/9.
+- **No thin line under Events' and Messages' labels** (2026-11-25; the owner's brief): under For you | All events and
+  Chats | Groups only the sliding aurora underline is left. Events' through `DiscoveryBar`'s new `hairline={false}`
+  (Explore, the bar's other user, keeps its line: the brief named Events and Messages); Messages' in
+  `inbox-header.tsx`'s row style. Seen in the Simulator on both tabs. `npm run check` 9/9.
+- **Events' top drawn as Messages' is** (2026-11-25; the owner's screenshots of both: Events = Messages, For you | All
+  events = Chats | Groups, Search events = Search chats, Today | This week | Weekend = All | Unread | Requests):
+  `DiscoveryBar` gains `look="messages"`, measure for measure from `INBOX_MEASURES` (exported by `inbox-header.tsx`):
+  the 44-point labels row with no line (replacing the `hairline` prop of the entry above), 12 points around a 46-point
+  field with 20-point sides, the filter button bare and as tall as the field like the inbox's pencil, filled 32-point
+  pills (blue when on); `discoveryBarHeight("messages")` sets the pages' inset. Events' title row takes Messages'
+  right inset and 40-point button. Explore keeps its look. Seen in the Simulator side by side with Messages (the rows,
+  the field, the button and the pills at the same places and sizes; Today turned blue with Clear beside it).
+  `npm run check` 9/9.
+- **No blink on Today, This week, Weekend** (2026-11-25; the owner's report: the pills blinked, unlike Messages'): the
+  pills sit in a scrolling row, where iOS shows a press only once the finger lifts, so their dimming while pressed came
+  as one flash; `DiscoveryBar`'s pills no longer dim (Explore's too, which flashed the same way), the new colour being
+  the feedback. All events swapped its list or "No events match" for a spinner on every filter tap; it shows the spinner
+  only before its first result now (`feed.round === 0`), keeping the last one until the new arrives, as For you did.
+  Seen in the Simulator: a tap on This week on All events, the message staying with no spinner. `npm run check` 9/9.
+- **Send To a full page** (2026-11-25; the owner's screenshot of a camera app's send screen): the Snap's Send To slides up
+  as a full-screen modal (it was an 88% sheet): the down chevron that closes it beside a 46-point search field, All |
+  Recent | Friends pills (Messages' filled ones), bold section titles, full-width rows (48-point photo, the name alone,
+  hairlines between) with the ring at the right, and the send bar along the bottom with a hairline above it; `onDismiss`
+  still tells the Snap screen it has gone. The screenshot's "Post to… My Story" was left out: a Snap is uploaded to the
+  snaps folder and a story needs its own (migration 59), so it would be a feature of its own. Seen in the Simulator on
+  a temporary dev route (deleted; its send did nothing, so no Snap was uploaded): the page, a pick raising "To Yubraj"
+  with the send button, the chevron closing it. `npm run check` 9/9. Then a little smaller at the owner's word: a 44-point
+  photo, the name at 16 points, 10 points above and below, a 26-point ring (rows about 64 points tall, were 72).
+- **BUZZ on the + camera opens the Buzz page's composer** (2026-11-25; the owner's report: no photo or video when
+  posting a buzz from the +, then "use the green circle's posting of the Buzz section"): switching the camera to BUZZ
+  raises `BuzzComposer`, the sheet the Buzz page's + opens (title, words, up to four photos or one video, poll,
+  category, Campus | Global), over the paused camera, once the guidelines are accepted (`buzz-stage.tsx` keeps only
+  the gate, the loading mark and the error; its own words-only composer is gone). Its X or a swipe comes back to the
+  camera's mode; after a buzz goes out, the sheet closes and then (450 ms on) the camera leaves for the Buzz page; an
+  answer to a prompt opens its thread there. Seen in the Simulator (Expo Go; nothing posted): + → BUZZ raised "New
+  buzz" with the 0/4 photo tile, Poll and Video; its X came back to SNAP. `npm run check` 9/9.
+- **No spinner on what is already known** (2026-11-25; the owner's report: loading when switching tabs, before content
+  opened and on opening a person from Messages): a session cache under `useQuery` (`key`, `src/lib/query-cache.ts`:
+  memory only, per reader, emptied on an account change before the next account's screens render, at most 1,000
+  entries, fresh for 15 s, loads joined while they run). A chat opened from the inbox now shows at once (its summary
+  handed over; before: the summary, then its members, then the messages, three round trips in a row behind two
+  spinners); a finger on a row starts its messages; a chat keeps its newest page when left and the server's page
+  replaces it on the next open; a one-to-one chat warms the other person's profile 0.6 s in. Profiles keep their parts
+  per reader (`profileKeys`). Housing, Roommate, Marketplace and Events hand their rows to the detail screens
+  (`useKeepRows`, the same select as the detail query), whose spinner now shows only with nothing to show; a post's page
+  is one round trip (was two). Events, Messages and Profile render 1.2 s after Home opens. Seen in the Simulator: after
+  a restart, Messages fully drawn 0.3 s after its tab was tapped, no spinner. Not tried there, to leave the live account
+  as it was: opening a chat (it marks it read) and opening a listing (it records a view). `npm run check` 9/9.
+- **Like, comment, share, save and Going on events** (2026-11-25; the owner's brief, then their answers: every name of
+  who is going seen by everyone who may see the event; on the cards and the page): **migration 69**
+  (`20261121000000_event_engagement.sql`, applied nowhere yet; see docs/migrations.md) lets `post_likes` and
+  `post_comments` take events, under events_read, and adds `event_rsvps` and `event_going_many`. Shared: the
+  `EngagementTargetType` type (likes and comments; `PostTargetType` unchanged for saves, views and chat cards),
+  `eventEngagementReady`, `getEventGoingMany`, `setEventGoing`, `listEventGoing`. App: `src/lib/event-engagement.ts`
+  (the readiness check, page counts, a Going state shared by a card and the page, `shareEvent`), `useEventCards` for
+  the two lists; the card's row of buttons (heart and comments with counts, Share, the Going pill, the bookmark), the
+  page's Like | Comment | Share | Going | Save and who is going; comments in the post sheet. Without 69 on the server,
+  Save and Share alone (Directions on the page). Tests: `event-engagement.test.mjs` 21/21; the five rollout suites with
+  69 in their `AHEAD` skips; `npm run check` 9/9. Seen in the Simulator on a temporary dev route with sample events
+  (deleted): the row with counts, a blue "8 going", a saved bookmark, and the Share and Save row of a server without 69.
+  Not tried against a database with 69 (none has it).
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.

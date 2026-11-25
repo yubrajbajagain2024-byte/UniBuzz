@@ -68,9 +68,9 @@ export function frameAspect(media: FeedMedia[], reel: boolean): number {
 
 /**
  * A post in the Home feed, its picture laid out as Instagram's Home feed lays one out (the owner's brief, 2026-11-24) and
- * its words under the name (2026-11-25): header → its title in bold, the caption folded to two lines ("more…" / "less";
- * three on a post of words alone) and its link → the photo or video edge to edge, sized by frameAspect → heart, comment
- * and share with their counts, a carousel's dots in the middle of that row, the bookmark on the right → "Liked by …" →
+ * its words under the name (2026-11-25): header → its title in bold, the caption folded to two lines ("… more" at the end
+ * of the second, "less" once open) and its link → the photo or video edge to edge, sized by frameAspect → heart, comment
+ * and share with their counts, the bookmark on the right → "Liked by …" →
  * the newest comments. A friends-only or selected-people post has no Share (the database refuses to send it into a
  * chat), and the author of a post that is not Global sees who can on the line under their name; one with comments off
  * has no comment button.
@@ -264,8 +264,7 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
 
       {title || text || link ? (
         // The title, the words and the link under the name, above the picture (the owner's brief, 2026-11-25), folded to two
-        // lines before "more…" over a picture so it stays near the name, three on a post of words alone, where the text
-        // is the post and takes the double tap.
+        // lines with "… more" at the end of the second; on a post of words alone the text is the post and takes the double tap.
         <Pressable onPress={media.length === 0 ? textTap : undefined} style={styles.body}>
           {title ? (
             <Text style={styles.title} selectable={detail}>
@@ -273,7 +272,7 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
             </Text>
           ) : null}
           {text ? (
-            <ExpandableText style={styles.text} lines={media.length > 0 ? 2 : 3} expanded={detail} collapsible={!detail} selectable={detail}>
+            <ExpandableText style={styles.text} lines={2} expanded={detail} collapsible={!detail} selectable={detail}>
               {caption}
             </ExpandableText>
           ) : null}
@@ -285,7 +284,7 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
         // Edge to edge, no corners, as Instagram's feed draws it; the big heart of a double tap over it.
         <View style={styles.media}>
           <View ref={frame} collapsable={false}>
-            <PhotoCarousel media={media} aspect={frameAspect(media, reel)} active={active} videoLabel={null} dots={false} onIndexChange={setSlide} jump={jump} onPress={openViewer} onDoubleTap={doubleTap} />
+            <PhotoCarousel media={media} aspect={frameAspect(media, reel)} active={active} videoLabel={null} onIndexChange={setSlide} jump={jump} onPress={openViewer} onDoubleTap={doubleTap} />
           </View>
           <Animated.View pointerEvents="none" style={[styles.heart, { opacity: heart, transform: [{ scale: heart.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }]}>
             <Icon name="heart" size={96} color={colors.onMedia} />
@@ -302,16 +301,6 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
         onComment={commentsOff ? undefined : onComments}
         onShare={shareable ? share : undefined}
         onSave={() => void save.toggle()}
-        center={
-          // A carousel's dots in the middle of the row under it, Instagram's place for them.
-          media.length > 1 ? (
-            <View style={styles.slideDots} accessibilityLabel={`${slide + 1} of ${media.length}`}>
-              {media.map((_, i) => (
-                <View key={i} style={[styles.slideDot, i === slide && styles.slideDotActive]} />
-              ))}
-            </View>
-          ) : undefined
-        }
       />
 
       {(face && like.likes > 0) || (!detail && !commentsOff && comments > 0) ? (
@@ -367,9 +356,6 @@ const useStyles = makeStyles((colors) => ({
   // The picture across the whole width, as Instagram's feed has it; the heart is laid over it.
   media: { width: "100%", overflow: "hidden", backgroundColor: colors.mediaBg },
   heart: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", shadowColor: colors.shadow, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 2 } },
-  slideDots: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
-  slideDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.faint },
-  slideDotActive: { backgroundColor: colors.accent },
   below: { paddingHorizontal: POST_GUTTER, paddingTop: 6, gap: 4 },
   likedBy: { flexDirection: "row", alignItems: "center", gap: 6 },
   face: { borderWidth: 1.5, borderColor: colors.bg, borderRadius: 12 },

@@ -2,8 +2,11 @@ import { memo, useCallback } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { categoryLabel, eventWhen, isEventLive, type EventSummary } from "@apartment-book/shared";
+import { categoryLabel, compactCount, eventWhen, isEventLive, type EventGoing, type EventSummary, type PostEngagement } from "@apartment-book/shared";
+import { useLike } from "@/components/engagement";
 import { Icon, useBounceOn } from "@/components/icon";
+import { ACTION_WEIGHT } from "@/components/post-bits";
+import { shareEvent, useGoing } from "@/lib/event-engagement";
 import { savedEvents } from "@/lib/event-saves-store";
 import { alertWithHaptic, hapticLike, hapticSelect } from "@/lib/haptics";
 import { errorText } from "@/lib/hooks";
@@ -54,16 +57,46 @@ export function EventGlyph({ category, size, iconSize }: { category: string; siz
 
 /**
  * One event in a list, compact and quick to scan: the picture (or the category's glyph) at the left; the title, when it
- * is on the campus's clock (`withDay` off under a day heading), where, and who is holding it with the category; the
- * bookmark at the right, filled when saved. A cancelled event keeps its row, greyed and marked, so nobody turns up; an
- * organization's event awaiting verification shows only to its members, marked. A tap opens the event's page.
- * Memoized: a list re-renders a row only when its event or its saved state changes.
+ * is on the campus's clock (`withDay` off under a day heading), where, and who is holding it with the category. Under it
+ * a row of buttons, as under a post (the owner's brief, 2026-11-25): the heart and the comments with their counts,
+ * Share, Going with how many are going (filled once you are), and the bookmark at the right, filled when saved. Like,
+ * comments and Going need migration 69 (`engaged`, from useEventEngagement; Share and the bookmark are always there).
+ * A cancelled event keeps its row, greyed and marked, so nobody turns up; an organization's event awaiting verification
+ * shows only to its members, marked. A tap opens the event's page. Memoized: a list re-renders a row only when its
+ * event, its counts or its saved state change.
  */
-export const EventCard = memo(function EventCard({ event, timeZone, withDay = true, saved, onToggleSave }: { event: EventSummary; timeZone: string; withDay?: boolean; saved: boolean; onToggleSave: (event: EventSummary) => void }) {
+export const EventCard = memo(function EventCard({
+  event,
+  timeZone,
+  withDay = true,
+  saved,
+  onToggleSave,
+  engaged = false,
+  engagement,
+  going,
+  onComments,
+}: {
+  event: EventSummary;
+  timeZone: string;
+  withDay?: boolean;
+  saved: boolean;
+  onToggleSave: (event: EventSummary) => void;
+  /** The server has migration 69: the heart, the comments and Going show. */
+  engaged?: boolean;
+  engagement?: PostEngagement;
+  going?: EventGoing;
+  onComments?: (event: EventSummary) => void;
+}) {
   const styles = useStyles();
   const colors = useColors();
   const router = useRouter();
+  const { user } = useSession();
+  const needLogin = useCallback(() => router.push("/(auth)/login"), [router]);
   const bounce = useBounceOn(saved);
+  const like = useLike("event", event.id, engagement, user?.id ?? null, needLogin);
+  const likeBounce = useBounceOn(like.liked);
+  const rsvp = useGoing(event.id, going, user?.id ?? null, needLogin);
+  const comments = engagement?.comments ?? 0;
   const now = Date.now();
   const cancelled = event.status === "cancelled";
   const live = !cancelled && isEventLive(event, now);
@@ -73,6 +106,7 @@ export const EventCard = memo(function EventCard({ event, timeZone, withDay = tr
   const open = () => router.push({ pathname: "/events/[id]", params: { id: event.id } } as never);
   return (
     <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={`${event.title}, ${when}${event.location ? `, ${event.location}` : ""}`} style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
+      <View style={styles.top}>
       <View style={styles.thumb}>{event.image_url ? <Image source={{ uri: event.image_url }} recyclingKey={event.id} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} /> : <EventGlyph category={event.category} size={THUMB} iconSize={28} />}</View>
       <View style={styles.body}>
         {event.status !== "scheduled" ? <EventStatusPill status={event.status} /> : null}
@@ -106,16 +140,60 @@ export const EventCard = memo(function EventCard({ event, timeZone, withDay = tr
           </Text>
         </View>
       </View>
-      <Pressable onPress={() => onToggleSave(event)} hitSlop={8} accessibilityRole="button" accessibilityLabel={saved ? "Saved" : "Save"} accessibilityState={{ selected: saved }} style={styles.bookmark}>
-        <Icon name={saved ? "bookmark" : "bookmark-outline"} size={22} color={saved ? colors.brand : colors.muted} bounce={bounce} />
-      </Pressable>
+      </View>
+      <View style={styles.actions}>
+        {engaged ? (
+          <>
+            <Pressable onPress={() => void like.toggle()} hitSlop={6} style={styles.action} accessibilityRole="button" accessibilityLabel={like.liked ? "Unlike" : "Like"} accessibilityState={{ selected: like.liked }}>
+              <Icon name={like.liked ? "heart" : "heart-outline"} size={22} weight={ACTION_WEIGHT} color={like.liked ? colors.like : colors.text} bounce={likeBounce} />
+              {like.likes > 0 ? <Text style={styles.count}>{compactCount(like.likes)}</Text> : null}
+            </Pressable>
+            {onComments ? (
+              <Pressable onPress={() => onComments(event)} hitSlop={6} style={styles.action} accessibilityRole="button" accessibilityLabel={comments > 0 ? `Comments, ${comments}` : "Comment"}>
+                <Icon name="chatbubble-outline" size={21} weight={ACTION_WEIGHT} color={colors.text} />
+                {comments > 0 ? <Text style={styles.count}>{compactCount(comments)}</Text> : null}
+              </Pressable>
+            ) : null}
+          </>
+        ) : null}
+        <Pressable onPress={() => void shareEvent(event, user?.id ?? null)} hitSlop={6} style={styles.action} accessibilityRole="button" accessibilityLabel="Share">
+          <Icon name="share-outline" size={21} weight={ACTION_WEIGHT} color={colors.text} />
+        </Pressable>
+        {engaged ? (
+          <Pressable
+            onPress={() => void rsvp.toggle()}
+            hitSlop={6}
+            style={[styles.going, rsvp.goingByMe && styles.goingOn]}
+            accessibilityRole="button"
+            accessibilityLabel={rsvp.goingByMe ? "Going, tap to take it back" : "Going"}
+            accessibilityHint={rsvp.going > 0 ? `${rsvp.going} going` : undefined}
+            accessibilityState={{ selected: rsvp.goingByMe }}
+          >
+            <Icon name={rsvp.goingByMe ? "people" : "people-outline"} size={17} weight={ACTION_WEIGHT} color={rsvp.goingByMe ? colors.brand : colors.text} />
+            <Text style={[styles.goingText, rsvp.goingByMe && { color: colors.brand }]}>{rsvp.going > 0 ? `${compactCount(rsvp.going)} going` : "Going"}</Text>
+          </Pressable>
+        ) : null}
+        <View style={{ flex: 1 }} />
+        <Pressable onPress={() => onToggleSave(event)} hitSlop={8} accessibilityRole="button" accessibilityLabel={saved ? "Saved" : "Save"} accessibilityState={{ selected: saved }}>
+          <Icon name={saved ? "bookmark" : "bookmark-outline"} size={21} weight={ACTION_WEIGHT} color={saved ? colors.brand : colors.text} bounce={bounce} />
+        </Pressable>
+      </View>
     </Pressable>
   );
 });
 
 const useStyles = makeStyles((colors) => ({
-  card: { flexDirection: "row", gap: space.md, padding: space.md, marginHorizontal: space.lg, backgroundColor: colors.card, borderRadius: 18, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  card: { gap: space.sm, padding: space.md, marginHorizontal: space.lg, backgroundColor: colors.card, borderRadius: 18, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   cardPressed: { opacity: 0.85 },
+  top: { flexDirection: "row", gap: space.md },
+  // The row of buttons under the event, as under a post.
+  actions: { flexDirection: "row", alignItems: "center", gap: 18, paddingTop: space.xs },
+  action: { flexDirection: "row", alignItems: "center", gap: 5 },
+  count: { fontSize: 14, fontWeight: "600", color: colors.text, fontVariant: ["tabular-nums"] },
+  // Going: a small pill, blue once you are going.
+  going: { flexDirection: "row", alignItems: "center", gap: 5, height: 28, paddingHorizontal: 10, borderRadius: radius.pill, backgroundColor: colors.input },
+  goingOn: { backgroundColor: colors.brandSoft },
+  goingText: { fontSize: 13, fontWeight: "700", color: colors.text, fontVariant: ["tabular-nums"] },
   thumb: { width: THUMB, height: THUMB, borderRadius: 14, borderCurve: "continuous", overflow: "hidden", backgroundColor: colors.skeleton },
   body: { flex: 1, gap: 3, justifyContent: "center" },
   title: { ...textStyle.headline, color: colors.text },
@@ -125,7 +203,6 @@ const useStyles = makeStyles((colors) => ({
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.green, marginRight: 2 },
   meta: { ...textStyle.footnote, color: colors.muted, flexShrink: 1 },
   host: { flexShrink: 1 },
-  bookmark: { width: 36, height: 36, alignItems: "center", justifyContent: "center", marginRight: -6, marginTop: -4 },
   pill: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill, marginBottom: 2 },
   pillText: { ...textStyle.caption1, fontWeight: "700" },
   pillDanger: { backgroundColor: colors.dangerSoft },

@@ -11,6 +11,8 @@ import { InboxOnlineFriends, useOpenFriendChat } from "@/components/messages/onl
 import { Button, EmptyState, ErrorBanner, Loading, useAppearingCells } from "@/components/ui";
 import { hapticTap, refreshWithHaptic } from "@/lib/haptics";
 import { useQuery } from "@/lib/hooks";
+import { conversationKey, warmChat } from "@/lib/chat-warm";
+import { remember } from "@/lib/query-cache";
 import { useSession } from "@/lib/session";
 import { AnimatedFlatList, listInset, useCollapsingHeader } from "@/lib/collapsing-header";
 import { supabase } from "@/lib/supabase";
@@ -219,6 +221,13 @@ export default function MessagesScreen() {
   }, [userId, refresh]);
 
   const conversations = data ?? NO_CHATS;
+  // Every chat the inbox shows is handed to the chat screen (chat-warm's conversationKey), so opening one is instant.
+  useEffect(() => {
+    if (!userId) return;
+    for (const c of conversations) remember(conversationKey(userId, c.id), c);
+  }, [conversations, userId]);
+  /** A finger on a row: its newest messages start loading before the chat opens. */
+  const warmRow = useCallback((c: ConversationSummary) => warmChat(userId ?? "", c.id), [userId]);
   const { requestIds } = useMessageRequests(conversations, userId);
   const requestCount = useMemo(() => conversations.filter((c) => requestIds.has(c.id)).length, [conversations, requestIds]);
   const messageSearch = useMessageSearch(text, Boolean(userId));
@@ -391,7 +400,7 @@ export default function MessagesScreen() {
     switch (item.type) {
       case "chat": {
         const c = item.conversation;
-        return <InboxRow conversation={c} muted={mutes.mutedFor(c)} now={now} onOpen={openChat} onMenu={chatMenu} />;
+        return <InboxRow conversation={c} muted={mutes.mutedFor(c)} now={now} onOpen={openChat} onWarm={warmRow} onMenu={chatMenu} />;
       }
       case "header":
         return <InboxSectionHeader title={item.title} />;

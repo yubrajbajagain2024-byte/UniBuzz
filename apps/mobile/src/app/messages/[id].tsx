@@ -56,6 +56,9 @@ import { EmptyState, ErrorBanner, Loading } from "@/components/ui";
 import { reduceMotionEnabled } from "@/lib/accessibility";
 import { hapticSuccess, hapticTap, alertWithHaptic } from "@/lib/haptics";
 import { errorText, useQuery } from "@/lib/hooks";
+import { conversationKey, messagesKey } from "@/lib/chat-warm";
+import { prefetch, recall, remember } from "@/lib/query-cache";
+import { warmProfile } from "@/components/profile/profile-view";
 import { openMessageFile, removeUploadedFiles, uploadAttachment, type ChatMessage, type OutgoingFiles, type PendingAttachment, type UploadStatus } from "@/lib/message-attachments";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -92,7 +95,8 @@ export default function ChatScreen() {
   const navigation = useNavigation();
   const styles = useStyles();
   const userId = user?.id ?? "";
-  const { data: conversation, loading, setData } = useQuery(() => (userId ? getConversation(supabase, id, userId) : Promise.resolve(null)), [id, userId]);
+  // The inbox hands its row over (chat-warm's conversationKey), so a chat opened from it shows at once, read again behind it.
+  const { data: conversation, loading, setData } = useQuery(() => (userId ? getConversation(supabase, id, userId) : Promise.resolve(null)), [id, userId], { key: userId ? conversationKey(userId, id) : null });
   // The chat itself stays on screen while its summary is read again (the poster of an anonymous listing showed who they are).
   const reload = useCallback(async () => {
     const fresh = await getConversation(supabase, id, userId).catch(() => null);
@@ -105,7 +109,7 @@ export default function ChatScreen() {
     if (navigation.canGoBack()) router.back();
     else router.replace("/(tabs)/messages");
   }, [navigation, router]);
-  if (sessionLoading || loading || !conversation) {
+  if (sessionLoading || !conversation) {
     return (
       <View style={styles.screen}>
         {sessionLoading || loading || !user ? <Loading /> : <EmptyState icon="chatbubbles-outline" title="Conversation not found" />}
@@ -234,10 +238,25 @@ function Chat({
   const { width: windowWidth } = useWindowDimensions();
   const mediaWidth = Math.min(Math.round(windowWidth * 0.66), 300);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const cacheKey = messagesKey(userId, conversation.id);
+  /**
+   * The chat as it was last seen, or as its pressed row loaded it (chat-warm), shown at once while the server is asked
+   * again; its answer replaces this page. Not when opening at a message (?at=), which pages to it from the server.
+   */
+  const [seed] = useState<ChatMessage[] | null>(() => {
+    if (jumpTo) return null;
+    const kept = recall<ChatMessage[]>(cacheKey)?.value;
+    if (!kept || kept.length === 0) return null;
+    const members = new Map(conversation.members.map((m) => [m.id, m]));
+    return kept.map((row) => {
+      const mine = asSeenBy(row, userId, conversation.anonymous);
+      return mine === row ? row : { ...mine, sender: members.get(userId) ?? mine.sender };
+    });
+  });
+  const [messages, setMessages] = useState<ChatMessage[]>(() => seed ?? []);
+  const [loaded, setLoaded] = useState(seed !== null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [hasOlder, setHasOlder] = useState(false);
+  const [hasOlder, setHasOlder] = useState(seed !== null && seed.length >= MESSAGES_PAGE_SIZE);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [memberStatus, setMemberStatus] = useState<Record<string, MemberStatus>>(conversation.memberStatus);
   const [text, setText] = useState("");
@@ -315,6 +334,23 @@ function Chat({
   const refreshActivity = useRef(activity.refresh);
   refreshActivity.current = activity.refresh;
 
+  // The other person's profile, loaded while the chat is read, so a tap on them opens it at once (the owner's brief,
+  // 2026-11-25). Not in a group, with a business, or with a listing's hidden poster.
+  useEffect(() => {
+    if (isGroup || business || posterHidden || !otherId) return;
+    const t = setTimeout(() => warmProfile(userId, otherId), 600);
+    return () => clearTimeout(t);
+  }, [isGroup, business, posterHidden, otherId, userId]);
+
+  // On the way out the newest page is kept, so this chat opens at once next time.
+  useEffect(() => {
+    const list = messagesRef;
+    return () => {
+      const settled = list.current.filter((m) => !m.pending && !m.failed);
+      if (settled.length > 0) remember(cacheKey, settled.slice(-MESSAGES_PAGE_SIZE));
+    };
+  }, [cacheKey]);
+
   function noteArrival(ids: string[]) {
     const now = Date.now();
     for (const id of ids) arriving.current.set(id, now);
@@ -352,8 +388,12 @@ function Chat({
   const loadInitial = useCallback(async () => {
     setLoadError(null);
     try {
-      const rows = (await listMessages(supabase, conversation.id)).map(seen);
-      setMessages((prev) => addFromServer(prev, rows, userId));
+      // Joins the load a pressed row started (chat-warm), if it is still on its way.
+      const rows = (await prefetch(cacheKey, () => listMessages(supabase, conversation.id))).map(seen);
+      const newest = rows.reduce((max, r) => (r.created_at > max ? r.created_at : max), "");
+      // The server's page replaces the one shown from memory (a message unsent since then goes); what came in after it
+      // and what is still sending stay.
+      setMessages((prev) => addFromServer(prev.filter((m) => m.pending || m.failed || (newest !== "" && m.created_at > newest)), rows, userId));
       setHasOlder(rows.length >= MESSAGES_PAGE_SIZE);
       if (rows.length === 0 && prefill) setText((t) => t || prefill);
     } catch (e) {
@@ -361,7 +401,7 @@ function Chat({
     } finally {
       setLoaded(true);
     }
-  }, [conversation.id, userId, prefill]);
+  }, [conversation.id, userId, prefill, cacheKey, seen]);
 
   useEffect(() => {
     void loadInitial();

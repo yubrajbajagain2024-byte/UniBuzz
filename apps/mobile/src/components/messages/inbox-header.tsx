@@ -1,5 +1,5 @@
 import { type ReactNode, type Ref } from "react";
-import { Animated, Pressable, StyleSheet, Text, TextInput, View, type TextInputInstance } from "react-native";
+import { Animated, Pressable, Text, TextInput, View, type TextInputInstance } from "react-native";
 import { useRouter } from "expo-router";
 import { SlidingTabs } from "@/components/sliding-tabs";
 import { auroraGradient, radius, space, textStyle } from "@/lib/theme";
@@ -27,6 +27,12 @@ const SEARCH_FIELD = 46;
 const SEARCH_ROOM = space.md;
 const CHIP = 32;
 const FILTERS_ROOM = space.sm;
+
+/**
+ * The inbox's measures, shared with Events' bar (DiscoveryBar's "messages" look, 2026-11-25: the owner asked for Events'
+ * top to be Messages' exactly), so the two never drift apart.
+ */
+export const INBOX_MEASURES = { TABS_ROW, SEARCH_FIELD, SEARCH_ROOM, CHIP, FILTERS_ROOM } as const;
 
 /** The signed-in header's whole height, below the status bar: how far the Messages tab's lists start down, under it. */
 export const INBOX_HEADER_HEIGHT = TOP_ROW + TABS_ROW + SEARCH_ROOM + SEARCH_FIELD + SEARCH_ROOM + CHIP + FILTERS_ROOM;
@@ -154,8 +160,8 @@ const useStyles = makeStyles((colors) => ({
   // The new-message pencil beside the inbox's search box: as tall as the box, the box giving up its width.
   newChat: { width: 40, height: SEARCH_FIELD, alignItems: "center", justifyContent: "center", marginRight: -8 },
   title: { flexShrink: 1, ...textStyle.largeTitle, color: colors.text },
-  // The labels row, as tall as Home's, with the hairline the sliding underline sits on.
-  tabs: { height: TABS_ROW, flexDirection: "row", marginHorizontal: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  // The labels row, as tall as Home's, with no line under it (the owner's brief, 2026-11-25): only the sliding underline.
+  tabs: { height: TABS_ROW, flexDirection: "row", marginHorizontal: 20 },
   filters: { flexDirection: "row", gap: space.sm, paddingHorizontal: 20, paddingBottom: FILTERS_ROOM },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, height: CHIP, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.input },
   chipSelected: { backgroundColor: colors.brandSoft },

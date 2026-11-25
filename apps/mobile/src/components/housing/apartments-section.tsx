@@ -8,7 +8,7 @@ import { HousingCard } from "@/components/housing/housing-card";
 import { FEED_HEADER_PADDING } from "@/components/post-card";
 import { EmptyState, ErrorBanner, Loading, useAppearingCells } from "@/components/ui";
 import { AnimatedFlatList, listInset } from "@/lib/collapsing-header";
-import { useFeed } from "@/lib/hooks";
+import { useFeed, useKeepRows } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useTabBarInset } from "@/lib/tab-bar";
@@ -38,6 +38,7 @@ export function ApartmentsSection({ topInset, onScroll, q, campus, filters, filt
     [q, universityId, filters.sort, filters.minBedrooms, filters.minPrice, filters.maxPrice, filters.furnished, filters.petsAllowed, filters.videoOnly, radiusKm],
   );
   const { savedIds, engagement } = useEngagement("apartment", feed.items, user?.id ?? null);
+  useKeepRows("apartment", feed.items);
   const inset = useMemo(() => listInset(topInset), [topInset]);
   // Tapping Explore again while Housing is on screen: back to the top.
   const listRef = useRef<FlatList<ApartmentWithOwner | AdRow>>(null);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
-import type { PostTargetType } from "@apartment-book/shared";
+import type { EngagementTargetType } from "@apartment-book/shared";
 import { useOpenProfile } from "@/lib/open-profile";
 import { makeStyles } from "@/lib/theme-provider";
 import { CommentComposer, CommentList, commentCountLabel, CommentProfileOpener, CommentsOff, CommentSortButton, useCommentThread } from "./comments";
@@ -10,7 +10,7 @@ import { Sheet, SheetFooter, SheetHeader, SheetScrollView } from "./sheet";
  * `focusComposer` opens the sheet straight into typing, once the sheet has slid up. `commentsOff`: the author turned
  * comments off (migration 44), so the sheet says so instead of offering a thread to write in.
  */
-export type CommentsTarget = { targetType: PostTargetType; targetId: string; ownerId: string; comments: number; focusComposer?: boolean; commentsOff?: boolean };
+export type CommentsTarget = { targetType: EngagementTargetType; targetId: string; ownerId: string; comments: number; focusComposer?: boolean; commentsOff?: boolean };
 
 /**
  * Bottom sheet with the comment thread of one post or reel, TikTok style: the count up top (the sort button beside it),

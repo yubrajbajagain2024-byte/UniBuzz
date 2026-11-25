@@ -128,10 +128,9 @@ export function PostFrame({ children }: { children: ReactNode }) {
 /**
  * Heart, comment (left out when there is no `onComment`: comments turned off) and share (left out when there is no
  * `onShare`: a post that cannot be sent into a chat) with their counts, an optional chat pill (listings: a chat with the owner),
- * either right after share (`messageBeside`) or on the right, and the bookmark at the far right. `center` is drawn in the
- * middle of the row, over nothing it could cover and taking no touches: Instagram puts a carousel's dots there.
+ * either right after share (`messageBeside`) or on the right, and the bookmark at the far right.
  */
-export function PostActions({ liked, likes, comments, saved, onLike, onComment, onShare, onSave, message, messageBeside, tight, center }: { liked: boolean; likes: number; comments: number; saved: boolean; onLike: () => void; onComment?: () => void; onShare?: () => void; onSave: () => void; message?: { label: string; onPress: () => void }; messageBeside?: boolean; tight?: boolean; center?: ReactNode }) {
+export function PostActions({ liked, likes, comments, saved, onLike, onComment, onShare, onSave, message, messageBeside, tight }: { liked: boolean; likes: number; comments: number; saved: boolean; onLike: () => void; onComment?: () => void; onShare?: () => void; onSave: () => void; message?: { label: string; onPress: () => void }; messageBeside?: boolean; tight?: boolean }) {
   const styles = useStyles();
   const colors = useColors();
   // The heart and the bookmark answer with the system's bounce as they fill (and only then). All four icons and the
@@ -141,11 +140,6 @@ export function PostActions({ liked, likes, comments, saved, onLike, onComment, 
   const saveBounce = useBounceOn(saved);
   return (
     <View style={[styles.actions, tight && { paddingTop: 6 }]}>
-      {center ? (
-        <View pointerEvents="none" style={[styles.center, tight && { top: 6 }]}>
-          {center}
-        </View>
-      ) : null}
       <Pressable onPress={onLike} hitSlop={6} style={styles.action} accessibilityRole="button" accessibilityLabel={liked ? "Unlike" : "Like"} accessibilityState={{ selected: liked }}>
         <Icon name={liked ? "heart" : "heart-outline"} size={26} weight={ACTION_WEIGHT} color={liked ? colors.like : colors.text} bounce={likeBounce} />
         {likes > 0 ? <Text style={styles.count}>{compactCount(likes)}</Text> : null}
@@ -197,8 +191,6 @@ const useStyles = makeStyles((colors) => ({
   frame: { marginHorizontal: POST_GUTTER, borderRadius: POST_FRAME_RADIUS, borderCurve: "continuous", overflow: "hidden", backgroundColor: colors.mediaBg },
   actions: { flexDirection: "row", alignItems: "center", gap: 22, paddingHorizontal: POST_GUTTER, paddingTop: 12, paddingBottom: 4 },
   action: { flexDirection: "row", alignItems: "center", gap: 6 },
-  // The row's own padding (12 above, 4 below), so whatever sits here is centred on the icons.
-  center: { position: "absolute", left: 0, right: 0, top: 12, bottom: 4, alignItems: "center", justifyContent: "center" },
   // Tabular figures: a count that changes (12 → 13) never shifts the icons beside it.
   count: { fontSize: 14, fontWeight: "600", color: colors.text, fontVariant: ["tabular-nums"] },
   message: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, marginRight: 14 },

@@ -1247,6 +1247,21 @@ export type Database = {
         Update: { event_id?: string; user_id?: string; created_at?: string };
         Relationships: [];
       };
+      /** Migration 69: who is going to an event. Read by everyone signed in who may see the event, less anyone blocked either way. */
+      event_rsvps: {
+        Row: { event_id: string; user_id: string; created_at: string };
+        Insert: { event_id: string; user_id: string; created_at?: string };
+        Update: { event_id?: string; user_id?: string; created_at?: string };
+        Relationships: [
+          {
+            foreignKeyName: "event_rsvps_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       event_interests: {
         Row: { user_id: string; category: string; created_at: string };
         Insert: { user_id: string; category: string; created_at?: string };
@@ -2448,6 +2463,11 @@ export type Database = {
       post_engagement_many: {
         Args: { p_target_type: string; p_target_ids: string[] };
         Returns: { target_id: string; likes: number; comments: number; liked_by_me: boolean }[];
+      };
+      /** Migration 69: how many are going to each event and whether the caller is (row-level security decides who counts). */
+      event_going_many: {
+        Args: { p_event_ids: string[] };
+        Returns: { event_id: string; going: number; going_by_me: boolean }[];
       };
       post_link: {
         Args: { p_target_type: string; p_target_id: string };

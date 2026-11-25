@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Tabs } from "expo-router";
 import { StyleSheet, UIManager, View, type ColorValue } from "react-native";
 import type { SFSymbol } from "expo-symbols";
@@ -117,6 +118,18 @@ export default function TabsLayout() {
     // The camera opens on SNAP, in the middle of BUZZ | SNAP | POST | REEL.
     onPress: () => openCreate({ snap: true }),
   };
+  /**
+   * Events, Messages and Profile render behind Home a moment after it opens (signed in), so switching to them finds them
+   * ready, their first page loaded, instead of a spinner (the owner's brief, 2026-11-25). Home loads first; the tabs then
+   * stay mounted, as tabs do.
+   */
+  const [warmTabs, setWarmTabs] = useState(false);
+  const signedIn = Boolean(user);
+  useEffect(() => {
+    if (!signedIn) return;
+    const t = setTimeout(() => setWarmTabs(true), 1200);
+    return () => clearTimeout(t);
+  }, [signedIn]);
   // A business account stays out of the student side: it is pointed to the business portal instead (after every hook).
   if (profile && isBusinessRole(profile.role)) return <BusinessAccountNotice />;
   // The header's own shadow barely shows on black, so in dark a hairline marks its edge. Light keeps its shadow.
@@ -134,11 +147,11 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: "Home", headerShown: false, tabBarIcon: icon("index") }} />
       {/* Events draws its own top bar ("Events" with Saved at its right, then For you | All events, the search box and the quick filters). */}
-      <Tabs.Screen name="events" options={{ title: "Events", headerShown: false, tabBarIcon: icon("events") }} />
+      <Tabs.Screen name="events" options={{ title: "Events", headerShown: false, lazy: !warmTabs, tabBarIcon: icon("events") }} />
       {/* Messages draws its own top bar: the new-message pencil, the "Messages" title, Chats | Requests and the search. */}
-      <Tabs.Screen name="messages" options={{ title: "Messages", headerShown: false, tabBarBadge: unread > 0 ? (unread > 99 ? "99+" : unread) : undefined, tabBarIcon: icon("messages") }} />
+      <Tabs.Screen name="messages" options={{ title: "Messages", headerShown: false, lazy: !warmTabs, tabBarBadge: unread > 0 ? (unread > 99 ? "99+" : unread) : undefined, tabBarIcon: icon("messages") }} />
       {/* Profile draws its own top bar (Find friends, your name, the menu), like TikTok. */}
-      <Tabs.Screen name="profile" options={{ title: "Profile", headerShown: false, tabBarIcon: (p) => <ProfileTabIcon {...p} /> }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile", headerShown: false, lazy: !warmTabs, tabBarIcon: (p) => <ProfileTabIcon {...p} /> }} />
     </Tabs>
   );
 }

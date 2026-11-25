@@ -2,7 +2,7 @@ import type { EventCategory } from "../constants";
 import { EVENTS_PAGE_SIZE } from "../constants";
 import { affinityFrom, type EventOrganizationSummary, type EventSummary, type ForYouContext } from "../events";
 import type { EventFormInput, OrganizationFormInput } from "../schemas/events";
-import type { Client, Organization } from "../types/models";
+import type { Client, Organization, ProfileSummary } from "../types/models";
 import { isMissingRelation } from "./profile-page";
 
 /** An event with its organization joined (PostgREST names the join by the foreign key). */
@@ -119,6 +119,67 @@ export async function toggleEventSave(supabase: Client, userId: string, eventId:
   const { error: e } = await supabase.from("event_saves").insert({ user_id: userId, event_id: eventId });
   if (e) throw e;
   return true;
+}
+
+// --- Likes, comments and who is going (migration 69) --------------------------------------------------------------------
+
+/** How many are going to an event and whether you are. */
+export type EventGoing = { going: number; goingByMe: boolean };
+
+/**
+ * Whether this database has migration 69 (likes, comments and who is going on events). Before it the app leaves those
+ * buttons out rather than offer what the server would refuse. One read that returns no rows.
+ */
+export async function eventEngagementReady(supabase: Client): Promise<boolean> {
+  const { error } = await supabase.from("event_rsvps").select("event_id").limit(0);
+  if (!error) return true;
+  if (isMissingRelation(error)) return false;
+  throw error;
+}
+
+/**
+ * How many are going to each of a page of events (at most 200) and whether you are; ids it does not answer for come back
+ * as nobody. The database counts only the rows you may read: an event you cannot see, people blocked either way.
+ */
+export async function getEventGoingMany(supabase: Client, eventIds: string[]): Promise<Record<string, EventGoing>> {
+  const out: Record<string, EventGoing> = {};
+  if (eventIds.length === 0) return out;
+  const { data, error } = await supabase.rpc("event_going_many", { p_event_ids: eventIds.slice(0, 200) });
+  if (error) throw eventsError(error);
+  for (const row of data ?? []) out[row.event_id] = { going: Number(row.going), goingByMe: Boolean(row.going_by_me) };
+  for (const id of eventIds) out[id] ??= { going: 0, goingByMe: false };
+  return out;
+}
+
+/** Says you are going to an event (`going` true) or takes it back. Twice is once. */
+export async function setEventGoing(supabase: Client, userId: string, eventId: string, going: boolean): Promise<void> {
+  if (going) {
+    const { error } = await supabase.from("event_rsvps").upsert({ event_id: eventId, user_id: userId }, { onConflict: "event_id,user_id", ignoreDuplicates: true });
+    if (error) throw eventsError(error);
+    return;
+  }
+  const { error } = await supabase.from("event_rsvps").delete().eq("event_id", eventId).eq("user_id", userId);
+  if (error) throw eventsError(error);
+}
+
+/**
+ * Who is going, the most recent first: everyone signed in who may see the event reads every name (the owner's choice,
+ * 2026-11-25), less people blocked either way, whom the database leaves out.
+ */
+export async function listEventGoing(supabase: Client, eventId: string, limit = 60): Promise<ProfileSummary[]> {
+  const { data, error } = await supabase
+    .from("event_rsvps")
+    .select("created_at, profile:profiles!event_rsvps_user_id_fkey(id, full_name, avatar_url)")
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw eventsError(error);
+  const out: ProfileSummary[] = [];
+  for (const row of (data ?? []) as { profile: ProfileSummary | ProfileSummary[] | null }[]) {
+    const p = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+    if (p) out.push(p);
+  }
+  return out;
 }
 
 // --- Interests and For you ------------------------------------------------------------------------------------------------
