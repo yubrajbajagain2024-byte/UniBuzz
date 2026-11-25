@@ -27,14 +27,17 @@ export const PROFILE_TABS: { key: ProfileTabKey; label: string; icon: keyof type
 const VISIBILITY_ICON: Record<ProfileVisibility, keyof typeof Ionicons.glyphMap> = { private: "lock-closed", friends: "people", public: "globe-outline" };
 const VISIBILITY_NAME: Record<ProfileVisibility, string> = { private: "Only me", friends: "Friends", public: "Everyone" };
 
-/** The underline is this share of a tab's width, centred under its icon: the whole tab, Instagram's. */
-const UNDERLINE_SHARE = 1;
-const UNDERLINE_HEIGHT = 2;
 const ICON_SIZE = 24;
+/**
+ * The underline: short, centred under the open tab's icon and a little wider than it, with rounded ends (the owner's
+ * brief, 2026-11-25: the tab-wide line of Instagram's read as too long).
+ */
+const UNDERLINE_WIDTH = 32;
+const UNDERLINE_HEIGHT = 2.5;
 
 /**
  * The row of tabs above a profile's grid, Instagram style: an icon per tab, the open one filled and in the text colour
- * with an underline as wide as the tab, the others outlined and grey, a hairline under the row. The open tab alone carries a small
+ * with a short underline under its icon, the others outlined and grey, a hairline under the row. The open tab alone carries a small
  * mark of who can see that section (`badges`: a lock for Only me, two people for Friends, a globe for Everyone). A tab
  * with an entry in `locks` is explained to screen readers by it ("Only you can see your saved posts"); `counts` are
  * read out too but not drawn. `tabs` are the tabs this viewer gets, in order (a visitor gets no tab they may not open:
@@ -159,7 +162,7 @@ export function ProfileTabs({
       {slide ? (
         <Animated.View
           pointerEvents="none"
-          style={[styles.slider, { width: tabWidth * UNDERLINE_SHARE, left: (tabWidth * (1 - UNDERLINE_SHARE)) / 2, transform: [{ translateX: slide }] }]}
+          style={[styles.slider, { width: UNDERLINE_WIDTH, left: (tabWidth - UNDERLINE_WIDTH) / 2, transform: [{ translateX: slide }] }]}
         />
       ) : null}
     </View>
@@ -175,10 +178,10 @@ const useStyles = makeStyles((colors) => ({
   // The filled look, drawn over the outlined one in the same spot.
   over: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
   badge: { position: "absolute", right: -16, top: -2 },
-  // UNDERLINE_SHARE of the tab.
-  underline: { height: UNDERLINE_HEIGHT, width: `${UNDERLINE_SHARE * 100}%`, backgroundColor: "transparent" },
+  // UNDERLINE_WIDTH, centred in the tab (the tab centres its children).
+  underline: { height: UNDERLINE_HEIGHT, width: UNDERLINE_WIDTH, borderRadius: UNDERLINE_HEIGHT / 2, backgroundColor: "transparent" },
   // The open tab's underline wears the aurora, like the labels' underline in Home, Explore and Messages.
   underlineActive: { backgroundColor: colors.brand, experimental_backgroundImage: auroraGradient(colors.auroraGlow, 90) },
   // On the row's bottom edge, where each tab's own underline sits.
-  slider: { position: "absolute", bottom: 0, height: UNDERLINE_HEIGHT, backgroundColor: colors.brand, experimental_backgroundImage: auroraGradient(colors.auroraGlow, 90) },
+  slider: { position: "absolute", bottom: 0, height: UNDERLINE_HEIGHT, borderRadius: UNDERLINE_HEIGHT / 2, overflow: "hidden", backgroundColor: colors.brand, experimental_backgroundImage: auroraGradient(colors.auroraGlow, 90) },
 }));

@@ -209,6 +209,10 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   sheet both simply open the profile. The name is a link now too. It covers every place the sheet opens (Orbit, Reels,
   the full-screen viewer). Seen in the Simulator on a temporary dev route (deleted) with the real sheet on a production
   post's comment, read-only and signed out: a tap on the name closed the sheet and showed the profile. `npm run check` 9/9.
+- **A short underline under the profile's tabs** (2026-11-25; the owner's brief: on another student's profile the
+  underline under the open tab, posts or reels, was too long): `profile-tabs.tsx` draws it 32 points wide (`UNDERLINE_WIDTH`,
+  was the whole tab), 2.5 high with rounded ends, centred under the icon, sliding with the pager as before; every
+  profile, your own included. Seen in the Simulator on a profile: under the grid, then slid under Reels. `npm run check` 9/9.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.
@@ -249,6 +253,8 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   on a phone.
 - Then **group `ad91a12a-425f-4e0f-a246-6b0bbb1f49e6`** (2026-11-25, the owner's "publish"), the branch at `f89088f`:
   all of the above and a commenter's photo or name closing the comments before opening their profile. Same way.
+- Then **group `f7922c28-de11-4e37-9282-211507fe4cbc`** (2026-11-25, the owner's "publish"), the branch at `d732bbc`:
+  the profile tabs' short underline as well. Same way.
 
 ## Pending
 

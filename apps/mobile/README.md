@@ -518,8 +518,8 @@ opens too) with a QR icon; then, with no labels (2026-11-15, the owner's pick of
 with the major and class year under it in grey, "Computer Science · ’28" (the year in the text colour; major and year
 from Settings → Account & Profile → Major & class year; what is missing drops out); the bio; and the
 card with Posts | Followers | Following | Likes (every like on your posts, reels and listings); then the tabs
-Posts | Classes | Reels | Saved | Liked | Listings as icons (the open one filled, with an underline as wide as the tab
-and a small mark of who can see that section: a lock for Only me, two people for Friends, a globe for
+Posts | Classes | Reels | Saved | Liked | Listings as icons (the open one filled, with a short underline under its icon
+(32 points, rounded ends; tab-wide until 2026-11-25) and a small mark of who can see that section: a lock for Only me, two people for Friends, a globe for
 Everyone; the filled icon and the mark crossfade with the swipe on the native side, like the underline, so they never
 wait for the pager to settle), over Instagram's grid: three 3:4 tiles to a row (9:16 on Reels), edge to edge with a
 hairline between them and square corners, a play count on videos only (Listings: your live
