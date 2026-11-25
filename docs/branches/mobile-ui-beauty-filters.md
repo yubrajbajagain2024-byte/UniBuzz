@@ -256,6 +256,14 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   a temporary dev route (deleted; its send did nothing, so no Snap was uploaded): the page, a pick raising "To Yubraj"
   with the send button, the chevron closing it. `npm run check` 9/9. Then a little smaller at the owner's word: a 44-point
   photo, the name at 16 points, 10 points above and below, a 26-point ring (rows about 64 points tall, were 72).
+- **BUZZ on the + camera opens the Buzz page's composer** (2026-11-25; the owner's report: no photo or video when
+  posting a buzz from the +, then "use the green circle's posting of the Buzz section"): switching the camera to BUZZ
+  raises `BuzzComposer`, the sheet the Buzz page's + opens (title, words, up to four photos or one video, poll,
+  category, Campus | Global), over the paused camera, once the guidelines are accepted (`buzz-stage.tsx` keeps only
+  the gate, the loading mark and the error; its own words-only composer is gone). Its X or a swipe comes back to the
+  camera's mode; after a buzz goes out, the sheet closes and then (450 ms on) the camera leaves for the Buzz page; an
+  answer to a prompt opens its thread there. Seen in the Simulator (Expo Go; nothing posted): + → BUZZ raised "New
+  buzz" with the 0/4 photo tile, Poll and Video; its X came back to SNAP. `npm run check` 9/9.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.

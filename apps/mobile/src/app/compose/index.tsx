@@ -13,6 +13,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { SFSymbol } from "expo-symbols";
 import { SNAP_LIMITS } from "@apartment-book/shared";
 import { CaptureButton } from "@/components/compose/capture-button";
+import { BuzzComposer } from "@/components/buzz/composer";
+import { openThread } from "@/components/buzz/card";
+import { useBuzzGate } from "@/components/buzz/gate";
 import { BuzzStage } from "@/components/compose/buzz-stage";
 import { DraftsSheet } from "@/components/compose/drafts-sheet";
 import { GallerySheet } from "@/components/compose/gallery-sheet";
@@ -30,6 +33,7 @@ import { useReduceMotion } from "@/lib/accessibility";
 import { useDrafts, type Draft } from "@/lib/compose-drafts";
 import { clock, photoFromCamera, videoFromCamera, videoStill } from "@/lib/compose-media";
 import { REEL_MAX_SECONDS, compose, composeNoun, isListing, roomFor, useCompose, type ComposeMedia, type ListingMode } from "@/lib/compose-store";
+import { buzzState, getBuzzState } from "@/lib/buzz-store";
 import { alertWithHaptic, hapticSelect, hapticSoft } from "@/lib/haptics";
 import { openHomeSection } from "@/lib/home-section";
 import { useSession } from "@/lib/session";
@@ -96,8 +100,8 @@ const SIMULATOR = Platform.OS === "ios" && !Device.isDevice;
  * POST and REEL are one camera: the same stage, the same switches and the same row above the shutter (3m, 60s, 15s,
  * Photo), so moving between them only moves the choice in that row, and the camera never restarts. Tap the shutter
  * for a photo, or to start and stop a video; pinch to zoom, double-tap to flip, swipe sideways to change mode. A post's
- * or reel's shot goes to the editor at once; a Snap goes to Send To (app/snap). BUZZ turns the stage into an anonymous
- * text composer (components/compose/buzz-stage.tsx) while the camera pauses underneath; its X comes back to the mode
+ * or reel's shot goes to the editor at once; a Snap goes to Send To (app/snap). BUZZ pauses the camera and raises the
+ * Buzz page's own composer over it (BuzzComposer: photos, a video, a poll; the gate first, in buzz-stage.tsx); its X comes back to the mode
  * the camera opened on (SNAP from the bar's Create, POST otherwise).
  * Minimal, as TikTok's: the switches are bare icons, and a change of flash, timer or lens is told in a passing pill
  * at the top, as the iPhone's camera does.
@@ -174,6 +178,19 @@ export default function CameraScreen() {
   const buzz = mode === "buzz";
   /** Where BUZZ's X comes back to: SNAP when the camera opened on it (the bar's Create), else POST, as before. */
   const home: CameraMode = params.mode === "snap" ? "snap" : "post";
+  /**
+   * BUZZ raises the Buzz page's own composer over the camera, the sheet its green + opens (a title, the words, up to four
+   * photos or one video, a poll, a category: the owner's brief, 2026-11-25), once the guidelines are accepted; until
+   * then BuzzStage shows the gate. Closing it comes back to the mode BUZZ was chosen from.
+   */
+  const buzzGate = useBuzzGate();
+  const buzzComposerOpen = buzz && buzzGate.status === "accepted";
+  /** A buzz went out: once the sheet has closed, on to the Buzz page. */
+  const buzzWentOut = useRef(false);
+  useEffect(() => {
+    // As the Buzz page's + does: a fresh draft takes the feed's scope; one already begun is kept as it is.
+    if (buzzComposerOpen) buzzState.prepareDraft(getBuzzState().scope);
+  }, [buzzComposerOpen]);
   /** A roommate post or an item (Explore's +): one kind only, no modes to switch, and Skip for one without pictures. */
   const listing = isListing(s.mode);
   // Only this kind's drafts: a post's drafts belong to the Home +, a listing's to Explore's.
@@ -436,6 +453,17 @@ export default function CameraScreen() {
     switchMode("post");
   }
 
+  /**
+   * The Buzz composer closed (its X, a swipe down, or after posting): back to the camera's mode, and on to the Buzz page
+   * once a buzz went out, after the sheet has gone (iOS takes nothing down under a sheet still on screen).
+   */
+  function closeBuzzComposer() {
+    switchMode(home);
+    if (!buzzWentOut.current) return;
+    buzzWentOut.current = false;
+    setTimeout(buzzPosted, 450);
+  }
+
   /** A buzz went out: away from the camera, to Home's Buzz page, where it is at the top of the feed it went to. */
   function buzzPosted() {
     openHomeSection("buzz");
@@ -595,7 +623,7 @@ export default function CameraScreen() {
           </GestureDetector>
         ) : null}
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.flash, flashStyle]} />
-        {buzz ? <BuzzStage stageTop={stageTop} onLeave={() => switchMode(home)} onPosted={buzzPosted} /> : null}
+        {buzz ? <BuzzStage onLeave={() => switchMode(home)} /> : null}
 
         {recording ? (
           <View style={styles.progressTrack} pointerEvents="none">
@@ -749,6 +777,20 @@ export default function CameraScreen() {
         )}
       </View>
 
+      {/* BUZZ: the Buzz page's own composer, over the camera (see buzzComposerOpen). */}
+      <BuzzComposer
+        visible={buzzComposerOpen}
+        onClose={closeBuzzComposer}
+        onPosted={() => {
+          buzzWentOut.current = true;
+        }}
+        onAnswered={(threadId, replyId) =>
+          setTimeout(() => {
+            buzzPosted();
+            openThread(router, threadId, replyId);
+          }, 450)
+        }
+      />
       <GallerySheet
         visible={galleryOpen}
         mode={s.mode}

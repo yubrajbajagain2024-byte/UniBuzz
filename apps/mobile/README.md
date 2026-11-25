@@ -829,7 +829,9 @@ Buzz, so nothing on the Buzz page shows who is looking) and the Buzz label carri
   Classes"; nothing when none). A day's prompt thread shows "✦ Daily prompt" where the alias
   would be and counts answers; an answer posted as its own buzz has the prompt as its title and "Daily prompt · See all
   answers" linking to that thread. The FAB (a pen with the mask, at the bottom right; it stays while the feed scrolls and
-  becomes the collapsed bottom bar's twin, opposite it) and the camera's BUZZ open the composer.
+  becomes the collapsed bottom bar's twin, opposite it) and the camera's BUZZ open the composer (the camera's since
+  2026-11-25: the same sheet over the paused camera, photos and video included, its X back to the camera's mode; the
+  camera had a words-only composer of its own before, `buzz-stage.tsx`, which now shows only the guidelines gate).
 - **Composer.** A full-height sheet (the system's page sheet on iPhone): "You're anonymous", Campus | Global with what
   each means, a category (one row of chips, `BUZZ_CATEGORIES`; optional, tap the chosen one again for none; the line
   under it says what belongs there; a database without `supabase/migrations/20261108000300_buzz_categories.sql` does
