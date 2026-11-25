@@ -258,7 +258,7 @@ function RecipientRow({ person, selected, disabled, onPress }: { person: SnapRec
       accessibilityHint={person.isFriend ? "Friend" : "In your chats"}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.input }]}
     >
-      <Avatar name={person.full_name} url={person.avatar_url} size={48} userId={person.id} ringColor={colors.bg} />
+      <Avatar name={person.full_name} url={person.avatar_url} size={44} userId={person.id} ringColor={colors.bg} />
       <View style={styles.rowWords}>
         <Text style={styles.name} numberOfLines={1}>
           {person.full_name}
@@ -352,12 +352,13 @@ const useStyles = makeStyles((colors) => ({
   groupTextOn: { color: colors.brand },
   list: { paddingBottom: 12, flexGrow: 1 },
   section: { fontSize: 15, fontWeight: "700", color: colors.text, marginTop: 18, marginBottom: 6, marginHorizontal: 16 },
-  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 16, paddingVertical: 12 },
+  // A person's row, a little smaller since 2026-11-25 (the owner's brief): a 44-point photo, 10 points above and below.
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
   rowLine: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   rowWords: { flex: 1 },
-  name: { fontSize: 18, fontWeight: "500", color: colors.text },
-  ring: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: colors.muted, alignItems: "center", justifyContent: "center" },
-  disc: { position: "absolute", top: -1.5, left: -1.5, width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  name: { fontSize: 16, fontWeight: "500", color: colors.text },
+  ring: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.muted, alignItems: "center", justifyContent: "center" },
+  disc: { position: "absolute", top: -1.5, left: -1.5, width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 32, paddingHorizontal: 28 },
   emptyTitle: { fontSize: 16, fontWeight: "700", color: colors.text, textAlign: "center" },
   emptyBody: { fontSize: 14, lineHeight: 19, color: colors.muted, textAlign: "center" },

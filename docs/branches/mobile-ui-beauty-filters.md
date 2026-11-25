@@ -254,7 +254,8 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   still tells the Snap screen it has gone. The screenshot's "Post to… My Story" was left out: a Snap is uploaded to the
   snaps folder and a story needs its own (migration 59), so it would be a feature of its own. Seen in the Simulator on
   a temporary dev route (deleted; its send did nothing, so no Snap was uploaded): the page, a pick raising "To Yubraj"
-  with the send button, the chevron closing it. `npm run check` 9/9.
+  with the send button, the chevron closing it. `npm run check` 9/9. Then a little smaller at the owner's word: a 44-point
+  photo, the name at 16 points, 10 points above and below, a 26-point ring (rows about 64 points tall, were 72).
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.
