@@ -341,6 +341,10 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   all of the above and a commenter's photo or name closing the comments before opening their profile. Same way.
 - Then **group `f7922c28-de11-4e37-9282-211507fe4cbc`** (2026-11-25, the owner's "publish"), the branch at `d732bbc`:
   the profile tabs' short underline as well. Same way.
+- Then **group `d95d4605-72d4-4343-ad05-c1374c53dd0c`** (2026-11-25, the owner's "push"), the branch at `bfb6f3d`:
+  everything since `d732bbc` (two lines and "… more", the carousel's pill on Orbit, Events' top as Messages', no blink
+  on its filters, Send To a full page, BUZZ opening the Buzz page's composer, the session cache and warm-ups, and the
+  events' likes, comments and Going, live with migration 69). From the folder cloned again, fingerprint unchanged.
 
 ## Pending
 

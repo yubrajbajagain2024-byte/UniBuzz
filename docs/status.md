@@ -49,12 +49,11 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 - **The app's redesign of 2026-11-17 to 11-24** (`mobile-ui-beauty-filters`, PRs #113 to #117; branch file
   [branches/mobile-ui-beauty-filters.md](branches/mobile-ui-beauty-filters.md)): the bottom bar and camera, beauty filters
   for photos, black full-screen viewers, Home as Orbit (a card feed under the story tray, a tap opening the viewer) |
-  Buzz, stories as a post's page. On testers' iPhones with the EAS update of 2026-11-25 (group `f7922c28`, build
-  `d30b8306`, from the branch at `d732bbc`: also Orbit's Instagram-style cards, bold white buttons, a commenter's
-  profile closing the comments and the profile tabs' short underline, not on `main` yet). **Migrations 68** (a like on
+  Buzz, stories as a post's page. On testers' iPhones with the EAS update of 2026-11-25 (group `d95d4605`, build
+  `d30b8306`, from the branch at `bfb6f3d`: also Orbit's Instagram-style cards, bold white buttons, the events' likes,
+  comments and Going and the rest of 2026-11-25's work, not on `main` yet). **Migrations 68** (a like on
   one's own story) **and 69** (likes, comments and who is going on events) are on production and staging since
-  2026-11-25 (docs/migrations.md); the app's part of 69 and everything after `d732bbc` reach testers with the next EAS
-  update. **Still to check:** the update on a real iPhone; Android.
+  2026-11-25 (docs/migrations.md), and the app's part with them. **Still to check:** the update on a real iPhone; Android.
 - **Chat redesign, media viewing and the keyboard (app)** (merged as PR #112, 2026-11-15 21:51 UTC; on `main`, summary in
   [history.md](history.md)): an Apple-style chat, tab labels side by side in every tab row, Home without lines between
   the tabs, the story tray and the feed, photos that pinch and double tap to zoom in the full-screen viewer, a video
