@@ -202,6 +202,13 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   at "regular", "medium" and "semibold": "medium" barely differed. iOS only: Android draws Ionicons, which have one
   weight. Seen on Orbit and Roommate (Expo Go, live data read-only); Housing has no listings on production to show.
   `npm run check` 9/9.
+- **A commenter's profile closes the comments** (2026-11-25; the owner's report: a commenter's profile opened with the
+  comments still open over it, and only the photo opened it): in the comments sheet a commenter's photo or name now
+  closes the sheet and then opens their profile (on iOS once the sheet's modal has gone, `onDismiss`, with a 900 ms
+  fallback; straight away on Android), through `CommentProfileOpener`, a context `CommentsSheet` provides; outside a
+  sheet both simply open the profile. The name is a link now too. It covers every place the sheet opens (Orbit, Reels,
+  the full-screen viewer). Seen in the Simulator on a temporary dev route (deleted) with the real sheet on a production
+  post's comment, read-only and signed out: a tap on the name closed the sheet and showed the profile. `npm run check` 9/9.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.

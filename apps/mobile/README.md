@@ -499,7 +499,9 @@ the header or the list pulled down from its top drags it down and closes it past
 flick (`SheetScrollView`), and with the keyboard up the sheet's top stays where it was while the list gives way and the
 composer rides just above the keyboard, on the UI thread (`KeyboardRoom`). "N comments" up top with a Top / Newest sort, each comment with
 a heart and its count (a dislike stays private), Reply, replies folded behind "View N replies", the composer pinned at the
-bottom, and a hold on a comment for Reply / Report / Block / Delete (your own comment, or any comment on your post); a like on a
+bottom, and a hold on a comment for Reply / Report / Block / Delete (your own comment, or any comment on your post). A commenter's
+photo or name opens their profile; in the sheet it closes the sheet first and opens the profile once the sheet has gone
+(`CommentProfileOpener` in `src/components/comments.tsx`, 2026-11-25), so the thread is never left over it; a like on a
 post, a reel or a comment buzzes the phone through `expo-haptics` (`src/lib/haptics.ts`). The same file holds the rest of the vocabulary: a selection tick for chips, segments, switches and the sound buttons, the softest impact when a primary button commits or a list is pulled to refresh, success when something is published, and a warning or an error with the alerts that ask before a delete or report a failure (`alertWithHaptic`). Tapping the tab you are on scrolls its page back to the top, as on every iOS tab bar (`src/lib/tab-reselect.ts`).
 The Share button on posts, reels and listings opens a sheet of your friends (full width since 2026-11-23, edge to edge and down to the screen's bottom like the comments, its list pulling it down from its top: `edge="full"`, `SheetScrollView`), the people you follow who follow you back
 (`src/components/share-sheet.tsx`, mounted once in `src/app/_layout.tsx`): search, tap one or more faces, add an optional
