@@ -12,6 +12,7 @@ import { useTabBarInset } from "@/lib/tab-bar";
 import { useTabReselect } from "@/lib/tab-reselect";
 import { useColors } from "@/lib/theme-provider";
 import { EventCard, useToggleSavedEvent } from "./event-card";
+import { useEventCards } from "./use-event-cards";
 import { DayHeader, EventsEmpty, iso, RowGap, type EventsPageProps } from "./events-page";
 
 type Row = { type: "day"; key: string; label: string } | { type: "event"; key: string; event: EventSummary };
@@ -50,7 +51,18 @@ export function AllEventsSection({ active, topInset, onScroll, universityId, tim
     }
     return out;
   }, [feed.items, timeZone]);
-  const renderItem = useCallback(({ item }: { item: Row }) => (item.type === "day" ? <DayHeader label={item.label} /> : <EventCard event={item.event} timeZone={timeZone} withDay={false} saved={saved.has(item.event.id)} onToggleSave={toggleSave} />), [timeZone, saved, toggleSave]);
+  // Like, comments and Going under each event (migration 69).
+  const cards = useEventCards(feed.items, user?.id ?? null);
+  const { engaged, engagementOf, goingOf, onComments } = cards;
+  const renderItem = useCallback(
+    ({ item }: { item: Row }) =>
+      item.type === "day" ? (
+        <DayHeader label={item.label} />
+      ) : (
+        <EventCard event={item.event} timeZone={timeZone} withDay={false} saved={saved.has(item.event.id)} onToggleSave={toggleSave} engaged={engaged} engagement={engagementOf(item.event.id)} going={goingOf(item.event.id)} onComments={onComments} />
+      ),
+    [timeZone, saved, toggleSave, engaged, engagementOf, goingOf, onComments],
+  );
   const filtered = Boolean(q) || categories.length > 0 || dateFilter !== "any";
 
   return (
@@ -79,6 +91,7 @@ export function AllEventsSection({ active, topInset, onScroll, universityId, tim
         onEndReachedThreshold={0.6}
         refreshControl={<RefreshControl refreshing={feed.refreshing} onRefresh={refreshWithHaptic(feed.refresh)} progressViewOffset={inset.progressViewOffset} />}
       />
+      {cards.sheet}
     </View>
   );
 }

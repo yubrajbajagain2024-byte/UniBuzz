@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputInstance, type ViewStyle } from "react-native";
 import { useRouter } from "expo-router";
-import { addComment, blockUser, COMMENT_SORTS, compactCount, deleteComment, getMyCommentVotes, listComments, reportContent, REPORT_REASONS, shortAge, threadComments, voteComment, type CommentSort, type PostCommentNode, type PostCommentWithAuthor, type PostTargetType, type ReportReason } from "@apartment-book/shared";
+import { addComment, blockUser, COMMENT_SORTS, compactCount, deleteComment, getMyCommentVotes, listComments, reportContent, REPORT_REASONS, shortAge, threadComments, voteComment, type CommentSort, type PostCommentNode, type PostCommentWithAuthor, type EngagementTargetType, type ReportReason } from "@apartment-book/shared";
 import { useActionSheet, type SheetOption } from "@/components/action-sheet";
 import { hapticLike, hapticSuccess, hapticTap, alertWithHaptic } from "@/lib/haptics";
 import { errorText } from "@/lib/hooks";
@@ -162,7 +162,7 @@ function firstName(fullName: string): string {
 }
 
 export type CommentThreadOptions = {
-  targetType: PostTargetType;
+  targetType: EngagementTargetType;
   targetId: string;
   /** Whose post this is: their comments carry the "Author" tag and they may delete any comment on it. */
   ownerId: string;
@@ -550,7 +550,7 @@ export function CommentList({ thread, emptyText }: { thread: CommentThread; empt
  * Pass `autoFocus` to jump straight into typing. The composer sits above the thread: a host that scrolls passes
  * `revealComposer` to bring it back on screen when Reply is tapped.
  */
-export function Comments({ targetType, targetId, ownerId, autoFocus, onCountChange, revealComposer }: { targetType: PostTargetType; targetId: string; ownerId: string; autoFocus?: boolean; onCountChange?: (delta: number) => void; revealComposer?: () => void }) {
+export function Comments({ targetType, targetId, ownerId, autoFocus, onCountChange, revealComposer }: { targetType: EngagementTargetType; targetId: string; ownerId: string; autoFocus?: boolean; onCountChange?: (delta: number) => void; revealComposer?: () => void }) {
   const thread = useCommentThread({ targetType, targetId, ownerId, onCountChange, revealComposer });
   const { inputRef } = thread;
   useEffect(() => {

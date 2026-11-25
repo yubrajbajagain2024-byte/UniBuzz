@@ -19,7 +19,7 @@ const STORIES_SET = [STORIES, MEDIA, FOLDERS];
 // story-actions-rollout.test.mjs, calls-paused.test.mjs); they are not part of this rehearsal.
 // 67 (admin authority) and 68 (liking your own story) go to production on their own (admin-authority.test.mjs,
 // story-self-like.test.mjs); left out until they are live. 68 needs 62, which this rehearsal does not apply.
-const AHEAD = ["20261113000000_events.sql", "20261114000000_story_actions.sql", "20261118000000_calls_paused.sql", "20261119000000_admin_authority.sql", "20261120000000_story_self_like.sql"];
+const AHEAD = ["20261113000000_events.sql", "20261114000000_story_actions.sql", "20261118000000_calls_paused.sql", "20261119000000_admin_authority.sql", "20261120000000_story_self_like.sql", "20261121000000_event_engagement.sql"];
 const ROLLBACKS = ["rollbacks/20261112000200_upload_folders.down.sql", "rollbacks/20261112000100_story_media.down.sql", "rollbacks/20261110000100_stories.down.sql"];
 // The release 58, 59 and 60 go ahead of, in file order.
 const REST = [

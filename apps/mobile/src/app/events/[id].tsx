@@ -1,20 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Linking, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { categoryLabel, deleteEvent, eventPath, eventWhen, getEvent, isEventLive, listMyOrganizations, ORGANIZATION_KINDS, recordEventClick, updateEvent, type EventSummary } from "@apartment-book/shared";
+import { categoryLabel, compactCount, deleteEvent, eventWhen, getEvent, getEventGoingMany, getPostEngagement, isEventLive, listEventGoing, listMyOrganizations, ORGANIZATION_KINDS, recordEventClick, updateEvent, type EventSummary, type ProfileSummary } from "@apartment-book/shared";
 import { Avatar } from "@/components/avatar";
+import { CommentsSheet } from "@/components/comments-sheet";
+import { useLike } from "@/components/engagement";
 import { EventGlyph, EventStatusPill, useToggleSavedEvent } from "@/components/events/event-card";
 import { OrganizationFollowButton } from "@/components/events/organization-follow-button";
 import { Icon, useBounceOn, type IconName } from "@/components/icon";
 import { Button, EmptyState, Loading } from "@/components/ui";
 import { useCampusTimeZone } from "@/lib/campus-time-zone";
+import { shareEvent, useEventEngagementReady, useGoing } from "@/lib/event-engagement";
+import { useOpenProfile } from "@/lib/open-profile";
 import { savedEvents } from "@/lib/event-saves-store";
 import { alertWithHaptic, hapticSuccess } from "@/lib/haptics";
 import { errorText, useQuery } from "@/lib/hooks";
 import { rowKey } from "@/lib/query-cache";
 import { useSession } from "@/lib/session";
-import { SITE_URL, supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { radius, space, textStyle } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 
@@ -24,21 +28,50 @@ function mapsUrl(location: string): string {
   return Platform.OS === "ios" ? `https://maps.apple.com/?q=${q}` : `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
 
-/** One of the three quiet actions under the title: its icon over its word. */
-function Action({ icon, sf, label, onPress, selected, bounce }: { icon: IconName; sf?: Parameters<typeof Icon>[0]["sf"]; label: string; onPress: () => void; selected?: boolean; bounce?: number }) {
+/** One of the actions under the title: its icon over its word, in the brand's colour (or `tint`) once selected. */
+function Action({ icon, sf, label, onPress, selected, bounce, tint }: { icon: IconName; sf?: Parameters<typeof Icon>[0]["sf"]; label: string; onPress: () => void; selected?: boolean; bounce?: number; tint?: string }) {
   const styles = useStyles();
   const colors = useColors();
+  const on = selected ? (tint ?? colors.brand) : colors.text;
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} accessibilityState={selected === undefined ? undefined : { selected }} style={({ pressed }) => [styles.action, pressed && { opacity: 0.6 }]}>
-      <Icon name={icon} sf={sf} size={22} color={selected ? colors.brand : colors.text} bounce={bounce} />
-      <Text style={[styles.actionText, selected && { color: colors.brand }]}>{label}</Text>
+      <Icon name={icon} sf={sf} size={22} weight="semibold" color={on} bounce={bounce} />
+      <Text style={[styles.actionText, selected && { color: on }]} numberOfLines={1}>
+        {label}
+      </Text>
     </Pressable>
+  );
+}
+
+/** Who is going: their faces and first names in a row that scrolls, the most recent first; a tap opens a profile. */
+function GoingRow({ people, total }: { people: ProfileSummary[]; total: number }) {
+  const styles = useStyles();
+  const openProfile = useOpenProfile();
+  return (
+    <View style={styles.goingBlock}>
+      <Text style={styles.goingTitle}>{total > 0 ? `${compactCount(total)} going` : "Who's going"}</Text>
+      {people.length === 0 ? (
+        <Text style={styles.goingEmpty}>Nobody yet. Tap Going to be the first.</Text>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.goingPeople}>
+          {people.map((p) => (
+            <Pressable key={p.id} onPress={() => openProfile(p.id)} accessibilityRole="button" accessibilityLabel={p.full_name} style={({ pressed }) => [styles.goingPerson, pressed && { opacity: 0.7 }]}>
+              <Avatar name={p.full_name} url={p.avatar_url} size={48} userId={p.id} />
+              <Text style={styles.goingName} numberOfLines={1}>
+                {p.full_name.split(" ")[0] || p.full_name}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
 /**
  * An event's own page: its picture (or the category's glyph on the aurora), what and when on the campus's clock, where
- * (a tap opens the maps app), who is holding it with a Follow pill, Save | Share | Directions, the registration link as
+ * (a tap opens the maps app), who is holding it with a Follow pill, Like | Comment | Share | Going | Save with who is
+ * going under them (migration 69; Save | Share | Directions on a server without it), the registration link as
  * the one big button, then the words. A cancelled or pending event says so at the top. Members of the organization
  * get Edit, Cancel or Restore, and Delete at the bottom. Opening counts once a day for the ranking (record_event_click).
  */
@@ -59,6 +92,23 @@ export default function EventScreen() {
   const toggleSave = useToggleSavedEvent();
   const saveBounce = useBounceOn(saved);
   const [busy, setBusy] = useState(false);
+  // Like, comments and who is going (migration 69; the owner's brief, 2026-11-25), once the server has them.
+  const engaged = useEventEngagementReady();
+  const needLogin = useCallback(() => router.push("/(auth)/login"), [router]);
+  const counts = useQuery(() => (engaged ? getPostEngagement(supabase, "event", id) : Promise.resolve(null)), [id, engaged, user?.id]);
+  const goingQ = useQuery(() => (engaged && user ? getEventGoingMany(supabase, [id]).then((m) => m[id] ?? null) : Promise.resolve(null)), [id, engaged, user?.id]);
+  const peopleQ = useQuery(() => (engaged && user ? listEventGoing(supabase, id, 40) : Promise.resolve([] as ProfileSummary[])), [id, engaged, user?.id]);
+  const like = useLike("event", id, counts.data ?? undefined, user?.id ?? null, needLogin);
+  const likeBounce = useBounceOn(like.liked);
+  const rsvp = useGoing(id, goingQ.data ?? undefined, user?.id ?? null, needLogin);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentDelta, setCommentDelta] = useState(0);
+  const comments = Math.max(0, (counts.data?.comments ?? 0) + commentDelta);
+  // You join the faces at once when you say you are going, and leave them when you take it back.
+  const goingPeople = (() => {
+    const others = (peopleQ.data ?? []).filter((p) => p.id !== user?.id);
+    return rsvp.goingByMe && profile ? [{ id: profile.id, full_name: profile.full_name, avatar_url: profile.avatar_url }, ...others] : others;
+  })();
   const { refresh } = event;
   // Coming back from Edit, the page reads the event again (the rows on screen stay until it arrives).
   const opened = useRef(false);
@@ -79,16 +129,7 @@ export default function EventScreen() {
   const cancelled = e.status === "cancelled";
   const live = !cancelled && isEventLive(e, now);
   const kind = e.organization ? (ORGANIZATION_KINDS.find((k) => k.value === e.organization?.kind)?.label ?? "Organization") : null;
-  const url = `${SITE_URL}${eventPath(e.id)}`;
-
-  async function share() {
-    try {
-      await Share.share(Platform.OS === "ios" ? { url, message: e!.title } : { message: `${e!.title}\n${url}` });
-      if (user) void recordEventClick(supabase, e!.id, "share");
-    } catch {
-      // The sheet was dismissed.
-    }
-  }
+  const share = () => shareEvent(e, user?.id ?? null);
   function register() {
     if (!e?.registration_url) return;
     if (user) void recordEventClick(supabase, e.id, "register");
@@ -140,6 +181,7 @@ export default function EventScreen() {
   }
 
   return (
+    <>
     <ScrollView contentContainerStyle={{ paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
       {e.image_url ? <Image source={{ uri: e.image_url }} style={{ width, height: Math.round((width * 9) / 16) }} contentFit="cover" transition={200} /> : <EventGlyph category={e.category} size={width} iconSize={44} />}
       <View style={styles.content}>
@@ -198,11 +240,23 @@ export default function EventScreen() {
             </View>
           </View>
         ) : null}
-        <View style={styles.actions}>
-          <Action icon={saved ? "bookmark" : "bookmark-outline"} label={saved ? "Saved" : "Save"} selected={saved} bounce={saveBounce} onPress={() => toggleSave(e)} />
-          <Action icon="share-outline" label="Share" onPress={() => void share()} />
-          {e.location ? <Action icon="navigate-outline" label="Directions" onPress={() => void Linking.openURL(mapsUrl(e.location!))} /> : null}
-        </View>
+        {engaged ? (
+          // Like, Comment, Share, Going and Save, as under a post (the place above already opens the maps app).
+          <View style={styles.actions}>
+            <Action icon={like.liked ? "heart" : "heart-outline"} label={like.likes > 0 ? compactCount(like.likes) : "Like"} selected={like.liked} tint={colors.like} bounce={likeBounce} onPress={() => void like.toggle()} />
+            <Action icon="chatbubble-outline" label={comments > 0 ? compactCount(comments) : "Comment"} onPress={() => setCommentsOpen(true)} />
+            <Action icon="share-outline" label="Share" onPress={() => void share()} />
+            <Action icon={rsvp.goingByMe ? "people" : "people-outline"} label="Going" selected={rsvp.goingByMe} onPress={() => void rsvp.toggle()} />
+            <Action icon={saved ? "bookmark" : "bookmark-outline"} label={saved ? "Saved" : "Save"} selected={saved} bounce={saveBounce} onPress={() => toggleSave(e)} />
+          </View>
+        ) : (
+          <View style={styles.actions}>
+            <Action icon={saved ? "bookmark" : "bookmark-outline"} label={saved ? "Saved" : "Save"} selected={saved} bounce={saveBounce} onPress={() => toggleSave(e)} />
+            <Action icon="share-outline" label="Share" onPress={() => void share()} />
+            {e.location ? <Action icon="navigate-outline" label="Directions" onPress={() => void Linking.openURL(mapsUrl(e.location!))} /> : null}
+          </View>
+        )}
+        {engaged && user ? <GoingRow people={goingPeople} total={rsvp.going} /> : null}
         {e.registration_url && !cancelled ? <Button title={e.source === "feed" ? "Event page" : "Register"} size="large" icon="open-outline" onPress={register} /> : null}
         {e.description ? (
           <Text style={styles.description} selectable>
@@ -221,6 +275,9 @@ export default function EventScreen() {
         ) : null}
       </View>
     </ScrollView>
+    {/* An event has no owner who could delete others' comments (migration 69): nobody is its "Author". */}
+    <CommentsSheet target={commentsOpen ? { targetType: "event", targetId: e.id, ownerId: "", comments } : null} onClose={() => setCommentsOpen(false)} onCountChange={(d) => setCommentDelta((n) => n + d)} />
+    </>
   );
 }
 
@@ -238,9 +295,16 @@ const useStyles = makeStyles((colors) => ({
   hostMeta: { ...textStyle.footnote, color: colors.muted },
   feedMark: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brandSoft, alignItems: "center", justifyContent: "center" },
   actions: { flexDirection: "row", justifyContent: "space-around", paddingVertical: space.xs, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  action: { alignItems: "center", gap: 4, paddingVertical: space.sm, minWidth: 84 },
+  // Up to five, sharing the row.
+  action: { flex: 1, alignItems: "center", gap: 4, paddingVertical: space.sm, minWidth: 0 },
   actionText: { ...textStyle.caption1, fontWeight: "600", color: colors.text },
   description: { ...textStyle.body, color: colors.text },
+  goingBlock: { gap: space.sm },
+  goingTitle: { ...textStyle.headline, color: colors.text },
+  goingEmpty: { ...textStyle.footnote, color: colors.muted },
+  goingPeople: { gap: space.md, paddingRight: space.lg },
+  goingPerson: { width: 60, alignItems: "center", gap: 4 },
+  goingName: { ...textStyle.caption1, color: colors.text, maxWidth: 60 },
   manage: { gap: space.sm, padding: space.md, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: colors.panel },
   manageTitle: { ...textStyle.footnote, fontWeight: "700", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4 },
 }));

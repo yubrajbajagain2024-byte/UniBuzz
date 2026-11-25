@@ -276,6 +276,19 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   is one round trip (was two). Events, Messages and Profile render 1.2 s after Home opens. Seen in the Simulator: after
   a restart, Messages fully drawn 0.3 s after its tab was tapped, no spinner. Not tried there, to leave the live account
   as it was: opening a chat (it marks it read) and opening a listing (it records a view). `npm run check` 9/9.
+- **Like, comment, share, save and Going on events** (2026-11-25; the owner's brief, then their answers: every name of
+  who is going seen by everyone who may see the event; on the cards and the page): **migration 69**
+  (`20261121000000_event_engagement.sql`, applied nowhere yet; see docs/migrations.md) lets `post_likes` and
+  `post_comments` take events, under events_read, and adds `event_rsvps` and `event_going_many`. Shared: the
+  `EngagementTargetType` type (likes and comments; `PostTargetType` unchanged for saves, views and chat cards),
+  `eventEngagementReady`, `getEventGoingMany`, `setEventGoing`, `listEventGoing`. App: `src/lib/event-engagement.ts`
+  (the readiness check, page counts, a Going state shared by a card and the page, `shareEvent`), `useEventCards` for
+  the two lists; the card's row of buttons (heart and comments with counts, Share, the Going pill, the bookmark), the
+  page's Like | Comment | Share | Going | Save and who is going; comments in the post sheet. Without 69 on the server,
+  Save and Share alone (Directions on the page). Tests: `event-engagement.test.mjs` 21/21; the five rollout suites with
+  69 in their `AHEAD` skips; `npm run check` 9/9. Seen in the Simulator on a temporary dev route with sample events
+  (deleted): the row with counts, a blue "8 going", a saved bookmark, and the Share and Save row of a server without 69.
+  Not tried against a database with 69 (none has it).
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.

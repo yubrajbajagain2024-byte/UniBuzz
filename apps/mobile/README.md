@@ -781,9 +781,15 @@ in a single line that opens `src/app/events/interests.tsx` and can be dismissed 
 `src/lib/event-interests.ts`; the filter sheet's Your interests stays; a save re-ranks at once), and suggests
 organizations to follow while they follow few. **All events** (`all-events-section.tsx`) is time order under day headings ("Today", "Tomorrow", "Thu,
 Nov 12"), a page at a time. Each row (`event-card.tsx`) is the picture or the category's glyph, the title, when, where,
-who is holding it and the category, with the bookmark; cancelled events stay, greyed and marked. An event's page
-(`src/app/events/[id].tsx`) adds the organization with a Follow pill, Save | Share | Directions, the registration link
-as the one big button and, for the organization's members, Edit, Cancel and Delete. Saved events are
+who is holding it and the category, then a row of buttons as under a post (2026-11-25): the heart and the comments
+with their counts, Share, a Going pill with how many are going (blue once you are) and the bookmark; cancelled events
+stay, greyed and marked. An event's page (`src/app/events/[id].tsx`) adds the organization with a Follow pill, Like |
+Comment | Share | Going | Save, who is going (their faces and first names, a tap opening a profile; everyone signed in
+who may see the event sees every name, the owner's choice), the registration link as the one big button and, for the
+organization's members, Edit, Cancel and Delete. Comments open the same sheet as a post's. Likes, comments and Going
+need migration 69 (`20261121000000_event_engagement.sql`): on a server without it the app shows Save | Share |
+Directions as before (`useEventEngagementReady`, `src/lib/event-engagement.ts`). Nobody is notified of a like or a
+comment on an event (it has no owner); a reply to a comment there notifies its writer. Saved events are
 `src/app/events/saved.tsx` and a group on Saved; interests `src/app/events/interests.tsx`.
 
 Events come from two places (migration 61, `supabase/migrations/20261113000000_events.sql`): the university's own

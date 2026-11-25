@@ -18,6 +18,7 @@ import { dismissInterestsPrompt, interestsPromptDismissed, onEventInterestsChang
 import { radius, space, textStyle } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/theme-provider";
 import { EventCard, useToggleSavedEvent } from "./event-card";
+import { useEventCards } from "./use-event-cards";
 import { EventsEmpty, iso, RowGap, type EventsPageProps } from "./events-page";
 import { OrganizationFollowButton } from "./organization-follow-button";
 
@@ -152,6 +153,8 @@ export function ForYouEventsSection({ active, topInset, onScroll, universityId, 
         ) : null}
       </View>
     ) : null;
+  // Like, comments and Going under each event (migration 69).
+  const cards = useEventCards(ranked, me);
   const filtered = Boolean(q) || categories.length > 0 || dateFilter !== "any";
 
   return (
@@ -166,7 +169,7 @@ export function ForYouEventsSection({ active, topInset, onScroll, universityId, 
         contentContainerStyle={{ paddingBottom: 90 + tabBar, paddingTop: inset.paddingTop }}
         CellRendererComponent={appearCells}
         ListHeaderComponent={header ?? undefined}
-        renderItem={({ item }) => <EventCard event={item} timeZone={timeZone} saved={saved.has(item.id)} onToggleSave={toggleSave} />}
+        renderItem={({ item }) => <EventCard event={item} timeZone={timeZone} saved={saved.has(item.id)} onToggleSave={toggleSave} engaged={cards.engaged} engagement={cards.engagementOf(item.id)} going={cards.goingOf(item.id)} onComments={cards.onComments} />}
         ItemSeparatorComponent={RowGap}
         windowSize={9}
         initialNumToRender={8}
@@ -176,6 +179,7 @@ export function ForYouEventsSection({ active, topInset, onScroll, universityId, 
         ListEmptyComponent={query.loading && !query.data ? <Loading /> : query.error ? <View style={{ paddingHorizontal: 16 }}><ErrorBanner message={query.error} onRetry={() => void query.refresh()} /></View> : <EventsEmpty filtered={filtered} campus={Boolean(universityId)} />}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshWithHaptic(() => void onRefresh())} progressViewOffset={inset.progressViewOffset} />}
       />
+      {cards.sheet}
     </View>
   );
 }
