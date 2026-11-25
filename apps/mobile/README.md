@@ -765,6 +765,10 @@ opened from a calendar in Home's top bar, between 2026-11-15 and 2026-11-21): th
 Saved at its right,
 For you | All events above a pager, with Explore's three levels (DiscoveryBar: the labels, one search field with the
 filter button, one row of chips, all sliding up under the title as a page scrolls), and the floating "+" to publish.
+Since 2026-11-25 Events' top is drawn exactly as Messages' is (the owner's brief; DiscoveryBar's `look="messages"`, its
+measures `INBOX_MEASURES` from `src/components/messages/inbox-header.tsx`): the same title row, no line under the
+labels, the inbox's 46-point search field, the filter button bare like the inbox's pencil, and filled pills as All |
+Unread | Requests are (blue when on). Explore keeps its own look.
 The quick filters narrow both pages with a tap: Today, This week, Weekend (`eventDateRange` in packages/shared, on the
 campus's clock; Upcoming is none of them), then a chip for each event type in force, a tap from being dropped, and
 Clear. The filter button counts the choices in force and opens a sheet (`src/components/events/event-filter-sheet.tsx`)

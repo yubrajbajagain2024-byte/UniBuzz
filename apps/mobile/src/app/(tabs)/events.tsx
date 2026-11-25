@@ -3,7 +3,7 @@ import { Animated, Pressable, Text, View, useWindowDimensions, type NativeScroll
 import { useIsFocused, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DEFAULT_EVENT_FILTERS, EVENT_SECTIONS, eventActiveChips, eventFilterCount, eventQuickFilters, type EventFilterChoice, type EventSection } from "@apartment-book/shared";
-import { DISCOVERY_BAR_HEIGHT, DiscoveryBar } from "@/components/discovery-bar";
+import { discoveryBarHeight, DiscoveryBar } from "@/components/discovery-bar";
 import { AllEventsSection } from "@/components/events/all-events-section";
 import { EventFilterSheet } from "@/components/events/event-filter-sheet";
 import { ForYouEventsSection } from "@/components/events/for-you-events-section";
@@ -20,7 +20,8 @@ import { makeStyles, useAppTheme } from "@/lib/theme-provider";
 const ORDER = EVENT_SECTIONS.map((s) => s.value);
 /** The title row, fixed under the safe area; the labels, the search field and the quick filters (DiscoveryBar) float and slide away like Explore's. */
 const TITLE_ROW = 52;
-const FLOAT = DISCOVERY_BAR_HEIGHT;
+// The bar in Messages' look (the owner's brief, 2026-11-25), so its height is the inbox's.
+const FLOAT = discoveryBarHeight("messages");
 
 /**
  * Events, the bottom bar's second tab (the owner's sketch, 2026-11-21: Home, Events, Create, Messages, Profile; Explore
@@ -140,14 +141,14 @@ export default function EventsScreen() {
             Events
           </Text>
           <Pressable onPress={() => router.push((user ? "/events/saved" : "/(auth)/login") as never)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Saved events" style={({ pressed }) => [styles.titleButton, pressed && { opacity: 0.6 }]}>
-            <Icon name="bookmark-outline" size={24} color={colors.text} />
+            <Icon name="bookmark-outline" size={25} color={colors.text} />
           </Pressable>
         </View>
       </View>
       <View style={styles.body}>
         <Animated.View style={[styles.float, { transform: [{ translateY: floatShift }] }]}>
           <DiscoveryBar
-            hairline={false}
+            look="messages"
             tabs={<SlidingTabs sections={EVENT_SECTIONS} section={section} onSelect={select} scrollX={scrollX} pageWidth={width} tint={colors.accent} tintGradient={auroraGradient(colors.auroraGlow, 90)} labelColor={colors.text} dimColor={colors.muted} fontSize={16} />}
             query={text}
             onQuery={setText}
@@ -211,9 +212,10 @@ export default function EventsScreen() {
 const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   chrome: { backgroundColor: colors.bar, zIndex: 3 },
-  titleRow: { height: TITLE_ROW, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.md, paddingLeft: 20, paddingRight: space.md },
+  // Messages' title row (inbox-header.tsx): the same height and insets, the button as wide as its magnifier's.
+  titleRow: { height: TITLE_ROW, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.md, paddingLeft: 20, paddingRight: space.lg },
   title: { flexShrink: 1, ...textStyle.largeTitle, color: colors.text },
-  titleButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  titleButton: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   body: { flex: 1, overflow: "hidden" },
   float: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 2, backgroundColor: colors.bar },
 }));

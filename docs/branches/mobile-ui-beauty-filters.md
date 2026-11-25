@@ -232,6 +232,15 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   Chats | Groups only the sliding aurora underline is left. Events' through `DiscoveryBar`'s new `hairline={false}`
   (Explore, the bar's other user, keeps its line: the brief named Events and Messages); Messages' in
   `inbox-header.tsx`'s row style. Seen in the Simulator on both tabs. `npm run check` 9/9.
+- **Events' top drawn as Messages' is** (2026-11-25; the owner's screenshots of both: Events = Messages, For you | All
+  events = Chats | Groups, Search events = Search chats, Today | This week | Weekend = All | Unread | Requests):
+  `DiscoveryBar` gains `look="messages"`, measure for measure from `INBOX_MEASURES` (exported by `inbox-header.tsx`):
+  the 44-point labels row with no line (replacing the `hairline` prop of the entry above), 12 points around a 46-point
+  field with 20-point sides, the filter button bare and as tall as the field like the inbox's pencil, filled 32-point
+  pills (blue when on); `discoveryBarHeight("messages")` sets the pages' inset. Events' title row takes Messages'
+  right inset and 40-point button. Explore keeps its look. Seen in the Simulator side by side with Messages (the rows,
+  the field, the button and the pills at the same places and sizes; Today turned blue with Clear beside it).
+  `npm run check` 9/9.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.

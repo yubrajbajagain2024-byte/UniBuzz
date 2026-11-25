@@ -28,6 +28,12 @@ const SEARCH_ROOM = space.md;
 const CHIP = 32;
 const FILTERS_ROOM = space.sm;
 
+/**
+ * The inbox's measures, shared with Events' bar (DiscoveryBar's "messages" look, 2026-11-25: the owner asked for Events'
+ * top to be Messages' exactly), so the two never drift apart.
+ */
+export const INBOX_MEASURES = { TABS_ROW, SEARCH_FIELD, SEARCH_ROOM, CHIP, FILTERS_ROOM } as const;
+
 /** The signed-in header's whole height, below the status bar: how far the Messages tab's lists start down, under it. */
 export const INBOX_HEADER_HEIGHT = TOP_ROW + TABS_ROW + SEARCH_ROOM + SEARCH_FIELD + SEARCH_ROOM + CHIP + FILTERS_ROOM;
 
