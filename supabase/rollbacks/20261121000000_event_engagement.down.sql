@@ -20,6 +20,31 @@ alter table public.post_likes add constraint post_likes_target_type_check check 
 alter table public.post_comments drop constraint if exists post_comments_target_type_check;
 alter table public.post_comments add constraint post_comments_target_type_check check (target_type in ('apartment', 'item', 'roommate', 'post'));
 
+-- CampConnect Admin's target_visible() as its own file has it (no 'event' case), where that schema is installed.
+do $do$
+begin
+  if to_regprocedure('public.target_visible(text, uuid)') is not null then
+    execute $f$
+      create or replace function public.target_visible(p_type text, p_id uuid)
+      returns boolean
+      language sql
+      stable
+      security definer
+      set search_path = public
+      as $$
+        select case p_type
+          when 'apartment' then exists (select 1 from public.apartments a where a.id = p_id and public.content_visible(a.owner_id, a.hidden_at))
+          when 'item' then exists (select 1 from public.items i where i.id = p_id and public.content_visible(i.seller_id, i.hidden_at))
+          when 'roommate' then exists (select 1 from public.roommate_posts r where r.id = p_id and public.content_visible(r.author_id, r.hidden_at))
+          when 'post' then exists (select 1 from public.feed_posts f where f.id = p_id and public.content_visible(f.author_id, f.hidden_at))
+          else false
+        end;
+      $$
+    $f$;
+  end if;
+end
+$do$;
+
 create or replace function public.post_link(p_target_type text, p_target_id uuid)
 returns text
 language sql

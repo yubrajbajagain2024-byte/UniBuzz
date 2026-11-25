@@ -288,7 +288,17 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   Save and Share alone (Directions on the page). Tests: `event-engagement.test.mjs` 21/21; the five rollout suites with
   69 in their `AHEAD` skips; `npm run check` 9/9. Seen in the Simulator on a temporary dev route with sample events
   (deleted): the row with counts, a blue "8 going", a saved bookmark, and the Share and Save row of a server without 69.
-  Not tried against a database with 69 (none has it).
+  Not tried against a database with 69 (none had it then).
+- **68 and 69 live** (2026-11-25, with the owner's token and approval): the project folder had been deleted on the Mac
+  while space was freed, so it was cloned again from GitHub at `f2333f1` (`npm install`, `npm run typecheck` green).
+  Staging: `story-actions.mjs` applied 68 (18/18). `event-engagement.mjs` (new) found likes and comments on events
+  refused: CampConnect Admin's `target_visible()` (applied-outside-repo, in the insert policies of likes and comments)
+  knew no 'event', and the offline suite had run in the repo's order only. 69 now teaches it 'event' where it exists
+  (its rollback puts it back); `event-engagement.test.mjs` runs in both orders (42/42). Then on staging 11/11,
+  `--restore` 12/12, afresh 11/11. Production: `verify.mjs --live --except` 68 and 69 the same schema; a full backup
+  (`~/CampConnect-backups/2026-11-25-before-migration-68-69`, 221 files checked); 68 at 20:17 UTC and 69 at 20:19 UTC,
+  each with its checks (69's with a rolled-back probe as a real student); `verify.mjs --live` after: the same schema
+  as the repo, 73 migrations. The app's event buttons appear on testers' phones with the next EAS update.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.
