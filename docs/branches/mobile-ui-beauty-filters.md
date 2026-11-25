@@ -186,6 +186,11 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   (3:4, a square second slide filling it, the dots in the row of buttons) and a 2.67:1 photo cropped to 1.91:1. No post
   on production has more than one photo. Orbit's "Could not load more. Tap to try again." showed at the end of each page
   in the same session (a retry loaded the next page): a paging problem, not this change; not looked into yet.
+- **The caption back under the name** (2026-11-25; the owner's brief: "caption or bio to top below username in orbit,
+  above content"): the title, the caption and the link sit under the header again, above the picture, two lines before
+  "more…" over a picture and three on a post of words alone; the bold name before the words is gone with the move.
+  `npm run check` 9/9. Seen in the Simulator (Expo Go, live data read-only): "Note" under Sunil Sherpa's name, above
+  the photo.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.

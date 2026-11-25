@@ -67,13 +67,13 @@ export function frameAspect(media: FeedMedia[], reel: boolean): number {
 }
 
 /**
- * A post in the Home feed, laid out as Instagram's Home feed lays one out (the owner's brief, 2026-11-24): header → the
- * photo or video edge to edge, sized by frameAspect → heart, comment and share with their counts, a carousel's dots in
- * the middle of that row, the bookmark on the right → "Liked by …" → its title in bold and the caption after the
- * author's name, folded to two lines ("more…" / "less"), and its link → the newest comments. A words-only post keeps its
- * words under the header, where they are the post. A friends-only or selected-people post has no Share (the database
- * refuses to send it into a chat), and the author of a post that is not Global sees who can on the line under their
- * name; one with comments off has no comment button.
+ * A post in the Home feed, its picture laid out as Instagram's Home feed lays one out (the owner's brief, 2026-11-24) and
+ * its words under the name (2026-11-25): header → its title in bold, the caption folded to two lines ("more…" / "less";
+ * three on a post of words alone) and its link → the photo or video edge to edge, sized by frameAspect → heart, comment
+ * and share with their counts, a carousel's dots in the middle of that row, the bookmark on the right → "Liked by …" →
+ * the newest comments. A friends-only or selected-people post has no Share (the database refuses to send it into a
+ * chat), and the author of a post that is not Global sees who can on the line under their name; one with comments off
+ * has no comment button.
  */
 export function InstaPost({ post, saved, engagement, preview, subtitle, active, detail, onComments, onDeleted, ...props }: InstaPostProps) {
   const router = useRouter();
@@ -257,41 +257,27 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
     ),
   );
 
-  /**
-   * The title in bold, the words and the link. Under a picture (`named`) the words follow the author's name in bold and
-   * fold to two lines, as Instagram's captions do; a words-only post shows three before "more…".
-   */
-  const words = (named: boolean) => (
-    <>
-      {title ? (
-        <Text style={styles.title} selectable={detail}>
-          {title}
-        </Text>
-      ) : null}
-      {text ? (
-        <ExpandableText style={styles.text} lines={named ? 2 : 3} expanded={detail} collapsible={!detail} selectable={detail}>
-          {named ? (
-            <>
-              <Text style={styles.bold} onPress={() => openProfile(author.id)}>
-                {author.full_name}
-              </Text>{" "}
-            </>
-          ) : null}
-          {caption}
-        </ExpandableText>
-      ) : null}
-      {link ? <PostLink url={link} /> : null}
-    </>
-  );
 
   return (
     <View style={styles.post} accessibilityLabel={`Post: ${(title ?? text).slice(0, 40) || `by ${author.full_name}`}`}>
       <PostHeader name={author.full_name} avatarUrl={author.avatar_url} userId={author.id} verified={isVerifiedPoster(author)} meta={meta} audience={own && audience !== "global" ? audience : undefined} audienceName={post.university?.name ?? profile?.university?.name} onOpen={() => openProfile(author.id)} onMenu={menu} />
 
-      {media.length === 0 && (title || text || link) ? (
-        // Words only: the text is the post, under the header, and takes the double tap.
-        <Pressable onPress={textTap} style={styles.body}>
-          {words(false)}
+      {title || text || link ? (
+        // The title, the words and the link under the name, above the picture (the owner's brief, 2026-11-25), folded to two
+        // lines before "more…" over a picture so it stays near the name, three on a post of words alone, where the text
+        // is the post and takes the double tap.
+        <Pressable onPress={media.length === 0 ? textTap : undefined} style={styles.body}>
+          {title ? (
+            <Text style={styles.title} selectable={detail}>
+              {title}
+            </Text>
+          ) : null}
+          {text ? (
+            <ExpandableText style={styles.text} lines={media.length > 0 ? 2 : 3} expanded={detail} collapsible={!detail} selectable={detail}>
+              {caption}
+            </ExpandableText>
+          ) : null}
+          {link ? <PostLink url={link} /> : null}
         </Pressable>
       ) : null}
 
@@ -328,7 +314,7 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
         }
       />
 
-      {(face && like.likes > 0) || (media.length > 0 && (title || text || link)) || (!detail && !commentsOff && comments > 0) ? (
+      {(face && like.likes > 0) || (!detail && !commentsOff && comments > 0) ? (
         <View style={styles.below}>
           {face && like.likes > 0 ? (
             <View style={styles.likedBy}>
@@ -353,8 +339,6 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
               </Text>
             </View>
           ) : null}
-
-          {media.length > 0 && (title || text || link) ? <View style={styles.caption}>{words(true)}</View> : null}
 
           {!detail && !commentsOff && comments > 1 ? (
             <Pressable onPress={onComments} accessibilityRole="button">
@@ -387,8 +371,6 @@ const useStyles = makeStyles((colors) => ({
   slideDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.faint },
   slideDotActive: { backgroundColor: colors.accent },
   below: { paddingHorizontal: POST_GUTTER, paddingTop: 6, gap: 4 },
-  // The title, the caption and the link under the picture: one block, spaced a little apart.
-  caption: { gap: 4 },
   likedBy: { flexDirection: "row", alignItems: "center", gap: 6 },
   face: { borderWidth: 1.5, borderColor: colors.bg, borderRadius: 12 },
   line: { fontSize: 14, lineHeight: 19, color: colors.text, flexShrink: 1 },
