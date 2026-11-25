@@ -22,15 +22,16 @@ export type DiscoveryChip = { key: string; label: string; on: boolean; removable
  * choice made in the filter sheet (with an ×, a tap from being dropped), and Clear when anything is on. A filter in force
  * is UniBuzz blue, its ring and words, on the soft blue fill. Every advanced choice lives in the sheet the button opens. The
  * screen floats the bar over its pages and slides it away as they scroll (useCollapsingHeader); its height is fixed
- * (DISCOVERY_BAR_HEIGHT), so the pages never move under it.
+ * (DISCOVERY_BAR_HEIGHT), so the pages never move under it. `hairline` false leaves out the thin line under the labels
+ * (Events, since 2026-11-25, the owner's brief); Explore keeps it.
  */
-export function DiscoveryBar({ tabs, query, onQuery, placeholder, searching = false, filterCount, onOpenFilters, filterHint, chips, onClear }: { tabs: ReactNode; query: string; onQuery: (text: string) => void; placeholder: string; searching?: boolean; filterCount: number; onOpenFilters: () => void; filterHint: string; chips: DiscoveryChip[]; onClear: () => void }) {
+export function DiscoveryBar({ tabs, query, onQuery, placeholder, searching = false, filterCount, onOpenFilters, filterHint, chips, onClear, hairline = true }: { hairline?: boolean; tabs: ReactNode; query: string; onQuery: (text: string) => void; placeholder: string; searching?: boolean; filterCount: number; onOpenFilters: () => void; filterHint: string; chips: DiscoveryChip[]; onClear: () => void }) {
   const styles = useStyles();
   const { colors, isDark } = useAppTheme();
   const on = filterCount > 0;
   return (
     <View>
-      <View style={styles.tabs}>{tabs}</View>
+      <View style={[styles.tabs, !hairline && styles.noHairline]}>{tabs}</View>
       <View style={styles.searchRow}>
         <View style={styles.search}>
           <View style={styles.searchMark}>{searching ? <ActivityIndicator size="small" color={colors.muted} /> : <Icon name="search" sf="magnifyingglass" size={17} color={colors.muted} />}</View>
@@ -80,6 +81,7 @@ export function DiscoveryBar({ tabs, query, onQuery, placeholder, searching = fa
 const useStyles = makeStyles((colors) => ({
   // The labels row, with the hairline the sliding underline sits on.
   tabs: { height: TABS_ROW, flexDirection: "row", marginHorizontal: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  noHairline: { borderBottomWidth: 0 },
   searchRow: { height: SEARCH_ROW, flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: 16 },
   search: { flex: 1, height: FIELD, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.input, borderRadius: radius.pill, paddingHorizontal: 12 },
   searchMark: { width: 20, alignItems: "center" },
