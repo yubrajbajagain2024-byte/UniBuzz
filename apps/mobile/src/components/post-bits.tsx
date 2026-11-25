@@ -127,7 +127,9 @@ export function PostFrame({ children }: { children: ReactNode }) {
 export function PostActions({ liked, likes, comments, saved, onLike, onComment, onShare, onSave, message, messageBeside, tight, center }: { liked: boolean; likes: number; comments: number; saved: boolean; onLike: () => void; onComment?: () => void; onShare?: () => void; onSave: () => void; message?: { label: string; onPress: () => void }; messageBeside?: boolean; tight?: boolean; center?: ReactNode }) {
   const styles = useStyles();
   const colors = useColors();
-  // The heart and the bookmark answer with the system's bounce as they fill (and only then).
+  // The heart and the bookmark answer with the system's bounce as they fill (and only then). All four icons and the
+  // counts are the text colour, white on the dark theme (the owner's brief, 2026-11-25: the bookmark was grey); a liked
+  // heart turns red.
   const likeBounce = useBounceOn(liked);
   const saveBounce = useBounceOn(saved);
   return (
@@ -156,7 +158,7 @@ export function PostActions({ liked, likes, comments, saved, onLike, onComment, 
       <View style={{ flex: 1 }} />
       {message && !messageBeside ? <MessagePill message={message} /> : null}
       <Pressable onPress={onSave} hitSlop={6} accessibilityRole="button" accessibilityLabel={saved ? "Unsave" : "Save"} accessibilityState={{ selected: saved }}>
-        <Icon name={saved ? "bookmark" : "bookmark-outline"} size={24} color={saved ? colors.text : colors.muted} bounce={saveBounce} />
+        <Icon name={saved ? "bookmark" : "bookmark-outline"} size={24} color={colors.text} bounce={saveBounce} />
       </Pressable>
     </View>
   );

@@ -191,6 +191,10 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   "more…" over a picture and three on a post of words alone; the bold name before the words is gone with the move.
   `npm run check` 9/9. Seen in the Simulator (Expo Go, live data read-only): "Note" under Sunil Sherpa's name, above
   the photo.
+- **White buttons under a post** (2026-11-25; the owner's brief: "make the like save comment share white"): the
+  bookmark in `PostActions` was grey (`muted`) until saved; it is the text colour now, like the heart, comment and
+  share, so all four are white on the dark theme (black on the light one, where white would vanish on the page). A liked
+  heart stays red. `PostActions` also serves roommate posts and apartments, so their bookmark changed too.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.
