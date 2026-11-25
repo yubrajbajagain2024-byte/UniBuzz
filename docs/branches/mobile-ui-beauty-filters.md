@@ -247,6 +247,8 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   request, carries the branch at `80b538d` (not on `main` yet): Orbit's Instagram-style cards, the caption under the
   name, the white and bold buttons. Exported and published the same way (the disk still about 290 MB free). Not yet seen
   on a phone.
+- Then **group `ad91a12a-425f-4e0f-a246-6b0bbb1f49e6`** (2026-11-25, the owner's "publish"), the branch at `f89088f`:
+  all of the above and a commenter's photo or name closing the comments before opening their profile. Same way.
 
 ## Pending
 
