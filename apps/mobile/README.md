@@ -184,8 +184,8 @@ header, the title and the caption under the name (2026-11-25; two lines with "�
 the same fold as the descriptions on Housing, Roommate and Marketplace: `ExpandableText`),
 then the photo or video across the whole width with no corners, keeping its shape between 3:4 and 1.91:1 and cropped to
 that when it is taller or wider (`frameAspect`; a reel's 9:16 shows at 3:4 here, whole in the viewer; a carousel's
-slides all fill the first one's frame, its "1/3" at the top right and its dots in the middle of the row of buttons
-under it), then the buttons, "Liked by …" and the newest comments. Sponsored cards already had that shape (4:5, edge to edge). A tap on a post's photo or video opens it full screen in the viewer (`openViewer`, `src/app/reels/[id].tsx`),
+slides all fill the first one's frame, its "1/3" at the top right and, at the bottom of the picture, a white pill for the
+slide showing and dots for the rest, as on Roommate and Marketplace: 2026-11-25), then the buttons, "Liked by …" and the newest comments. Sponsored cards already had that shape (4:5, edge to edge). A tap on a post's photo or video opens it full screen in the viewer (`openViewer`, `src/app/reels/[id].tsx`),
 TikTok's way: edge to edge on black, its photos swiping sideways with dots at the bottom, its video going on from where
 it was with its sound on, the rail (like, comments, save, share, "…") up the right and the name and caption at the
 bottom left; a swipe up goes on down Orbit's posts with pictures, their next pages loading as needed. A reel opens on its

@@ -223,6 +223,11 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   Seen in the Simulator: Roommate's long description in two lines ending "… more", opened in place; Marketplace's
   one-line description without it; on a temporary dev route (deleted), a long Orbit caption with hashtags and an emoji
   in two lines, then opened with its hashtags blue. Housing has no listings on production to show. `npm run check` 9/9.
+- **The carousel's pill and dots on Orbit** (2026-11-25; the owner's screenshot of a Roommate post's indicator): a
+  post's photos and videos show their position as Roommate and Marketplace do, over the bottom of the picture (a white
+  pill for the one showing, soft dots for the rest: `PhotoCarousel`'s own dots), instead of grey dots in the row of
+  buttons; `PostActions`' `center` slot, which only they used, is gone. Seen in the Simulator on a temporary dev route
+  (deleted) with a three-photo sample post. `npm run check` 9/9.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.
