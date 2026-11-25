@@ -247,6 +247,14 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   the feedback. All events swapped its list or "No events match" for a spinner on every filter tap; it shows the spinner
   only before its first result now (`feed.round === 0`), keeping the last one until the new arrives, as For you did.
   Seen in the Simulator: a tap on This week on All events, the message staying with no spinner. `npm run check` 9/9.
+- **Send To a full page** (2026-11-25; the owner's screenshot of a camera app's send screen): the Snap's Send To slides up
+  as a full-screen modal (it was an 88% sheet): the down chevron that closes it beside a 46-point search field, All |
+  Recent | Friends pills (Messages' filled ones), bold section titles, full-width rows (48-point photo, the name alone,
+  hairlines between) with the ring at the right, and the send bar along the bottom with a hairline above it; `onDismiss`
+  still tells the Snap screen it has gone. The screenshot's "Post to… My Story" was left out: a Snap is uploaded to the
+  snaps folder and a story needs its own (migration 59), so it would be a feature of its own. Seen in the Simulator on
+  a temporary dev route (deleted; its send did nothing, so no Snap was uploaded): the page, a pick raising "To Yubraj"
+  with the send button, the chevron closing it. `npm run check` 9/9.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.

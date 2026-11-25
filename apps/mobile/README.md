@@ -658,8 +658,9 @@ screen that shows nothing until there is something to show, so closing the camer
 re-encoded as a JPEG at most 1920 px long, without its metadata. The take fills the screen on black (a photo over a blurred
 copy of itself) with close and "take another" (the camera again; it waits for Send To to be fully gone, since iOS presents
 nothing over a sheet that is still leaving) and the Aurora "Send To". That starts the upload (straight from the file, with
-progress) and raises the Send To sheet (`send-to-sheet.tsx`): your direct chats, the most recent first, then your friends,
-a search over both, a ring per person that fills with the Aurora when picked (only what turns on bounces), and a bar that
+progress) and slides up Send To, a full page since 2026-11-25 (`send-to-sheet.tsx`, a full-screen modal; the owner's brief:
+a whole page as camera apps have, not a sheet): the chevron that closes it beside a search field, All | Recent | Friends
+pills, your direct chats, the most recent first, then your friends, in full-width rows, a ring per person that fills with the Aurora when picked (only what turns on bounces), and a bar that
 rises with who it goes to and the round send button: a spinner and "Sending… 42%", then the plane flies off and a tick
 lands on green, and the Snap fades away. In a chat (`snap-bubble.tsx`) a Snap is the same large bubble as a sent photo, at the Snap's own shape, and never its picture: it
 shows only its 32-pixel preview (of the photo, or the first frame of the video) in its own colours, lightly softened under a
