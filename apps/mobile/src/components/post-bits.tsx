@@ -12,6 +12,13 @@ import { Icon, useBounceOn, type IconName } from "@/components/icon";
 
 /** The side gutter of every post: the header, the text, the photo's rounded frame and the rows under it keep to it. */
 export const POST_GUTTER = 16;
+/**
+ * The weight of the like, comment, share and save symbols (and the chat pill's) under a post or a listing, on Orbit,
+ * Housing, Roommate and Marketplace (iOS draws them as SF Symbols; Android keeps Ionicons, which have one weight): a firmer
+ * line than the symbols' default "regular", so they read crisp and defined, white on the dark theme (the owner's brief,
+ * 2026-11-25: "semibold" first, chosen over "medium", which barely differed from "regular"; then "bold", on request).
+ */
+export const ACTION_WEIGHT = "bold" as const;
 /** The corner radius of a post's photo frame. */
 export const POST_FRAME_RADIUS = 18;
 const AVATAR = 42;
@@ -121,36 +128,44 @@ export function PostFrame({ children }: { children: ReactNode }) {
 /**
  * Heart, comment (left out when there is no `onComment`: comments turned off) and share (left out when there is no
  * `onShare`: a post that cannot be sent into a chat) with their counts, an optional chat pill (listings: a chat with the owner),
- * either right after share (`messageBeside`) or on the right, and the bookmark at the far right.
+ * either right after share (`messageBeside`) or on the right, and the bookmark at the far right. `center` is drawn in the
+ * middle of the row, over nothing it could cover and taking no touches: Instagram puts a carousel's dots there.
  */
-export function PostActions({ liked, likes, comments, saved, onLike, onComment, onShare, onSave, message, messageBeside, tight }: { liked: boolean; likes: number; comments: number; saved: boolean; onLike: () => void; onComment?: () => void; onShare?: () => void; onSave: () => void; message?: { label: string; onPress: () => void }; messageBeside?: boolean; tight?: boolean }) {
+export function PostActions({ liked, likes, comments, saved, onLike, onComment, onShare, onSave, message, messageBeside, tight, center }: { liked: boolean; likes: number; comments: number; saved: boolean; onLike: () => void; onComment?: () => void; onShare?: () => void; onSave: () => void; message?: { label: string; onPress: () => void }; messageBeside?: boolean; tight?: boolean; center?: ReactNode }) {
   const styles = useStyles();
   const colors = useColors();
-  // The heart and the bookmark answer with the system's bounce as they fill (and only then).
+  // The heart and the bookmark answer with the system's bounce as they fill (and only then). All four icons and the
+  // counts are the text colour, white on the dark theme (the owner's brief, 2026-11-25: the bookmark was grey); a liked
+  // heart turns red.
   const likeBounce = useBounceOn(liked);
   const saveBounce = useBounceOn(saved);
   return (
     <View style={[styles.actions, tight && { paddingTop: 6 }]}>
+      {center ? (
+        <View pointerEvents="none" style={[styles.center, tight && { top: 6 }]}>
+          {center}
+        </View>
+      ) : null}
       <Pressable onPress={onLike} hitSlop={6} style={styles.action} accessibilityRole="button" accessibilityLabel={liked ? "Unlike" : "Like"} accessibilityState={{ selected: liked }}>
-        <Icon name={liked ? "heart" : "heart-outline"} size={26} color={liked ? colors.like : colors.text} bounce={likeBounce} />
+        <Icon name={liked ? "heart" : "heart-outline"} size={26} weight={ACTION_WEIGHT} color={liked ? colors.like : colors.text} bounce={likeBounce} />
         {likes > 0 ? <Text style={styles.count}>{compactCount(likes)}</Text> : null}
       </Pressable>
       {onComment ? (
         <Pressable onPress={onComment} hitSlop={6} style={styles.action} accessibilityRole="button" accessibilityLabel="Comment">
-          <Icon name="chatbubble-outline" size={24} color={colors.text} />
+          <Icon name="chatbubble-outline" size={24} weight={ACTION_WEIGHT} color={colors.text} />
           {comments > 0 ? <Text style={styles.count}>{compactCount(comments)}</Text> : null}
         </Pressable>
       ) : null}
       {onShare ? (
         <Pressable onPress={onShare} hitSlop={6} style={styles.action} accessibilityRole="button" accessibilityLabel="Share">
-          <Icon name="share-outline" size={24} color={colors.text} />
+          <Icon name="share-outline" size={24} weight={ACTION_WEIGHT} color={colors.text} />
         </Pressable>
       ) : null}
       {message && messageBeside ? <MessagePill message={message} beside /> : null}
       <View style={{ flex: 1 }} />
       {message && !messageBeside ? <MessagePill message={message} /> : null}
       <Pressable onPress={onSave} hitSlop={6} accessibilityRole="button" accessibilityLabel={saved ? "Unsave" : "Save"} accessibilityState={{ selected: saved }}>
-        <Icon name={saved ? "bookmark" : "bookmark-outline"} size={24} color={saved ? colors.text : colors.muted} bounce={saveBounce} />
+        <Icon name={saved ? "bookmark" : "bookmark-outline"} size={24} weight={ACTION_WEIGHT} color={colors.text} bounce={saveBounce} />
       </Pressable>
     </View>
   );
@@ -162,7 +177,7 @@ function MessagePill({ message, beside }: { message: { label: string; onPress: (
   const colors = useColors();
   return (
     <Pressable onPress={message.onPress} hitSlop={4} style={({ pressed }) => [styles.message, beside && styles.messageBeside, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel={message.label}>
-      <Icon name="chatbubble-ellipses-outline" size={16} color={colors.text} />
+      <Icon name="chatbubble-ellipses-outline" size={16} weight={ACTION_WEIGHT} color={colors.text} />
       <Text style={styles.messageText}>{message.label}</Text>
     </Pressable>
   );
@@ -182,6 +197,8 @@ const useStyles = makeStyles((colors) => ({
   frame: { marginHorizontal: POST_GUTTER, borderRadius: POST_FRAME_RADIUS, borderCurve: "continuous", overflow: "hidden", backgroundColor: colors.mediaBg },
   actions: { flexDirection: "row", alignItems: "center", gap: 22, paddingHorizontal: POST_GUTTER, paddingTop: 12, paddingBottom: 4 },
   action: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // The row's own padding (12 above, 4 below), so whatever sits here is centred on the icons.
+  center: { position: "absolute", left: 0, right: 0, top: 12, bottom: 4, alignItems: "center", justifyContent: "center" },
   // Tabular figures: a count that changes (12 → 13) never shifts the icons beside it.
   count: { fontSize: 14, fontWeight: "600", color: colors.text, fontVariant: ["tabular-nums"] },
   message: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, marginRight: 14 },

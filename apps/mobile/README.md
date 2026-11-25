@@ -179,7 +179,12 @@ it is about, "Mark all read" sits in the header, and the bell's badge counts the
 Home opens on **Orbit**, a blend of posts and reels (anonymous Buzz threads stay on the Buzz page; the fixed pattern
 lives in `packages/shared/src/for-you.ts` and is shared with the website), as a feed of cards under the story tray
 (`src/components/home/for-you-section.tsx`, each row the Instagram-style `InstaPost`; a post of nothing but words has
-its card too). A tap on a post's photo or video opens it full screen in the viewer (`openViewer`, `src/app/reels/[id].tsx`),
+its card too). Each card's picture is laid out as Instagram's Home feed lays one out (the owner's brief, 2026-11-24): the
+header, the title and the caption under the name (2026-11-25; two lines before "more…", three on a post of words alone),
+then the photo or video across the whole width with no corners, keeping its shape between 3:4 and 1.91:1 and cropped to
+that when it is taller or wider (`frameAspect`; a reel's 9:16 shows at 3:4 here, whole in the viewer; a carousel's
+slides all fill the first one's frame, its "1/3" at the top right and its dots in the middle of the row of buttons
+under it), then the buttons, "Liked by …" and the newest comments. Sponsored cards already had that shape (4:5, edge to edge). A tap on a post's photo or video opens it full screen in the viewer (`openViewer`, `src/app/reels/[id].tsx`),
 TikTok's way: edge to edge on black, its photos swiping sideways with dots at the bottom, its video going on from where
 it was with its sound on, the rail (like, comments, save, share, "…") up the right and the name and caption at the
 bottom left; a swipe up goes on down Orbit's posts with pictures, their next pages loading as needed. A reel opens on its

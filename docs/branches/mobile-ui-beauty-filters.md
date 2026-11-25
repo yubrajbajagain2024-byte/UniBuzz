@@ -173,6 +173,35 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   The viewer's top row holds nothing but the hidden Campus | Global toggle, so nothing there needed it; the white status
   bar is drawn straight over the picture, as on TikTok. `npm run check` 9/9. Seen in the Simulator (signed out, Expo Go):
   a tall video opened from Orbit's cards fills the screen with its top clear.
+- **Orbit's cards laid out as Instagram's Home feed** (2026-11-24, after PR #117; the owner's brief with Instagram's
+  sizes, not on `main` yet): `InstaPost` draws the photo or video edge to edge with no corners (it was in a rounded frame
+  inset 16 points), keeping its shape between 3:4 and 1.91:1 (it was 4:5) and cropped to that when taller or wider; a
+  reel shows at 3:4 in the feed (it was 9:16) and whole in the viewer; a carousel's slides all fill the first one's frame,
+  its dots now in the middle of the row of buttons (`PostActions`' new `center`) and its "1/3" at the top right; the
+  title and caption moved under the picture, after "Liked by …", the author's name in bold before the words and two
+  lines before "more…". Words-only posts keep their words under the header. The post's own page (`posts/[id]`) shares
+  `InstaPost`, so it changed too; roommate posts, apartments (`post-card.tsx`) and Sponsored cards did not. `npm run
+  check` 9/9. Seen in the Simulator (Expo Go, live data read-only): photos edge to edge, a tall screenshot cropped to
+  3:4, the caption after the bold name; on a temporary dev route with sample data (deleted): a three-photo carousel
+  (3:4, a square second slide filling it, the dots in the row of buttons) and a 2.67:1 photo cropped to 1.91:1. No post
+  on production has more than one photo. Orbit's "Could not load more. Tap to try again." showed at the end of each page
+  in the same session (a retry loaded the next page): a paging problem, not this change; not looked into yet.
+- **The caption back under the name** (2026-11-25; the owner's brief: "caption or bio to top below username in orbit,
+  above content"): the title, the caption and the link sit under the header again, above the picture, two lines before
+  "more…" over a picture and three on a post of words alone; the bold name before the words is gone with the move.
+  `npm run check` 9/9. Seen in the Simulator (Expo Go, live data read-only): "Note" under Sunil Sherpa's name, above
+  the photo.
+- **White buttons under a post** (2026-11-25; the owner's brief: "make the like save comment share white"): the
+  bookmark in `PostActions` was grey (`muted`) until saved; it is the text colour now, like the heart, comment and
+  share, so all four are white on the dark theme (black on the light one, where white would vanish on the page). A liked
+  heart stays red. `PostActions` also serves roommate posts and apartments, so their bookmark changed too.
+- **Firmer, more defined buttons** (2026-11-25; the owner's brief: like, comment, share and save "white, more defined,
+  sophisticated" on Orbit, Housing, Roommate and Marketplace): the symbols are drawn at SF Symbols' "bold" weight
+  (`ACTION_WEIGHT` in `post-bits.tsx`; "semibold" first, then "bold" at the owner's "make it bold") instead of "regular", in `PostActions` (Orbit, Roommate and Marketplace, the chat
+  pill's icon too) and in Housing's own row (`housing-card.tsx`, all its buttons). Compared side by side in the Simulator
+  at "regular", "medium" and "semibold": "medium" barely differed. iOS only: Android draws Ionicons, which have one
+  weight. Seen on Orbit and Roommate (Expo Go, live data read-only); Housing has no listings on production to show.
+  `npm run check` 9/9.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.
@@ -207,6 +236,10 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   return and the viewer without its top shade included. The Mac's disk was full, so it was exported by hand without
   source maps (`npx expo export --platform ios --dump-assetmap`, the `.env` values matching EAS's `preview` ones by hash)
   and published with `--skip-bundler`; crash reports from it are not symbolicated. Not yet seen on a phone.
+- The next, **group `a71044ee-5dde-4282-865d-a8952749ec24`** (iOS, the same runtime), on 2026-11-25 at the owner's
+  request, carries the branch at `80b538d` (not on `main` yet): Orbit's Instagram-style cards, the caption under the
+  name, the white and bold buttons. Exported and published the same way (the disk still about 290 MB free). Not yet seen
+  on a phone.
 
 ## Pending
 

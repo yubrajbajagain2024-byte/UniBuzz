@@ -18,7 +18,7 @@ import { Avatar } from "../avatar";
 import { useLike, useSave } from "../engagement";
 import { ExpandableText } from "../expandable-text";
 import { PhotoCarousel } from "../photo-carousel";
-import { POST_FRAME_RADIUS, POST_GUTTER, POST_TEXT, PostActions, PostFrame, PostHeader, PostLink } from "../post-bits";
+import { POST_GUTTER, POST_TEXT, PostActions, PostHeader, PostLink } from "../post-bits";
 import { useShareSheet } from "../share-sheet";
 import { Icon } from "@/components/icon";
 import { useOpenProfile } from "@/lib/open-profile";
@@ -49,24 +49,31 @@ export type InstaPostProps = {
   onOpenVideo?: () => void;
 };
 
-const TALLEST = 4 / 5;
+/** Instagram's feed since 2025: a picture as tall as 3:4 and as wide as 1.91:1. */
+const TALLEST = 3 / 4;
 const WIDEST = 1.91;
 
-/** A photo keeps its own shape, but never taller than 4:5 or wider than 1.91:1. Buzz's media frames follow the same rule. */
+/**
+ * The frame of a post's media in the feed, as Instagram's Home feed sizes it (the owner's brief, 2026-11-24): the first
+ * photo or video keeps its own shape between 3:4 and 1.91:1, and anything taller or wider is cropped to that limit. A
+ * reel (9:16) shows at 3:4 here and whole in the full-screen viewer a tap opens. Every slide of a carousel fills the first
+ * one's frame (PhotoCarousel crops them to it), as Instagram's carousels do.
+ */
 export function frameAspect(media: FeedMedia[], reel: boolean): number {
-  if (reel) return 9 / 16;
+  if (reel) return TALLEST;
   const first = media[0];
   if (!first?.width || !first.height) return TALLEST;
   return Math.min(WIDEST, Math.max(TALLEST, first.width / first.height));
 }
 
 /**
- * A post in the Home feed, laid out like every other post in the app (see post-bits): header → its title in bold, the
- * caption folded to three lines ("more…" / "less") and its link → the photo or video in a rounded frame (a carousel's
- * slide dots on their own row under it) → heart, comment and share with their counts, the bookmark on the right →
- * "Liked by …" → the newest comments. A friends-only or selected-people post has no Share (the database refuses to send
- * it into a chat), and the author of a post that is not Global sees who can on the line under their name; one with
- * comments off has no comment button.
+ * A post in the Home feed, its picture laid out as Instagram's Home feed lays one out (the owner's brief, 2026-11-24) and
+ * its words under the name (2026-11-25): header → its title in bold, the caption folded to two lines ("more…" / "less";
+ * three on a post of words alone) and its link → the photo or video edge to edge, sized by frameAspect → heart, comment
+ * and share with their counts, a carousel's dots in the middle of that row, the bookmark on the right → "Liked by …" →
+ * the newest comments. A friends-only or selected-people post has no Share (the database refuses to send it into a
+ * chat), and the author of a post that is not Global sees who can on the line under their name; one with comments off
+ * has no comment button.
  */
 export function InstaPost({ post, saved, engagement, preview, subtitle, active, detail, onComments, onDeleted, ...props }: InstaPostProps) {
   const router = useRouter();
@@ -140,7 +147,7 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
     const time = at?.time ?? null;
     const player = at?.player ?? null;
     if (time !== null && !props.onOpen) props.onOpenVideo?.();
-    void measureOrigin(frame.current, POST_FRAME_RADIUS).then((measured) => {
+    void measureOrigin(frame.current, 0).then((measured) => {
       const origin = measured && openingBand ? { ...measured, clip: openingBand() } : measured;
       const live = { engagement: { likes: like.likes, comments, likedByMe: like.liked }, saved: save.saved, slide, origin, time, player };
       if (props.onOpen) return props.onOpen(live);
@@ -250,12 +257,15 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
     ),
   );
 
+
   return (
     <View style={styles.post} accessibilityLabel={`Post: ${(title ?? text).slice(0, 40) || `by ${author.full_name}`}`}>
       <PostHeader name={author.full_name} avatarUrl={author.avatar_url} userId={author.id} verified={isVerifiedPoster(author)} meta={meta} audience={own && audience !== "global" ? audience : undefined} audienceName={post.university?.name ?? profile?.university?.name} onOpen={() => openProfile(author.id)} onMenu={menu} />
 
       {title || text || link ? (
-        // The words come before the picture, Facebook style. Words only: the text is the post, and takes the double tap.
+        // The title, the words and the link under the name, above the picture (the owner's brief, 2026-11-25), folded to two
+        // lines before "more…" over a picture so it stays near the name, three on a post of words alone, where the text
+        // is the post and takes the double tap.
         <Pressable onPress={media.length === 0 ? textTap : undefined} style={styles.body}>
           {title ? (
             <Text style={styles.title} selectable={detail}>
@@ -263,7 +273,7 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
             </Text>
           ) : null}
           {text ? (
-            <ExpandableText style={styles.text} expanded={detail} collapsible={!detail} selectable={detail}>
+            <ExpandableText style={styles.text} lines={media.length > 0 ? 2 : 3} expanded={detail} collapsible={!detail} selectable={detail}>
               {caption}
             </ExpandableText>
           ) : null}
@@ -272,26 +282,37 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
       ) : null}
 
       {media.length > 0 ? (
-        <PostFrame>
+        // Edge to edge, no corners, as Instagram's feed draws it; the big heart of a double tap over it.
+        <View style={styles.media}>
           <View ref={frame} collapsable={false}>
             <PhotoCarousel media={media} aspect={frameAspect(media, reel)} active={active} videoLabel={null} dots={false} onIndexChange={setSlide} jump={jump} onPress={openViewer} onDoubleTap={doubleTap} />
           </View>
           <Animated.View pointerEvents="none" style={[styles.heart, { opacity: heart, transform: [{ scale: heart.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }]}>
             <Icon name="heart" size={96} color={colors.onMedia} />
           </Animated.View>
-        </PostFrame>
-      ) : null}
-
-      {/* A carousel's slide dots on their own line under the photo, above the hearts. */}
-      {media.length > 1 ? (
-        <View style={styles.slideDots} accessibilityLabel={`${slide + 1} of ${media.length}`}>
-          {media.map((_, i) => (
-            <View key={i} style={[styles.slideDot, i === slide && styles.slideDotActive]} />
-          ))}
         </View>
       ) : null}
 
-      <PostActions liked={like.liked} likes={like.likes} comments={comments} saved={save.saved} onLike={() => void like.toggle()} onComment={commentsOff ? undefined : onComments} onShare={shareable ? share : undefined} onSave={() => void save.toggle()} tight={media.length > 1} />
+      <PostActions
+        liked={like.liked}
+        likes={like.likes}
+        comments={comments}
+        saved={save.saved}
+        onLike={() => void like.toggle()}
+        onComment={commentsOff ? undefined : onComments}
+        onShare={shareable ? share : undefined}
+        onSave={() => void save.toggle()}
+        center={
+          // A carousel's dots in the middle of the row under it, Instagram's place for them.
+          media.length > 1 ? (
+            <View style={styles.slideDots} accessibilityLabel={`${slide + 1} of ${media.length}`}>
+              {media.map((_, i) => (
+                <View key={i} style={[styles.slideDot, i === slide && styles.slideDotActive]} />
+              ))}
+            </View>
+          ) : undefined
+        }
+      />
 
       {(face && like.likes > 0) || (!detail && !commentsOff && comments > 0) ? (
         <View style={styles.below}>
@@ -343,8 +364,10 @@ const useStyles = makeStyles((colors) => ({
   // A roommate post's title, the same weight over the words (see post-card.tsx).
   title: { fontSize: 17, fontWeight: "700", lineHeight: 22, color: colors.text },
   text: { ...POST_TEXT, color: colors.text },
+  // The picture across the whole width, as Instagram's feed has it; the heart is laid over it.
+  media: { width: "100%", overflow: "hidden", backgroundColor: colors.mediaBg },
   heart: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", shadowColor: colors.shadow, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 2 } },
-  slideDots: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingTop: 10 },
+  slideDots: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   slideDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.faint },
   slideDotActive: { backgroundColor: colors.accent },
   below: { paddingHorizontal: POST_GUTTER, paddingTop: 6, gap: 4 },
