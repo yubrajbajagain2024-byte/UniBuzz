@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputInstance, type ViewStyle } from "react-native";
 import { useRouter } from "expo-router";
 import { addComment, blockUser, COMMENT_SORTS, compactCount, deleteComment, getMyCommentVotes, listComments, reportContent, REPORT_REASONS, shortAge, threadComments, voteComment, type CommentSort, type PostCommentNode, type PostCommentWithAuthor, type PostTargetType, type ReportReason } from "@apartment-book/shared";
@@ -12,6 +12,13 @@ import { makeStyles, useAppTheme, useColors } from "@/lib/theme-provider";
 import { Avatar } from "./avatar";
 import { Icon } from "@/components/icon";
 import { useOpenProfile } from "@/lib/open-profile";
+
+/**
+ * How a commenter's profile opens from a comment. Inside a sheet (CommentsSheet) the sheet closes first and the profile
+ * opens once it has gone, so the thread never stays over the profile (the owner's report, 2026-11-25); anywhere else the
+ * profile simply opens (useOpenProfile).
+ */
+export const CommentProfileOpener = createContext<((id: string) => void) | null>(null);
 
 /*
  * The thread looks like TikTok's comment sheet: no bubbles, a round avatar, the name in small grey, the comment in
@@ -577,7 +584,8 @@ type RowProps = {
 function CommentRow({ node: c, vote: override, isAuthor, onVoted, onReply, onHold }: RowProps) {
   const colors = useColors();
   const styles = useStyles();
-  const openProfile = useOpenProfile();
+  const plainOpen = useOpenProfile();
+  const openProfile = useContext(CommentProfileOpener) ?? plainOpen;
   const { user } = useSession();
   const { vote, cast } = useVote("comment", c.id, override ?? { score: c.score, likes: c.likes, myVote: c.myVote }, (value) => voteComment(supabase, c.id, value), onVoted);
   const name = c.author.full_name;
@@ -603,7 +611,8 @@ function CommentRow({ node: c, vote: override, isAuthor, onVoted, onReply, onHol
       </Pressable>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
+          {/* The name opens the profile too, as the photo does. */}
+          <Text style={styles.name} numberOfLines={1} onPress={() => openProfile(c.author.id)} suppressHighlighting accessibilityRole="link" accessibilityHint="Opens their profile">
             {name}
           </Text>
           {isAuthor ? (

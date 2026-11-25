@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Platform } from "react-native";
 import type { PostTargetType } from "@apartment-book/shared";
+import { useOpenProfile } from "@/lib/open-profile";
 import { makeStyles } from "@/lib/theme-provider";
-import { CommentComposer, CommentList, commentCountLabel, CommentsOff, CommentSortButton, useCommentThread } from "./comments";
+import { CommentComposer, CommentList, commentCountLabel, CommentProfileOpener, CommentsOff, CommentSortButton, useCommentThread } from "./comments";
 import { Sheet, SheetFooter, SheetHeader, SheetScrollView } from "./sheet";
 
 /**
@@ -15,7 +17,9 @@ export type CommentsTarget = { targetType: PostTargetType; targetId: string; own
  * the thread, and the composer pinned under it. Pass `target = null` to keep it closed. Built on the app's one Sheet,
  * full width (the owner's brief, 2026-11-22: edge to edge, no gaps at its sides, down to the bottom): it rises on the
  * system's spring over a fading backdrop; the header, or the list pulled down from its top, pulls it down; and the
- * composer rides just above the keyboard while the sheet's top stays where it was.
+ * composer rides just above the keyboard while the sheet's top stays where it was. A commenter's photo or name closes the
+ * sheet and then opens their profile (straight away on Android, once the sheet has gone on iOS, which shows nothing new
+ * while a modal is on screen), so the thread is never left open over it.
  */
 export function CommentsSheet({ target, onClose, onCountChange }: { target: CommentsTarget | null; onClose: () => void; onCountChange: (delta: number) => void }) {
   // Keep showing the last thread while the sheet slides away, so it does not go blank mid-animation.
@@ -24,15 +28,42 @@ export function CommentsSheet({ target, onClose, onCountChange }: { target: Comm
     if (target) setShown(target);
   }, [target]);
 
+  const openProfile = useOpenProfile();
+  /** The profile to open once the sheet is gone, and the timer that opens it should the dismissal never be reported. */
+  const afterDismiss = useRef<(() => void) | null>(null);
+  const fallback = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => void (fallback.current && clearTimeout(fallback.current)), []);
+  const runAfterDismiss = useCallback(() => {
+    const fn = afterDismiss.current;
+    afterDismiss.current = null;
+    if (fallback.current) clearTimeout(fallback.current);
+    fallback.current = null;
+    fn?.();
+  }, []);
+  const openFromComment = useCallback(
+    (id: string) => {
+      onClose();
+      const go = () => openProfile(id);
+      if (Platform.OS !== "ios") return go();
+      afterDismiss.current = go;
+      // The sheet slides away first (about a quarter second), then the modal goes: allow for both.
+      if (fallback.current) clearTimeout(fallback.current);
+      fallback.current = setTimeout(runAfterDismiss, 900);
+    },
+    [onClose, openProfile, runAfterDismiss],
+  );
+
   return (
-    <Sheet visible={target !== null} onClose={onClose} closeLabel="Close comments" height="72%" keyboard edge="full">
+    <Sheet visible={target !== null} onClose={onClose} onDismiss={runAfterDismiss} closeLabel="Close comments" height="72%" keyboard edge="full">
       {shown?.commentsOff ? (
         <>
           <SheetHeader title="Comments" />
           <CommentsOff style={{ paddingVertical: 32 }} />
         </>
       ) : shown ? (
-        <SheetBody key={`${shown.targetType}:${shown.targetId}`} target={shown} onCountChange={onCountChange} />
+        <CommentProfileOpener.Provider value={openFromComment}>
+          <SheetBody key={`${shown.targetType}:${shown.targetId}`} target={shown} onCountChange={onCountChange} />
+        </CommentProfileOpener.Provider>
       ) : null}
     </Sheet>
   );
