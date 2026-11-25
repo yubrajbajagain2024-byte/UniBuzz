@@ -49,8 +49,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 - **The app's redesign of 2026-11-17 to 11-24** (`mobile-ui-beauty-filters`, PRs #113 to #117; branch file
   [branches/mobile-ui-beauty-filters.md](branches/mobile-ui-beauty-filters.md)): the bottom bar and camera, beauty filters
   for photos, black full-screen viewers, Home as Orbit (a card feed under the story tray, a tap opening the viewer) |
-  Buzz, stories as a post's page. On testers' iPhones with the EAS update of 2026-11-24 (group `7da591cf`, build
-  `d30b8306`). **Migration 68** (a like on one's own story) is on `main` but on no project yet (as of 2026-11-24): until
+  Buzz, stories as a post's page. On testers' iPhones with the EAS update of 2026-11-25 (group `a71044ee`, build
+  `d30b8306`, from the branch at `80b538d`: also Orbit's Instagram-style cards and bold white buttons, not on `main` yet). **Migration 68** (a like on one's own story) is on `main` but on no project yet (as of 2026-11-24): until
   it is, that heart is refused with the reason. It waits on a Supabase access token (staging first, then a full backup
   and production) and on free disk space for the backup. **Still to check:** the update on a real iPhone; Android.
 - **Chat redesign, media viewing and the keyboard (app)** (merged as PR #112, 2026-11-15 21:51 UTC; on `main`, summary in

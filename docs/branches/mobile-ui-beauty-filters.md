@@ -236,6 +236,10 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   return and the viewer without its top shade included. The Mac's disk was full, so it was exported by hand without
   source maps (`npx expo export --platform ios --dump-assetmap`, the `.env` values matching EAS's `preview` ones by hash)
   and published with `--skip-bundler`; crash reports from it are not symbolicated. Not yet seen on a phone.
+- The next, **group `a71044ee-5dde-4282-865d-a8952749ec24`** (iOS, the same runtime), on 2026-11-25 at the owner's
+  request, carries the branch at `80b538d` (not on `main` yet): Orbit's Instagram-style cards, the caption under the
+  name, the white and bold buttons. Exported and published the same way (the disk still about 290 MB free). Not yet seen
+  on a phone.
 
 ## Pending
 
