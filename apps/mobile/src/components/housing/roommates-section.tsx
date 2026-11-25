@@ -7,7 +7,7 @@ import { OnlineStrip } from "@/components/online-strip";
 import { FEED_HEADER_PADDING, PostCard } from "@/components/post-card";
 import { EmptyState, ErrorBanner, Loading, useAppearingCells } from "@/components/ui";
 import { AnimatedFlatList, listInset } from "@/lib/collapsing-header";
-import { useFeed } from "@/lib/hooks";
+import { useFeed, useKeepRows } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useTabBarInset } from "@/lib/tab-bar";
@@ -62,6 +62,7 @@ export function RoommatesSection({ topInset, onScroll, q, campus, type, filters,
     [q, universityId, type, filters.maxBudget, filters.genderPreference, filters.videoOnly, radiusKm],
   );
   const { savedIds, engagement } = useEngagement("roommate", feed.items, user?.id ?? null);
+  useKeepRows("roommate", feed.items);
   const inset = useMemo(() => listInset(topInset), [topInset]);
   // Tapping Explore again while Roommate is on screen: back to the top.
   const listRef = useRef<FlatList<RoommatePostWithAuthor>>(null);

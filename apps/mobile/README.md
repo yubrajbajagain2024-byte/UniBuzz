@@ -904,6 +904,15 @@ feel native:
 - **Buttons.** One `Button` (`src/components/ui.tsx`), an iOS 26 capsule in three sizes: compact (34pt) in list rows,
   regular (44pt) for most actions, large (50pt) for the action that ends a form or a sheet. Semibold labels, a spring
   press and a soft haptic on the primary ones.
+- **No waiting on what is already known (2026-11-25).** `useQuery`'s `key` (`src/lib/query-cache.ts`) keeps a
+  screen's result for the session, in memory, per reader, emptied when the account changes: a screen opened again
+  shows it at once and reads it again behind it (not at all while it is under 15 seconds old), and a load already
+  running for the key is joined. The inbox hands each chat to the chat screen (`src/lib/chat-warm.ts`), a finger on a
+  row starts its newest messages loading, and a chat keeps its newest page when left; a one-to-one chat loads the other
+  person's profile behind it (`warmProfile`). The Housing, Roommate, Marketplace and Events lists hand their rows to the
+  screens they open (`useKeepRows`), which show them at once; a post's page asks for everything in one round trip.
+  Events, Messages and Profile render behind Home 1.2 seconds after it opens (`lazy: false` from then), so switching to
+  them finds them loaded.
 - **Sheets.** One `Sheet` (`src/components/sheet.tsx`) under the comments, share, filter and share-profile sheets: the
   screen dims as the sheet rises on UIKit's presentation spring, the header (or the whole sheet when nothing in it
   scrolls) pulls it down on the UI thread, and a flick or a long pull closes it. Every sheet has the same grabber,

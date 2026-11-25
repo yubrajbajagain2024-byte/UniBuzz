@@ -7,6 +7,7 @@ import { listingPoster } from "@/lib/listing-poster";
 import { categoryIcon, priceText } from "@/components/marketplace/item-text";
 import { Badge, Button, EmptyState, Loading } from "@/components/ui";
 import { useQuery } from "@/lib/hooks";
+import { rowKey } from "@/lib/query-cache";
 import { supabase } from "@/lib/supabase";
 import { alertWithHaptic } from "@/lib/haptics";
 
@@ -25,9 +26,10 @@ function conditionLabel(condition: string): string {
 export default function ItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { data: item, loading, refresh } = useQuery(() => getItem(supabase, id), [id]);
+  // The Marketplace list hands its row over (useKeepRows): the item shows at once.
+  const { data: item, loading, refresh } = useQuery(() => getItem(supabase, id), [id], { key: rowKey("item", id) });
   const detailStyles = useDetailStyles();
-  if (loading) return <Loading />;
+  if (loading && !item) return <Loading />;
   if (!item) return <EmptyState icon="bag-handle-outline" title="This item is no longer available" />;
   const description = item.description.trim();
   return (

@@ -1,31 +1,69 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { isFresh, prefetch, recall, remember, rowKey, type RowKind } from "./query-cache";
 
-/** Load something once (and again when `deps` change), with a manual refresh. */
-export function useQuery<T>(load: () => Promise<T>, deps: unknown[]) {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const seq = useRef(0);
-  const run = useCallback(async () => {
-    const id = ++seq.current;
-    setLoading(true);
-    try {
-      const result = await load();
-      if (id === seq.current) {
-        setData(result);
-        setError(null);
-      }
-    } catch (e) {
-      if (id === seq.current) setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      if (id === seq.current) setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+/**
+ * Hands a list's rows to the screens they open (lib/query-cache): the list and the screen read the same row, so the
+ * screen shows it at once and reads it again only once it is a few seconds old.
+ */
+export function useKeepRows<T extends { id: string }>(kind: RowKind, rows: readonly T[] | null | undefined) {
   useEffect(() => {
-    void run();
+    if (rows) for (const r of rows) remember(rowKey(kind, r.id), r);
+  }, [kind, rows]);
+}
+
+/**
+ * Load something once (and again when `deps` change), with a manual refresh. With `key` (lib/query-cache) the result is
+ * kept for the session: the screen opens at once on what was kept (a row a list handed over, the last visit, a load a
+ * pressed row started), `loading` only while there is nothing to show, and the server is asked again behind it unless
+ * the kept copy is a few seconds old; a load already running for the key (a prefetch) is joined, not repeated. `setData`
+ * keeps the cache in step.
+ */
+export function useQuery<T>(load: () => Promise<T>, deps: unknown[], options?: { key?: string | null }) {
+  const key = options?.key ?? null;
+  const [data, setDataState] = useState<T | null>(() => (key ? (recall<T>(key)?.value ?? null) : null));
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(() => !(key && recall(key)));
+  const seq = useRef(0);
+  const keyRef = useRef(key);
+  keyRef.current = key;
+  const run = useCallback(
+    async (force: boolean) => {
+      const id = ++seq.current;
+      const kept = key ? recall<T>(key) : undefined;
+      if (kept) setDataState(kept.value);
+      if (!force && key && isFresh(key)) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const result = key ? await prefetch(key, load) : await load();
+        if (id === seq.current) {
+          setDataState(result);
+          setError(null);
+        }
+      } catch (e) {
+        if (id === seq.current) setError(e instanceof Error ? e.message : "Something went wrong");
+      } finally {
+        if (id === seq.current) setLoading(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [...deps, key],
+  );
+  useEffect(() => {
+    void run(false);
   }, [run]);
-  return { data, error, loading, refresh: run, setData };
+  const refresh = useCallback(() => run(true), [run]);
+  const setData: Dispatch<SetStateAction<T | null>> = useCallback((action) => {
+    setDataState((prev) => {
+      const next = typeof action === "function" ? (action as (p: T | null) => T | null)(prev) : action;
+      const k = keyRef.current;
+      if (k && next !== null) remember(k, next);
+      return next;
+    });
+  }, []);
+  return { data, error, loading, refresh, setData };
 }
 
 /**

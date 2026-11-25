@@ -17,17 +17,23 @@ const NO_ENGAGEMENT: PostEngagement = { likes: 0, comments: 0, likedByMe: false 
 export default function PostScreen() {
   const { id, comment } = useLocalSearchParams<{ id: string; comment?: string }>();
   const { user } = useSession();
-  const { data, loading, error, refresh } = useQuery(async () => {
-    const post = await getFeedPost(supabase, id);
-    if (!post) return null;
-    const [engagement, saved, previews] = await Promise.all([
-      getPostEngagement(supabase, "post", id).catch(() => NO_ENGAGEMENT),
-      user ? isSaved(supabase, user.id, "post", id).catch(() => false) : Promise.resolve(false),
-      getPostPreviewsMany(supabase, "post", [id]).catch(() => ({}) as Record<string, PostPreview>),
-    ]);
-    recordView(supabase, "post", id).catch(() => {});
-    return { post, engagement, saved, preview: previews[id] };
-  }, [id, user?.id]);
+  // One round trip, not two: the post, its counts, whether you saved it and its newest comment all at once (the counts
+  // need only the id). Kept for the session per reader (lib/query-cache), so it opens at once the next time.
+  const { data, loading, error, refresh } = useQuery(
+    async () => {
+      const [post, engagement, saved, previews] = await Promise.all([
+        getFeedPost(supabase, id),
+        getPostEngagement(supabase, "post", id).catch(() => NO_ENGAGEMENT),
+        user ? isSaved(supabase, user.id, "post", id).catch(() => false) : Promise.resolve(false),
+        getPostPreviewsMany(supabase, "post", [id]).catch(() => ({}) as Record<string, PostPreview>),
+      ]);
+      if (!post) return null;
+      recordView(supabase, "post", id).catch(() => {});
+      return { post, engagement, saved, preview: previews[id] };
+    },
+    [id, user?.id],
+    { key: `post-page:${user?.id ?? "-"}:${id}` },
+  );
   if (loading && !data) return <Loading />;
   if (error && !data) return <View style={{ padding: 16 }}><ErrorBanner message={error} onRetry={refresh} /></View>;
   if (!data) return <EmptyState icon="newspaper-outline" title="This post is no longer available" />;

@@ -3,6 +3,7 @@ import { AppState } from "react-native";
 import type { Session, User } from "@supabase/supabase-js";
 import { getProfile, markDeliveredAll, type ProfileWithUniversity } from "@apartment-book/shared";
 import { stopPresence } from "./presence-store";
+import { clearQueryCache } from "./query-cache";
 import { supabase } from "./supabase";
 import { registerForPush } from "./push";
 
@@ -27,12 +28,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // INITIAL_SESSION fires once the stored session has been read, so protected
     // screens never see "signed out" during the first paint of a cold start.
-    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+    // What screens kept (lib/query-cache) belongs to one account: emptied whenever the account changes, before the new
+    // one's screens render, so nothing of the last account's is ever shown to the next.
+    let account: string | null = null;
+    const follow = (next: Session | null) => {
+      const id = next?.user.id ?? null;
+      if (id !== account) {
+        account = id;
+        clearQueryCache();
+      }
       setSession(next);
+    };
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      follow(next);
       if (event === "INITIAL_SESSION") setLoading(false);
     });
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setSession(data.session);
+      if (data.session) follow(data.session);
     });
     return () => sub.subscription.unsubscribe();
   }, []);

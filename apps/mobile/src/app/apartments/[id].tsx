@@ -6,6 +6,7 @@ import { Icon, type IconName } from "@/components/icon";
 import { Fact, ListingDetail, useDetailStyles } from "@/components/listing-detail";
 import { Badge, Button, EmptyState, Loading } from "@/components/ui";
 import { useQuery } from "@/lib/hooks";
+import { rowKey } from "@/lib/query-cache";
 import { supabase } from "@/lib/supabase";
 import { useColors } from "@/lib/theme-provider";
 import { alertWithHaptic } from "@/lib/haptics";
@@ -66,10 +67,11 @@ function PanelGrid({ items }: { items: { icon: IconName; label: string; value: s
 export default function ApartmentScreen() {
   const { id, comment } = useLocalSearchParams<{ id: string; comment?: string }>();
   const router = useRouter();
-  const { data: a, loading } = useQuery(() => getApartment(supabase, id), [id]);
+  // The Housing list hands its row over (useKeepRows): the listing shows at once.
+  const { data: a, loading } = useQuery(() => getApartment(supabase, id), [id], { key: rowKey("apartment", id) });
   const colors = useColors();
   const detailStyles = useDetailStyles();
-  if (loading) return <Loading />;
+  if (loading && !a) return <Loading />;
   if (!a) return <EmptyState icon="home-outline" title="This listing is no longer available" />;
 
   const rent = formatPrice(a.price_per_month, a.currency);

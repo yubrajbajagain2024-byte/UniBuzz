@@ -8,7 +8,7 @@ import { ErrorBanner, Loading, useAppearingCells } from "@/components/ui";
 import { AnimatedFlatList, listInset } from "@/lib/collapsing-header";
 import { savedEvents } from "@/lib/event-saves-store";
 import { refreshWithHaptic } from "@/lib/haptics";
-import { useQuery } from "@/lib/hooks";
+import { useKeepRows, useQuery } from "@/lib/hooks";
 import { organizationFollows } from "@/lib/organization-follows-store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -54,6 +54,7 @@ export function ForYouEventsSection({ active, topInset, onScroll, universityId, 
   }, [me, universityId, timeZone, q, dateFilter, categories]);
   const organizations = useQuery(() => (me ? listOrganizations(supabase, { universityId, limit: 12 }) : Promise.resolve([] as Organization[])), [me, universityId]);
 
+  useKeepRows("event", query.data?.events);
   const interests = query.data?.ctx.interests ?? [];
   // Interests saved in Your interests (the prompt below, or the filter sheet): ranked again with them at once.
   const refreshQuery = query.refresh;

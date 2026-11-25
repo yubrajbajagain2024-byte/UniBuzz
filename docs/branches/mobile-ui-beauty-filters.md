@@ -264,6 +264,18 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   camera's mode; after a buzz goes out, the sheet closes and then (450 ms on) the camera leaves for the Buzz page; an
   answer to a prompt opens its thread there. Seen in the Simulator (Expo Go; nothing posted): + → BUZZ raised "New
   buzz" with the 0/4 photo tile, Poll and Video; its X came back to SNAP. `npm run check` 9/9.
+- **No spinner on what is already known** (2026-11-25; the owner's report: loading when switching tabs, before content
+  opened and on opening a person from Messages): a session cache under `useQuery` (`key`, `src/lib/query-cache.ts`:
+  memory only, per reader, emptied on an account change before the next account's screens render, at most 1,000
+  entries, fresh for 15 s, loads joined while they run). A chat opened from the inbox now shows at once (its summary
+  handed over; before: the summary, then its members, then the messages, three round trips in a row behind two
+  spinners); a finger on a row starts its messages; a chat keeps its newest page when left and the server's page
+  replaces it on the next open; a one-to-one chat warms the other person's profile 0.6 s in. Profiles keep their parts
+  per reader (`profileKeys`). Housing, Roommate, Marketplace and Events hand their rows to the detail screens
+  (`useKeepRows`, the same select as the detail query), whose spinner now shows only with nothing to show; a post's page
+  is one round trip (was two). Events, Messages and Profile render 1.2 s after Home opens. Seen in the Simulator: after
+  a restart, Messages fully drawn 0.3 s after its tab was tapped, no spinner. Not tried there, to leave the live account
+  as it was: opening a chat (it marks it read) and opening a listing (it records a view). `npm run check` 9/9.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.

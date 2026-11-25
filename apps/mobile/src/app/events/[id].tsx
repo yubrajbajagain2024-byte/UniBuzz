@@ -12,6 +12,7 @@ import { useCampusTimeZone } from "@/lib/campus-time-zone";
 import { savedEvents } from "@/lib/event-saves-store";
 import { alertWithHaptic, hapticSuccess } from "@/lib/haptics";
 import { errorText, useQuery } from "@/lib/hooks";
+import { rowKey } from "@/lib/query-cache";
 import { useSession } from "@/lib/session";
 import { SITE_URL, supabase } from "@/lib/supabase";
 import { radius, space, textStyle } from "@/lib/theme";
@@ -48,7 +49,8 @@ export default function EventScreen() {
   const colors = useColors();
   const { width } = useWindowDimensions();
   const { user, profile } = useSession();
-  const event = useQuery(() => getEvent(supabase, id), [id]);
+  // The Events lists hand their rows over (useKeepRows): the event shows at once.
+  const event = useQuery(() => getEvent(supabase, id), [id], { key: rowKey("event", id) });
   const e = event.data;
   const timeZone = useCampusTimeZone(e?.university_id ?? profile?.university_id);
   const mine = useQuery(() => (user ? listMyOrganizations(supabase, user.id) : Promise.resolve([])), [user?.id]);

@@ -5,7 +5,7 @@ import { ErrorBanner, Loading, useAppearingCells } from "@/components/ui";
 import { AnimatedFlatList, listInset } from "@/lib/collapsing-header";
 import { savedEvents } from "@/lib/event-saves-store";
 import { refreshWithHaptic } from "@/lib/haptics";
-import { useFeed } from "@/lib/hooks";
+import { useFeed, useKeepRows } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useTabBarInset } from "@/lib/tab-bar";
@@ -35,6 +35,7 @@ export function AllEventsSection({ active, topInset, onScroll, universityId, tim
     },
     [universityId, timeZone, q, dateFilter, categories],
   );
+  useKeepRows("event", feed.items);
   const inset = useMemo(() => listInset(topInset), [topInset]);
   const listRef = useRef<FlatList<Row>>(null);
   const appearCells = useAppearingCells();

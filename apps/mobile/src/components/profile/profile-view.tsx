@@ -46,6 +46,7 @@ import { Button, EmptyState, ErrorBanner, Loading } from "@/components/ui";
 import { openCompose } from "@/lib/compose-nav";
 import { hapticTap, alertWithHaptic, refreshWithHaptic } from "@/lib/haptics";
 import { errorText, useQuery } from "@/lib/hooks";
+import { warm } from "@/lib/query-cache";
 import { emitPostPinned, onPostPinned, onPostRemoved } from "@/lib/posts-events";
 import { setStoryMuted, useStoryMuted } from "@/lib/stories-store";
 import { useSession } from "@/lib/session";
@@ -78,6 +79,29 @@ const TABS_GAP = 14;
 const NO_TILES: ProfileTile[] = [];
 const OWNER_ACCESS: ProfileSectionAccess = OWNER_SECTION_ACCESS;
 const NO_PROFILE_STATS: ProfileStats = { posts: 0, reels: 0, likesReceived: 0 };
+
+/**
+ * Where a profile's parts are kept for the session (lib/query-cache), per reader, since what a profile shows depends on
+ * who reads it: a profile opened again shows at once, and one warmed beforehand opens without a spinner.
+ */
+function profileKeys(viewerId: string | null, userId: string) {
+  const v = viewerId ?? "-";
+  return { profile: `profile:${v}:${userId}`, follow: `follow:${v}:${userId}`, stats: `pstats:${v}:${userId}`, access: `access:${v}:${userId}`, blocked: `blocked:${v}:${userId}` };
+}
+
+/**
+ * Loads someone's profile ahead of a tap that may open it (the other person of a chat as the chat opens), so their
+ * page shows at once: the same reads, under the same keys, as ProfileView's. Nothing for your own.
+ */
+export function warmProfile(viewerId: string | null, userId: string): void {
+  if (!userId || viewerId === userId) return;
+  const k = profileKeys(viewerId, userId);
+  warm(k.profile, () => getProfile(supabase, userId));
+  warm(k.follow, () => getFollowStats(supabase, userId));
+  warm(k.stats, () => getProfileStats(supabase, userId).catch(() => NO_PROFILE_STATS));
+  warm(k.access, () => getProfileSectionAccess(supabase, userId));
+  if (viewerId) warm(k.blocked, () => isBlocked(supabase, viewerId, userId));
+}
 /** What each tab holds, for "Could not load …". */
 const TAB_NOUNS: Record<ProfileTabKey, string> = { posts: "posts", classes: "classes", reels: "reels", saved: PROFILE_SECTION_NOUNS.saved, liked: PROFILE_SECTION_NOUNS.liked, listings: PROFILE_SECTION_NOUNS.listings };
 
@@ -738,17 +762,18 @@ export function ProfileView({ userId, topBar = false }: { userId: string; topBar
   // Read through a ref: the tracker is made below, once the open page is known, and starts over on each tab.
 
   // Your own profile follows the session's copy, which Settings and the photo button refresh.
-  const profileQ = useQuery(() => getProfile(supabase, userId), [userId]);
+  const keys = profileKeys(viewerId, userId);
+  const profileQ = useQuery(() => getProfile(supabase, userId), [userId], { key: keys.profile });
   const profile = (own ? myProfile : null) ?? profileQ.data;
   // "Followed by me" is the viewer's: signing in or out loads it again. The first answer gates the screen, so the button never flips from Follow to Following.
-  const followQ = useQuery(() => getFollowStats(supabase, userId), [userId, viewerId]);
-  const statsQ = useQuery(() => getProfileStats(supabase, userId).catch(() => NO_PROFILE_STATS), [userId, viewerId]);
-  const accessQ = useQuery(() => (own ? Promise.resolve(OWNER_ACCESS) : getProfileSectionAccess(supabase, userId)), [userId, viewerId, own]);
+  const followQ = useQuery(() => getFollowStats(supabase, userId), [userId, viewerId], { key: keys.follow });
+  const statsQ = useQuery(() => getProfileStats(supabase, userId).catch(() => NO_PROFILE_STATS), [userId, viewerId], { key: keys.stats });
+  const accessQ = useQuery(() => (own ? Promise.resolve(OWNER_ACCESS) : getProfileSectionAccess(supabase, userId)), [userId, viewerId, own], { key: own ? null : keys.access });
   // The database hides classes the reader may not see (the list just comes back empty), so they load again whenever that
   // access changes: following each other, a block.
   const classesOpen = own || accessQ.data?.classes === true;
   const classesQ = useQuery(() => listProfileClasses(supabase, userId), [userId, viewerId, classesOpen]);
-  const blockedQ = useQuery(() => (viewerId && !own ? isBlocked(supabase, viewerId, userId) : Promise.resolve(false)), [viewerId, userId, own]);
+  const blockedQ = useQuery(() => (viewerId && !own ? isBlocked(supabase, viewerId, userId) : Promise.resolve(false)), [viewerId, userId, own], { key: viewerId && !own ? keys.blocked : null });
   /** Whether you have muted this person's stories (lib/stories-store.ts): More offers the other choice. */
   const storiesMuted = useStoryMuted(own ? null : userId);
 
