@@ -12,6 +12,13 @@ import { Icon, useBounceOn, type IconName } from "@/components/icon";
 
 /** The side gutter of every post: the header, the text, the photo's rounded frame and the rows under it keep to it. */
 export const POST_GUTTER = 16;
+/**
+ * The weight of the like, comment, share and save symbols (and the chat pill's) under a post or a listing, on Orbit,
+ * Housing, Roommate and Marketplace (iOS draws them as SF Symbols; Android keeps Ionicons, which have one weight): a firmer
+ * line than the symbols' default "regular", so they read crisp and defined, white on the dark theme (the owner's brief,
+ * 2026-11-25; "semibold" chosen over "medium", which barely differed from "regular", side by side in the Simulator).
+ */
+export const ACTION_WEIGHT = "semibold" as const;
 /** The corner radius of a post's photo frame. */
 export const POST_FRAME_RADIUS = 18;
 const AVATAR = 42;
@@ -140,25 +147,25 @@ export function PostActions({ liked, likes, comments, saved, onLike, onComment, 
         </View>
       ) : null}
       <Pressable onPress={onLike} hitSlop={6} style={styles.action} accessibilityRole="button" accessibilityLabel={liked ? "Unlike" : "Like"} accessibilityState={{ selected: liked }}>
-        <Icon name={liked ? "heart" : "heart-outline"} size={26} color={liked ? colors.like : colors.text} bounce={likeBounce} />
+        <Icon name={liked ? "heart" : "heart-outline"} size={26} weight={ACTION_WEIGHT} color={liked ? colors.like : colors.text} bounce={likeBounce} />
         {likes > 0 ? <Text style={styles.count}>{compactCount(likes)}</Text> : null}
       </Pressable>
       {onComment ? (
         <Pressable onPress={onComment} hitSlop={6} style={styles.action} accessibilityRole="button" accessibilityLabel="Comment">
-          <Icon name="chatbubble-outline" size={24} color={colors.text} />
+          <Icon name="chatbubble-outline" size={24} weight={ACTION_WEIGHT} color={colors.text} />
           {comments > 0 ? <Text style={styles.count}>{compactCount(comments)}</Text> : null}
         </Pressable>
       ) : null}
       {onShare ? (
         <Pressable onPress={onShare} hitSlop={6} style={styles.action} accessibilityRole="button" accessibilityLabel="Share">
-          <Icon name="share-outline" size={24} color={colors.text} />
+          <Icon name="share-outline" size={24} weight={ACTION_WEIGHT} color={colors.text} />
         </Pressable>
       ) : null}
       {message && messageBeside ? <MessagePill message={message} beside /> : null}
       <View style={{ flex: 1 }} />
       {message && !messageBeside ? <MessagePill message={message} /> : null}
       <Pressable onPress={onSave} hitSlop={6} accessibilityRole="button" accessibilityLabel={saved ? "Unsave" : "Save"} accessibilityState={{ selected: saved }}>
-        <Icon name={saved ? "bookmark" : "bookmark-outline"} size={24} color={colors.text} bounce={saveBounce} />
+        <Icon name={saved ? "bookmark" : "bookmark-outline"} size={24} weight={ACTION_WEIGHT} color={colors.text} bounce={saveBounce} />
       </Pressable>
     </View>
   );
@@ -170,7 +177,7 @@ function MessagePill({ message, beside }: { message: { label: string; onPress: (
   const colors = useColors();
   return (
     <Pressable onPress={message.onPress} hitSlop={4} style={({ pressed }) => [styles.message, beside && styles.messageBeside, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel={message.label}>
-      <Icon name="chatbubble-ellipses-outline" size={16} color={colors.text} />
+      <Icon name="chatbubble-ellipses-outline" size={16} weight={ACTION_WEIGHT} color={colors.text} />
       <Text style={styles.messageText}>{message.label}</Text>
     </Pressable>
   );

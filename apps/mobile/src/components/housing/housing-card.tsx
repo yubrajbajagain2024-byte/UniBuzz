@@ -6,6 +6,7 @@ import { Avatar } from "@/components/avatar";
 import { Icon, useBounceOn, type IconName } from "@/components/icon";
 import { useListingActions } from "@/components/listing-actions";
 import { PhotoCarousel } from "@/components/photo-carousel";
+import { ACTION_WEIGHT } from "@/components/post-bits";
 import { shortDate } from "@/lib/short-date";
 import { auroraGradient } from "@/lib/theme";
 import { makeStyles, useAppTheme, useColors } from "@/lib/theme-provider";
@@ -30,7 +31,7 @@ function Action({ icon, label, onPress, color, bounce, selected, accessibilityLa
   const colors = useColors();
   return (
     <Pressable onPress={onPress} hitSlop={4} style={({ pressed }) => [styles.action, pressed && { opacity: 0.55 }]} accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={selected === undefined ? undefined : { selected }}>
-      <Icon name={icon} size={22} color={color ?? colors.text} bounce={bounce} />
+      <Icon name={icon} size={22} weight={ACTION_WEIGHT} color={color ?? colors.text} bounce={bounce} />
       <Text style={[styles.actionText, color ? { color } : null]} numberOfLines={1}>
         {label}
       </Text>

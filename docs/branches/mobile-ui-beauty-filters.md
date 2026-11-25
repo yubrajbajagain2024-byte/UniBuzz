@@ -195,6 +195,13 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   bookmark in `PostActions` was grey (`muted`) until saved; it is the text colour now, like the heart, comment and
   share, so all four are white on the dark theme (black on the light one, where white would vanish on the page). A liked
   heart stays red. `PostActions` also serves roommate posts and apartments, so their bookmark changed too.
+- **Firmer, more defined buttons** (2026-11-25; the owner's brief: like, comment, share and save "white, more defined,
+  sophisticated" on Orbit, Housing, Roommate and Marketplace): the symbols are drawn at SF Symbols' "semibold" weight
+  (`ACTION_WEIGHT` in `post-bits.tsx`) instead of "regular", in `PostActions` (Orbit, Roommate and Marketplace, the chat
+  pill's icon too) and in Housing's own row (`housing-card.tsx`, all its buttons). Compared side by side in the Simulator
+  at "regular", "medium" and "semibold": "medium" barely differed. iOS only: Android draws Ionicons, which have one
+  weight. Seen on Orbit and Roommate (Expo Go, live data read-only); Housing has no listings on production to show.
+  `npm run check` 9/9.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.
