@@ -66,6 +66,11 @@ open work is in [status.md](status.md).
   Home as Orbit | Buzz, stories as a post's page, Orbit a card feed again (2026-11-24) and the viewer without its top
   shade. PR #116 brought migration 68 (a like on one's own story), not on production when it merged. The iOS EAS update
   `7da591cf` (2026-11-24) took `main` at `28f2b10` to build `d30b8306` on the testers' iPhones.
+- **2026-11-25:** the project folder on the owner's Mac was deleted while disk space was freed; it was cloned again
+  from GitHub (nothing pushed was lost; `apps/web/.env.local` and the local-only branch copies were). Migrations 68
+  (a like on one's own story, 20:17 UTC) and 69 (likes, comments and who is going on events, 20:19 UTC) went live,
+  after staging, a full verified backup and a zero-difference schema check; production then matched the repo at 73
+  migrations.
 
 ## The AI documentation
 

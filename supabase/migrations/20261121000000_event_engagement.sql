@@ -12,6 +12,8 @@
 --  2. Only on an event the caller can see: a like or a comment is refused on an event events_read hides from them
 --     (pending, hidden, an inactive organization's), and comments on an event are read only by those who can see it
 --     (and by their writers, who can still find and delete them), restrictive as 44's post audience policy is.
+--     Where CampConnect Admin's moderation is installed (production, staging), its target_visible() learns 'event' too,
+--     or its insert policies would refuse every like and comment on an event.
 --  3. post_link knows events, so a reply to a comment on an event links to /events/<id> (its notification, and the
 --     console's snapshot of a reported comment).
 --  4. Nobody is notified of a like or a comment on an event itself: listing_owner and listing_poster have no 'event'
@@ -61,6 +63,36 @@ drop policy if exists "post_comments_event_audience" on public.post_comments;
 create policy "post_comments_event_audience" on public.post_comments
   as restrictive for select
   using (target_type <> 'event' or user_id = (select auth.uid()) or exists (select 1 from public.events e where e.id = target_id));
+
+-- 2b. -----------------------------------------------------------------------
+-- CampConnect Admin's moderation (supabase/applied-outside-repo/20261024000000_moderation_support.sql, on production and
+-- staging) adds target_visible() to the insert policies of likes and comments, and it answers false for a type it does
+-- not know: there, it takes the 'event' case too (an event staff have not hidden; what a student may see is the trigger's
+-- to decide, above). Every other case is that file's, word for word. Without that schema there is nothing to change.
+do $do$
+begin
+  if to_regprocedure('public.target_visible(text, uuid)') is not null then
+    execute $f$
+      create or replace function public.target_visible(p_type text, p_id uuid)
+      returns boolean
+      language sql
+      stable
+      security definer
+      set search_path = public
+      as $$
+        select case p_type
+          when 'apartment' then exists (select 1 from public.apartments a where a.id = p_id and public.content_visible(a.owner_id, a.hidden_at))
+          when 'item' then exists (select 1 from public.items i where i.id = p_id and public.content_visible(i.seller_id, i.hidden_at))
+          when 'roommate' then exists (select 1 from public.roommate_posts r where r.id = p_id and public.content_visible(r.author_id, r.hidden_at))
+          when 'post' then exists (select 1 from public.feed_posts f where f.id = p_id and public.content_visible(f.author_id, f.hidden_at))
+          when 'event' then exists (select 1 from public.events e where e.id = p_id and e.status <> 'hidden')
+          else false
+        end;
+      $$
+    $f$;
+  end if;
+end
+$do$;
 
 -- 3. ------------------------------------------------------------------------
 -- Migration 20's function with the 'event' case; every other link is as it was.

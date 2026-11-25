@@ -49,6 +49,9 @@ Supabase's `auth` and `storage` schemas.
   `done`.
 - `as()` sets the role on the one connection: never run two of them at once (`Promise.all`), or each
   sees the other's user. Loop instead.
+- Rehearse a new migration in production's order too (`boot({ live: true })`), not only this repo's: the
+  `applied-outside-repo/` migrations change policies the repo's order lacks (CampConnect Admin's `target_visible()`
+  in the insert policies of likes and comments refused 69's events until staging caught it).
 - `reopen()`: the same database on a new connection. A custom setting (`app.…`) that a migration or
   a function set stays defined, as `''`, in the session that set it, but reads as null on the API's
   fresh connections: test code that depends on one there.
@@ -65,7 +68,8 @@ Supabase's `auth` and `storage` schemas.
   (`student <label>` makes a fresh student per device, since impressions and clicks count once per student, ad and
   hour; `pause <placement>` and `resume <placement>` for the phone's pause check), then `verify` and `cleanup`;
   `admin-authority.mjs`, migration 67 applied, checked through Auth and the REST API, rolled back and applied again
-  (`--restore` leaves it rolled back); and
+  (`--restore` leaves it rolled back); `event-engagement.mjs`, events' likes, comments and who is going (migration 69,
+  applied when missing) through the app's own code (`--restore` rolls it back); and
   `release-rehearsal.mjs`, which rehearses a release step by step (see its header) and expects every
   migration that went live ahead of the release (58 to 61) to be applied on staging first.
   Staging's `media_jobs` grows on its own: leave it out of row-count comparisons.

@@ -51,11 +51,10 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   for photos, black full-screen viewers, Home as Orbit (a card feed under the story tray, a tap opening the viewer) |
   Buzz, stories as a post's page. On testers' iPhones with the EAS update of 2026-11-25 (group `f7922c28`, build
   `d30b8306`, from the branch at `d732bbc`: also Orbit's Instagram-style cards, bold white buttons, a commenter's
-  profile closing the comments and the profile tabs' short underline, not on `main` yet). **Migration 68** (a like on one's own story) is on `main` but on no project yet (as of 2026-11-24): until
-  it is, that heart is refused with the reason. It waits on a Supabase access token (staging first, then a full backup
-  and production) and on free disk space for the backup. **Migration 69** (likes, comments and who is going on
-  events, 2026-11-25, on the branch) is on no project either; until it is, events show Save and Share alone. **Still to
-  check:** the update on a real iPhone; Android.
+  profile closing the comments and the profile tabs' short underline, not on `main` yet). **Migrations 68** (a like on
+  one's own story) **and 69** (likes, comments and who is going on events) are on production and staging since
+  2026-11-25 (docs/migrations.md); the app's part of 69 and everything after `d732bbc` reach testers with the next EAS
+  update. **Still to check:** the update on a real iPhone; Android.
 - **Chat redesign, media viewing and the keyboard (app)** (merged as PR #112, 2026-11-15 21:51 UTC; on `main`, summary in
   [history.md](history.md)): an Apple-style chat, tab labels side by side in every tab row, Home without lines between
   the tabs, the story tray and the feed, photos that pinch and double tap to zoom in the full-screen viewer, a video
@@ -385,7 +384,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | Testers' app: EAS updates reach only builds with the same native fingerprint (since `828b9d3`); today that is Android build `0493abcf` alone (update of 2026-11-05 03:13 UTC), whose install link stops working on 2026-11-17 (installed apps keep working); the old Android build gets no more updates; the iPhone build is `preview` build `d30b8306` (2026-11-21, from `828e0a4`, internal distribution to the four iPhones registered so far: the owner's and three testers', team `H7F8K4XUB4`, install link valid until 2026-12-05; it has expo-gl for the beauty filters, so updates from `main` since then reach it alone, and the older iPhone builds `8f77d85f` (2026-11-11) and `b2aaee9d` (2026-11-10) get no more); more testers' iPhones need `eas device:create` and a new build and no store build (the last Play Store build is on SDK 57) | "Ads refresh with the feed" above |
 | Production has no listings and no For You or Reels campaigns (read-only, 2026-11-05): Housing is empty everywhere and no student sees an ad until listings and campaigns exist | "Production's one live campaign is not visible yet" above |
 | Test records on production (read-only, 2026-11-05): four test Housing ads with two test payments (one ad scheduled from 2026-11-05 09:00 CST), and three accounts from the calls end-to-end test of 2026-10-24 whose passwords sit in a local, world-readable `apps/mobile/e2e/.call-partners.json` | "Test ads on production" above |
-| No backup of production on the owner's Mac as of 2026-11-24: no `~/CampConnect-backups` folder and no daily backup job in `launchctl list` (`scripts/backup-daily.sh` not loaded); the disk was full (about 200 MB free) | supabase/CLAUDE.md ("Production") |
+| The daily backup of production is not running on the owner's Mac (no job in `launchctl list` as of 2026-11-24; `scripts/backup-daily.sh` not loaded). One full backup exists: `~/CampConnect-backups/2026-11-25-before-migration-68-69` (221 files checked). The project folder was deleted on 2026-11-25 while space was freed and cloned again from GitHub: nothing pushed was lost, but `apps/web/.env.local` and the never-pushed local branch copies went with it | supabase/CLAUDE.md ("Production") |
 | The staging access token (a Supabase personal access token, in `~/.config/unibuzz/staging.env`) reaches every project in the account, production included: revoke it in the dashboard and delete the file once testing is done. The file is gone as of 2026-11-24; whether the token was revoked is not checked | docs/environment.md |
 
 ## Future plans

@@ -75,6 +75,7 @@ the same day (docs/decisions.md, last row); every §9 now lives in the files her
   commit on those branches that `main` lacks only adds an old copy or the stub, and every note in
   the copies is in these docs.
 - Copies committed only on the owner's Mac, never pushed: `ankur/dev`, `ankur/owner-moderation`,
-  `step-admin`, `step-1-brand-shell` (one local commit each; reset to `origin/<branch>` to drop it).
+  `step-admin`, `step-1-brand-shell` (one local commit each; reset to `origin/<branch>` to drop it). Gone since
+  2026-11-25, when the project folder was deleted and cloned again from GitHub: only `origin`'s branches remain.
 - If you continue a branch that has a copy, merge `main` into it and resolve `CLAUDE.md` by taking
   `main`'s version.
