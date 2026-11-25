@@ -180,7 +180,8 @@ Home opens on **Orbit**, a blend of posts and reels (anonymous Buzz threads stay
 lives in `packages/shared/src/for-you.ts` and is shared with the website), as a feed of cards under the story tray
 (`src/components/home/for-you-section.tsx`, each row the Instagram-style `InstaPost`; a post of nothing but words has
 its card too). Each card's picture is laid out as Instagram's Home feed lays one out (the owner's brief, 2026-11-24): the
-header, the title and the caption under the name (2026-11-25; two lines before "more…", three on a post of words alone),
+header, the title and the caption under the name (2026-11-25; two lines with "… more" at the end of the second, Instagram's,
+the same fold as the descriptions on Housing, Roommate and Marketplace: `ExpandableText`),
 then the photo or video across the whole width with no corners, keeping its shape between 3:4 and 1.91:1 and cropped to
 that when it is taller or wider (`frameAspect`; a reel's 9:16 shows at 3:4 here, whole in the viewer; a carousel's
 slides all fill the first one's frame, its "1/3" at the top right and its dots in the middle of the row of buttons

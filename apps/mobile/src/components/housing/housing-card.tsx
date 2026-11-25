@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { businessLabel, compactCount, formatDistance, formatPrice, isPlainBusinessLabel, isVerifiedPoster, listingMedia, listingPoster, type ApartmentWithOwner, type PostEngagement } from "@apartment-book/shared";
 import { Avatar } from "@/components/avatar";
 import { Icon, useBounceOn, type IconName } from "@/components/icon";
+import { ExpandableText } from "@/components/expandable-text";
 import { useListingActions } from "@/components/listing-actions";
 import { PhotoCarousel } from "@/components/photo-carousel";
 import { ACTION_WEIGHT } from "@/components/post-bits";
@@ -89,9 +90,10 @@ export const HousingCard = memo(function HousingCard({ apartment: a, saved, enga
           {facts ? <Text style={styles.facts}>{`  ·  ${facts}`}</Text> : null}
         </Text>
         {a.description?.trim() ? (
-          <Text style={styles.description} numberOfLines={2}>
+          // Two lines, "… more" at the end of the second opening the rest in place (2026-11-25).
+          <ExpandableText style={styles.description} lines={2}>
             {a.description.trim()}
-          </Text>
+          </ExpandableText>
         ) : null}
       </Pressable>
 

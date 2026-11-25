@@ -213,6 +213,16 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   underline under the open tab, posts or reels, was too long): `profile-tabs.tsx` draws it 32 points wide (`UNDERLINE_WIDTH`,
   was the whole tab), 2.5 high with rounded ends, centred under the icon, sliding with the pager as before; every
   profile, your own included. Seen in the Simulator on a profile: under the grid, then slid under Reels. `npm run check` 9/9.
+- **Two lines and "… more" at the end of the second** (2026-11-25; the owner's brief, for Orbit, Housing, Roommate and
+  Marketplace: "more…" not on a third line): `ExpandableText` now folds inline, Instagram's way. A hidden copy at full
+  length gives the laid-out lines; the second is cut where "… more" (measured in the same style) fits after it, the
+  hashtags and mentions keeping their spans (`sliceInline`), never mid-space or mid-emoji; a hidden copy of the folded
+  text checks it keeps to two lines and pulls the cut back two characters at a time if not. "more" opens the rest in
+  place, "less" under it folds it again. Orbit's captions (every post, words-only ones too, were three), Roommate and
+  Marketplace (`post-card.tsx`, were three lines and "…") and Housing (`housing-card.tsx`, two and "…") all use it.
+  Seen in the Simulator: Roommate's long description in two lines ending "… more", opened in place; Marketplace's
+  one-line description without it; on a temporary dev route (deleted), a long Orbit caption with hashtags and an emoji
+  in two lines, then opened with its hashtags blue. Housing has no listings on production to show. `npm run check` 9/9.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.

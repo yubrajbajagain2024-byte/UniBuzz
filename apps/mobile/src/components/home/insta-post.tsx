@@ -68,8 +68,8 @@ export function frameAspect(media: FeedMedia[], reel: boolean): number {
 
 /**
  * A post in the Home feed, its picture laid out as Instagram's Home feed lays one out (the owner's brief, 2026-11-24) and
- * its words under the name (2026-11-25): header → its title in bold, the caption folded to two lines ("more…" / "less";
- * three on a post of words alone) and its link → the photo or video edge to edge, sized by frameAspect → heart, comment
+ * its words under the name (2026-11-25): header → its title in bold, the caption folded to two lines ("… more" at the end
+ * of the second, "less" once open) and its link → the photo or video edge to edge, sized by frameAspect → heart, comment
  * and share with their counts, a carousel's dots in the middle of that row, the bookmark on the right → "Liked by …" →
  * the newest comments. A friends-only or selected-people post has no Share (the database refuses to send it into a
  * chat), and the author of a post that is not Global sees who can on the line under their name; one with comments off
@@ -264,8 +264,7 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
 
       {title || text || link ? (
         // The title, the words and the link under the name, above the picture (the owner's brief, 2026-11-25), folded to two
-        // lines before "more…" over a picture so it stays near the name, three on a post of words alone, where the text
-        // is the post and takes the double tap.
+        // lines with "… more" at the end of the second; on a post of words alone the text is the post and takes the double tap.
         <Pressable onPress={media.length === 0 ? textTap : undefined} style={styles.body}>
           {title ? (
             <Text style={styles.title} selectable={detail}>
@@ -273,7 +272,7 @@ export function InstaPost({ post, saved, engagement, preview, subtitle, active, 
             </Text>
           ) : null}
           {text ? (
-            <ExpandableText style={styles.text} lines={media.length > 0 ? 2 : 3} expanded={detail} collapsible={!detail} selectable={detail}>
+            <ExpandableText style={styles.text} lines={2} expanded={detail} collapsible={!detail} selectable={detail}>
               {caption}
             </ExpandableText>
           ) : null}
