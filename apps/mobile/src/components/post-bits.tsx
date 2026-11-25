@@ -16,9 +16,9 @@ export const POST_GUTTER = 16;
  * The weight of the like, comment, share and save symbols (and the chat pill's) under a post or a listing, on Orbit,
  * Housing, Roommate and Marketplace (iOS draws them as SF Symbols; Android keeps Ionicons, which have one weight): a firmer
  * line than the symbols' default "regular", so they read crisp and defined, white on the dark theme (the owner's brief,
- * 2026-11-25; "semibold" chosen over "medium", which barely differed from "regular", side by side in the Simulator).
+ * 2026-11-25: "semibold" first, chosen over "medium", which barely differed from "regular"; then "bold", on request).
  */
-export const ACTION_WEIGHT = "semibold" as const;
+export const ACTION_WEIGHT = "bold" as const;
 /** The corner radius of a post's photo frame. */
 export const POST_FRAME_RADIUS = 18;
 const AVATAR = 42;
