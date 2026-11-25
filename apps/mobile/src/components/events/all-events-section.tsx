@@ -70,7 +70,9 @@ export function AllEventsSection({ active, topInset, onScroll, universityId, tim
         maxToRenderPerBatch={8}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        ListEmptyComponent={feed.loading ? <Loading /> : feed.error ? <View style={{ paddingHorizontal: 16 }}><ErrorBanner message={feed.error} onRetry={feed.refresh} /></View> : <EventsEmpty filtered={filtered} campus={Boolean(universityId)} />}
+        // The spinner only before the first result: a new filter keeps the last result (or "nothing here") until the new one
+        // arrives, so a tap on Today no longer swaps it for a spinner and back (the owner saw it blink, 2026-11-25).
+        ListEmptyComponent={feed.loading && feed.round === 0 ? <Loading /> : feed.error ? <View style={{ paddingHorizontal: 16 }}><ErrorBanner message={feed.error} onRetry={feed.refresh} /></View> : <EventsEmpty filtered={filtered} campus={Boolean(universityId)} />}
         ListFooterComponent={feed.items.length > 0 && feed.hasMore ? <Text style={{ textAlign: "center", color: colors.faint, padding: 12 }}>Loading more…</Text> : undefined}
         onEndReached={feed.loadMore}
         onEndReachedThreshold={0.6}

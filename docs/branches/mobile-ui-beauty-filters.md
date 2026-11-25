@@ -241,6 +241,12 @@ change is migration 68, on `main` since PR #116 but applied nowhere yet (below).
   right inset and 40-point button. Explore keeps its look. Seen in the Simulator side by side with Messages (the rows,
   the field, the button and the pills at the same places and sizes; Today turned blue with Clear beside it).
   `npm run check` 9/9.
+- **No blink on Today, This week, Weekend** (2026-11-25; the owner's report: the pills blinked, unlike Messages'): the
+  pills sit in a scrolling row, where iOS shows a press only once the finger lifts, so their dimming while pressed came
+  as one flash; `DiscoveryBar`'s pills no longer dim (Explore's too, which flashed the same way), the new colour being
+  the feedback. All events swapped its list or "No events match" for a spinner on every filter tap; it shows the spinner
+  only before its first result now (`feed.round === 0`), keeping the last one until the new arrives, as For you did.
+  Seen in the Simulator: a tap on This week on All events, the message staying with no spinner. `npm run check` 9/9.
 - **Migration 68** (`20261120000000_story_self_like.sql`, `c9a1f4f`): drops the one condition
   of migration 62 that kept a heart off your own story. **Not applied anywhere** — not production, not staging. Until
   it is, the heart on your own story is drawn but the database refuses the like and it goes back with the reason.

@@ -71,7 +71,9 @@ export function DiscoveryBar({ tabs, query, onQuery, placeholder, searching = fa
             accessibilityLabel={c.removable ? `${c.label}, remove filter` : c.label}
             accessibilityState={c.removable ? undefined : { selected: c.on }}
             hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
-            style={({ pressed }) => [styles.chip, c.on && styles.chipOn, m && styles.mChip, m && c.on && styles.mChipOn, pressed && { opacity: 0.6 }]}
+            // No dimming while pressed: in a scrolling row iOS shows the press only once the finger lifts, so a quick tap
+            // flashed the pill (the owner saw it blink, 2026-11-25). The pill's new colour is the feedback, as in Messages.
+            style={[styles.chip, c.on && styles.chipOn, m && styles.mChip, m && c.on && styles.mChipOn]}
           >
             <Text style={[styles.chipText, m && styles.mChipText, c.on && styles.chipTextOn]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
               {c.label}
