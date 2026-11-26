@@ -1,6 +1,7 @@
 # admin-portal-phase-1
 
-- **Owner:** Sunil. **As of 2026-11-26:** branched from `main` at `a0a1a9f` (PR #126). Written by an AI session.
+- **Owner:** Sunil. **As of 2026-11-26:** branched from `main` at `a0a1a9f` (PR #126); **draft PR #127**, to be merged
+  only after staging (the CSP checked signed in) and the owner's go-ahead. Written by an AI session.
 - **Purpose:** Phase 1 of the **UniBuzz Master Admin Portal** roadmap (the owner's approval of 2026-11-25; roadmap in
   [../status.md](../status.md), decisions in [../decisions.md](../decisions.md)): the portal's name on screen, one audit
   view over the three audit logs with where staff actions came from, a Content-Security-Policy, and navigation driven
@@ -60,7 +61,10 @@
 - `npm run check` (typecheck, lint, build: 9 tasks), `npm run test:shared` 316/316, `npm run db:test` 67 suites, 2412
   checks, 0 failures: all pass (2026-11-26, [../testing.md](../testing.md)). The browser check found zod 4 testing
   `new Function` on every page under the new CSP; fixed (zod runs jitless in the browser).
-- **Not run yet:** staging (no staging token on this Mac as of 2026-11-26), and the browser check signed in.
+- **Not run yet:** staging (no staging token on this Mac as of 2026-11-26), and the browser check signed in. PR #127's
+  Vercel previews built (both projects); the portal's preview is behind Vercel's protection, so its CSP was not fetched
+  there (`vercel curl` would add a protection bypass to the project's settings). The portal loads no Vercel scripts;
+  on previews Vercel's toolbar is refused by the CSP, which is expected.
 
 ## Rollout (not started: each step waits on the owner)
 
