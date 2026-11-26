@@ -1,16 +1,17 @@
 "use server";
 
 /**
- * Writes of the Moderation, Content, Support and Administration sections that go through the staff console functions
- * (migrations 41 and 61): deciding an appeal, switching a rule pack, hiding, cancelling or restoring an event, verifying
- * or hiding an organization. Each checks the caller here first (a staff member in a session with a second factor;
- * rule packs need an admin) and again in SQL, which also writes the audit rows; these wrappers only shape the input
- * and the answer. Arguments are whatever was posted: every string is cut to its limit.
+ * Writes of the Moderation, Content, Support, Universities and Administration sections that go through the staff console
+ * functions (migrations 41, 61 and 70): deciding an appeal, switching a rule pack, hiding, cancelling or restoring an
+ * event, verifying or hiding an organization, deciding a university request. Each checks the caller here first (a
+ * staff member in a session with a second factor; rule packs and university requests need an admin) and again in SQL,
+ * which also writes the audit rows; these wrappers only shape the input and the answer. Arguments are whatever was
+ * posted: every string is cut to its limit.
  */
 import { revalidatePath } from "next/cache";
 import { requireStaffAction } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/server";
-import type { RulePackState, StaffAppeal } from "./ops-types";
+import type { ConsoleUniversityRequest, RulePackState, StaffAppeal } from "./ops-types";
 import { consoleRpc, toConsoleError, type ActionResult } from "./rpc";
 
 const str = (v: unknown, max: number): string | null => (typeof v === "string" ? v.slice(0, max) : null);
@@ -52,4 +53,32 @@ export async function setOrganizationAction(input: { id: string; verified?: bool
     p_status: input.status ? str(input.status, 20) : null,
     p_note: str(input.note ?? "", 2000) || null,
   });
+}
+
+/**
+ * Approve (adds the university, never with an email domain: opening sign-up is the owners' separate step), link to a
+ * university already listed, or decline a student's request. `response` is what the student reads.
+ */
+export async function decideUniversityRequestAction(input: {
+  id: string;
+  decision: "approve" | "link" | "decline";
+  name?: string;
+  city?: string;
+  country?: string;
+  universityId?: string | null;
+  response?: string;
+}): Promise<ActionResult<ConsoleUniversityRequest>> {
+  return run<ConsoleUniversityRequest>(
+    "console_decide_university_request",
+    {
+      p_id: str(input.id, 64),
+      p_decision: str(input.decision, 20),
+      p_name: input.decision === "approve" ? str(input.name ?? "", 160) || null : null,
+      p_city: input.decision === "approve" && typeof input.city === "string" ? str(input.city, 120) : null,
+      p_country: input.decision === "approve" && typeof input.country === "string" ? str(input.country, 120) : null,
+      p_university: input.decision === "link" ? str(input.universityId ?? "", 64) || null : null,
+      p_response: str(input.response ?? "", 1000) || null,
+    },
+    { admin: true },
+  );
 }

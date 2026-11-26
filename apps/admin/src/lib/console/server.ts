@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   AdCounts, AdRate, AdsAnalytics, AnalyticsOverview, BusinessCounts, BusinessOpsOverview, ConsoleAd, ConsoleAdRow, ConsoleBusiness, ConsoleBusinessRow,
   ConsoleEvent, ConsoleEventsCounts, ConsoleEventsFilter, ConsoleFeed, ConsoleOrganization, ConsolePage, PaymentsPage, QueueCounts, RevenueAnalytics,
-  RulePackState, StaffAppeal, StaffPage, SystemHealth,
+  RulePackState, StaffAppeal, StaffPage, SystemHealth, UniversityRequestsPage, UniversityRequestStatus,
 } from "./ops-types";
 import { consoleRpc, toConsoleError } from "./rpc";
 
@@ -24,9 +24,19 @@ export async function requireConsoleAdmin(nextPath: string): Promise<{ access: S
 
 /**
  * Whether this admin may run businesses and ads too: Business v2's review functions, which the Business section
- * reuses, also ask for the UniBuzz admin role on the account (profiles.role, granted by the database owner).
+ * reuses, ask is_admin(). Since migration 67 the database answers that from the staff list (an owner or admin, not
+ * suspended, past the second factor) through admin_standing(), whatever profiles.role says; this asks the same
+ * function. On a database without 67, the admin role on the account (profiles.role) decides, as it did there.
  */
-export const hasBusinessRole = cache(async (): Promise<boolean> => roleOf(await getCurrentProfile()) === "admin");
+export const hasBusinessRole = cache(async (): Promise<boolean> => {
+  const supabase = await createClient();
+  try {
+    return (await consoleRpc<string | null>(supabase, "admin_standing")) === "admin";
+  } catch (e) {
+    if (toConsoleError(e).code !== "not_deployed") throw e;
+    return roleOf(await getCurrentProfile()) === "admin";
+  }
+});
 
 /** A console function's answer; "not found" becomes the not-found page, a missing second factor the Security page. */
 export async function consoleFetch<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
@@ -87,3 +97,7 @@ export const fetchEventFeeds = () => consoleFetch<ConsoleFeed[]>("events_console
 export const fetchConsoleOrganizations = (filter: { verified?: boolean; status?: string; q?: string } = {}) =>
   consoleFetch<ConsoleOrganization[]>("events_console_organizations", { p_filter: filter });
 export const fetchConsoleEvents = (filter: ConsoleEventsFilter = {}) => consoleFetch<{ items: ConsoleEvent[]; total: number }>("events_console_events", { p_filter: filter });
+
+// --- Universities (migration 70): students' requests, for owners and admins of the staff (ts_require_admin in SQL).
+export const fetchUniversityRequests = (status: UniversityRequestStatus, offset: number, limit: number) =>
+  consoleFetch<UniversityRequestsPage>("console_university_requests", { p_status: status, p_limit: limit, p_offset: offset });

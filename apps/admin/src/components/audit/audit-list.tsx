@@ -8,6 +8,7 @@ import {
   Crown,
   Eye,
   EyeOff,
+  GraduationCap,
   Mail,
   MailX,
   RefreshCw,
@@ -54,6 +55,10 @@ const LOOKS: Record<string, { icon: LucideIcon; className: string }> = {
   "report.resolve": { icon: CheckCircle2, className: "bg-brand-50 text-brand-700" },
   "report.reopen": { icon: RotateCcw, className: "bg-gray-100 text-gray-700" },
   "media.retry": { icon: RefreshCw, className: "bg-gray-100 text-gray-700" },
+  "university.create": { icon: GraduationCap, className: "bg-green-100 text-green-700" },
+  "university_request.approve": { icon: GraduationCap, className: "bg-green-100 text-green-700" },
+  "university_request.link": { icon: GraduationCap, className: "bg-brand-50 text-brand-700" },
+  "university_request.decline": { icon: GraduationCap, className: "bg-gray-100 text-gray-700" },
 };
 
 const FALLBACK_LOOK = { icon: Activity, className: "bg-gray-100 text-gray-700" };

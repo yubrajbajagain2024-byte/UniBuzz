@@ -3,8 +3,8 @@
 //   BASE=http://localhost:3001 node apps/admin/e2e/admin.mjs
 // Optional accounts (their checks are skipped with a note when unset):
 //   ADMIN_E2E_EMAIL + ADMIN_E2E_PASSWORD   a staff account; ADMIN_E2E_TOTP_SECRET is its authenticator key (base32) for the 2FA step.
-//                                          An owner or admin also gets Analytics and Business (migration 59) checked: every view
-//                                          renders, or says it needs migration 63 or the admin role; a moderator must not see them.
+//                                          An owner or admin also gets Analytics, Business (migration 63) and Universities (70)
+//                                          checked: every view renders, or says it needs its migration; a moderator must not see them.
 //   E2E_USER_EMAIL + E2E_USER_PASSWORD     an ordinary (non-staff) account, which must land on /no-access
 //   VERCEL_BYPASS                          bypass secret when Vercel Deployment Protection guards the deployment
 import fs from "node:fs";
@@ -41,7 +41,7 @@ async function newPage() { const ctx = await browser.newContext({ viewport: { wi
 try {
   const D = await newPage();
   await step("signed out: every page goes to /login with next= pointing back", async () => {
-    for (const path of ["/", "/users", "/reports", "/appeals", "/flagged", "/content", "/events", "/media", "/operations/health", "/operations/email", "/support", "/support/issues", "/staff", "/audit", "/security", "/settings"]) { await D.goto(BASE + path); await D.waitForURL((u) => u.pathname === "/login"); expectLogin(D, path); }
+    for (const path of ["/", "/users", "/reports", "/appeals", "/flagged", "/content", "/events", "/media", "/operations/health", "/operations/email", "/support", "/support/issues", "/universities", "/staff", "/audit", "/security", "/settings"]) { await D.goto(BASE + path); await D.waitForURL((u) => u.pathname === "/login"); expectLogin(D, path); }
     await D.waitForLoadState("networkidle"); await D.getByRole("heading", { name: "CampConnect Admin" }).waitFor();
     if (await D.getByText(/create an account/i).count()) throw new Error("a sign-up link is offered");
     await D.screenshot({ path: SHOTS + "admin-01-login.png" });
@@ -92,16 +92,23 @@ try {
         const nav = D.getByRole("navigation", { name: "Admin" }).first();
         const shown = await nav.getByRole("link", { name: "Business", exact: true }).count();
         const role = (await D.locator("header").innerText()).toLowerCase();
-        if (/moderator/.test(role)) { if (shown) throw new Error("a moderator sees Business"); note("Analytics and Business skipped: this account is a moderator"); return; }
+        const universitiesShown = await nav.getByRole("link", { name: "Universities", exact: true }).count();
+        if (/moderator/.test(role)) {
+          if (shown || universitiesShown) throw new Error("a moderator sees Business or Universities");
+          await D.goto(BASE + "/universities"); await D.waitForLoadState("networkidle");
+          if (new URL(D.url()).pathname === "/universities") throw new Error("a moderator opened /universities");
+          note("Analytics, Business and Universities skipped: this account is a moderator"); return;
+        }
+        if (!universitiesShown) throw new Error("no Universities link for an owner or admin");
         if (!shown) throw new Error("no Business link for an owner or admin");
         const views = ["/analytics", "/analytics?view=ads", "/analytics?view=revenue&range=90", "/business", "/business/advertisers", "/business/campaigns", "/business/campaigns?status=all",
-          "/business/payments", "/business/pricing", "/business/reports", "/business/audit", "/settings"];
+          "/business/payments", "/business/pricing", "/business/reports", "/business/audit", "/settings", "/universities", "/universities?status=approved"];
         for (const path of views) {
           const res = await D.goto(BASE + path); await D.waitForLoadState("networkidle");
           const text = await D.locator("main").innerText();
           if (!res || res.status() >= 400 || /Something went wrong|Application error/.test(text)) throw new Error(`${path}: ${res?.status()} ${text.slice(0, 120)}`);
           if (new URL(D.url()).pathname === "/security" || /two-factor code/i.test(text)) throw new Error(`${path}: sent back to the Security page (the aal2 session was lost)`);
-          if (!/needs migration 63|need the UniBuzz admin role|Platform|Overview|Advertisers|Campaigns|Payments|Rate card|reports|Nothing logged yet|When/.test(text)) throw new Error(`${path}: unexpected page ${text.slice(0, 160)}`);
+          if (!/needs migration 63|needs migration 20261122000000|not available to this account|need the UniBuzz admin role|Platform|Waiting|Overview|Advertisers|Campaigns|Payments|Rate card|reports|Nothing logged yet|When/.test(text)) throw new Error(`${path}: unexpected page ${text.slice(0, 160)}`);
           await D.screenshot({ path: SHOTS + `admin-06${path.replace(/[/?=&]/g, "-")}.png`, fullPage: true });
         }
         const first = D.locator("a[href^='/business/campaigns/']").first();

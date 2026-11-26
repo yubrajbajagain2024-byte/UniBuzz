@@ -260,7 +260,7 @@ Why npm workspaces rather than pnpm: nothing to install for a new contributor, V
 | Social | Following, like Instagram: a Follow button on every other person's profile ("Following" once you follow, "Follow back" when they follow you), follower / following counts (public, like the profiles) with your own two lists behind them and, on anyone else's profile, the mutual friends you share with them (row-level security keeps every follow readable only by the two people in it), a "Following" filter on Home → Posts (in the app, a row of the feed dropdown in the top bar), and a notification when someone follows you. Blocking someone removes the follow in both directions and stops new ones; row-level security only lets you add or remove your own follows |
 | Comments | Under posts, reels and apartments (not roommate posts or Marketplace items, which go to private messages), TikTok style: threaded replies folded behind "View N replies", a heart with its count on every comment (a dislike stays private), Top / Newest sort, hold a comment for Reply / Report / Block / Delete (your own comment or any comment on your post); the author of a comment you answer gets a notification |
 | Profiles | TikTok style (see Profile in the [feature map](#feature-map)): @username, Following · Followers · Likes, Edit profile / Share profile with a QR code, classes per semester, the person's listings, and Posts, Classes, Reels, Saved and Liked tabs; each person chooses who can see their Classes (Friends by default), Saved (Only me) and Liked (Everyone); up to three pinned posts |
-| Other | Global search across all three sections, saved listings page, public profile pages, "add your university", SEO metadata + sitemap, PWA manifest |
+| Other | Global search across all three sections, saved listings page, public profile pages, "ask us to add your university" (reviewed by the team, migration 70), SEO metadata + sitemap, PWA manifest |
 
 Security is enforced in the database with row-level security: users can only edit their own listings, only conversation members can read or send messages, and images can only be uploaded to a user's own folder.
 
@@ -457,7 +457,7 @@ Map view with pins (Google Maps or Mapbox), university email verification badges
 
 ## CampConnect Admin: sections
 
-The admin app (`apps/admin`) is organised in nine sections, defined once in `apps/admin/src/lib/sections.ts` and
+The admin app (`apps/admin`) is organised in ten sections, defined once in `apps/admin/src/lib/sections.ts` and
 rendered by the sidebar (`components/shell/admin-nav.tsx`: title and what the section holds) and by the tab strip under
 each page title (`components/shell/section-tabs.tsx`). A section is a grouping of existing routes, not a route: every
 page keeps its path, so deep links and the browser check (`apps/admin/e2e/admin.mjs`) still work.
@@ -468,6 +468,7 @@ page keeps its path, so deep links and the browser check (`apps/admin/e2e/admin.
 | Users `/users` | Accounts, Suspensions, Verification (`?filter=unverified`: email unconfirmed or campus unset; migration 65), Staff accounts | `admin_users_list` |
 | Moderation | Reports `/reports`, Appeals `/appeals` (blind review: `console_appeals`, `console_decide_appeal`; never one's own action; suspensions and bans for admins), Automatic hiding `/flagged` | migrations 15, 16, 41, 64 |
 | Content | Hidden content `/content`, Events `/events` (hide, cancel, restore: `events_console_events`, `events_console_set_event`) | migrations 16, 61 |
+| Universities `/universities` | Requests: students' requests for missing universities (waiting, added or linked, declined); approve (never with an email domain), link to a listed university, decline, with the reply the student reads; owners and admins | migration 70 (`console_university_requests`, `console_decide_university_request`) |
 | Business & Ads `/business` | unchanged (its own tabs) | migration 63 and Business v2 |
 | Analytics `/analytics` | unchanged (Platform = growth and engagement, Ads, Revenue) | migration 63 |
 | Operations | Media jobs `/media`, System health `/operations/health` (`console_system_health`, migration 65), Email `/operations/email` (whether invitations can be sent, the invitations and their emails) | CampConnect Admin's media and staff functions, migration 65 |

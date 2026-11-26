@@ -40,7 +40,7 @@ export default async function SupportPage() {
         {business ? (
           <StatCard label="Businesses awaiting review" value={business.businesses.pending} hint={`${plural(business.ads.inReview, "ad")} in review`} href="/business/advertisers?status=pending" icon={Building2} tone={business.businesses.pending ? "amber" : "green"} />
         ) : (
-          <StatCard label="Businesses awaiting review" value="–" hint={admin ? "needs the UniBuzz admin role on your account" : "admins only"} icon={Building2} />
+          <StatCard label="Businesses awaiting review" value="–" hint={admin ? "not available to this account" : "admins only"} icon={Building2} />
         )}
       </div>
 

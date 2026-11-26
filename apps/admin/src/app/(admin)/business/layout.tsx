@@ -7,8 +7,8 @@ import { PageHeader } from "@/components/shell/page-header";
 
 /**
  * Business: the advertisers, their campaigns, payments, pricing, students' reports and the business audit log, for
- * admins of the staff (two-factor session) who also hold the UniBuzz admin role that Business v2's own functions ask
- * for. Moderators and everyone else get the not-found page; each function checks the caller again.
+ * owners and admins of the staff in a two-factor session, whom Business v2's own functions accept since migration 67
+ * (admin_standing). Moderators and everyone else get the not-found page; each function checks the caller again.
  */
 export default async function BusinessLayout({ children }: { children: ReactNode }) {
   await requireConsoleAdmin("/business");
@@ -16,8 +16,8 @@ export default async function BusinessLayout({ children }: { children: ReactNode
     return (
       <EmptyBox
         icon={KeyRound}
-        title="Business tools need the UniBuzz admin role"
-        description="You are an admin of the staff, but your account does not have the admin role that reviewing businesses, ads and payments needs. The database owner grants it with grant_role()."
+        title="Business tools are not available to this account"
+        description="The database does not count this account as an admin for businesses, ads and payments. Since migration 67 that means a staff owner or admin, not suspended, in a session that passed two-factor sign-in; on a database without 67, the admin role on the account (granted with grant_role())."
       />
     );
   }

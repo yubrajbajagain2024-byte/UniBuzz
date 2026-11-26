@@ -46,6 +46,19 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 
 ## Open work, in priority order
 
+- **UniBuzz Master Admin Portal** (the owner's approval of 2026-11-25): CampConnect Admin (`apps/admin`) grows into the
+  one staff portal, in phases, each its own branch and PR, each migration rehearsed offline and on staging and applied
+  to production only with the owner's approval and a backup; the decisions are in [decisions.md](decisions.md).
+  0. **University requests** (`university-requests`, local, not pushed until live; [branches/university-requests.md](branches/university-requests.md)):
+     migration 70, students' requests reviewed in the portal instead of adding universities themselves. Built and tested
+     offline; next: the read-only production checks, staging, then the owner's approval for production.
+  1. The portal's name on screen, one audit view over the three audit logs with request context, a Content-Security-Policy.
+  2. Campus scopes and the Campus Admin role, `staff_can()`, every staff function scoped in SQL (before any campus staff).
+  3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.
+  4. One moderation model: the website console's queue in the portal, one sanction system, safety metrics.
+  5. Organizations and departments: directory, editing, members and ownership, official departments.
+  6. A content browser. 7. Business and ads: the portal's parity with `/business/admin`, owner-only financial approvals.
+  8. Platform settings. 9. The website's staff tools retired after verified parity. 10. Scale and hardening.
 - **The app's redesign of 2026-11-17 to 11-24** (`mobile-ui-beauty-filters`, PRs #113 to #117; branch file
   [branches/mobile-ui-beauty-filters.md](branches/mobile-ui-beauty-filters.md)): the bottom bar and camera, beauty filters
   for photos, black full-screen viewers, Home as Orbit (a card feed under the story tray, a tap opening the viewer) |

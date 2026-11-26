@@ -436,3 +436,36 @@ export interface SystemHealth {
   storage: { objects: number; uploads: number };
   database: { size_bytes: number };
 }
+
+// --- University requests (migration 70: console_university_requests, console_decide_university_request) ---
+
+export type UniversityRequestStatus = "pending" | "approved" | "declined";
+
+/** A student's request for a missing university, as owners and admins of the staff see it. */
+export type ConsoleUniversityRequest = {
+  id: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+  note: string | null;
+  status: UniversityRequestStatus;
+  universityId: string | null;
+  universityName: string | null;
+  /** What the student reads about the decision. */
+  response: string | null;
+  createdAt: number;
+  decidedAt: number | null;
+  requester: { id: string; name: string; username: string | null } | null;
+  decidedBy: { id: string; name: string } | null;
+  /** Other students waiting for the same name: approving or linking this one answers them too. */
+  samePending: number;
+  /** Universities already listed whose names contain this one's, or the other way round. */
+  similar: { id: string; name: string; city: string | null; country: string | null }[];
+};
+
+export type UniversityRequestsPage = {
+  items: ConsoleUniversityRequest[];
+  total: number;
+  nextOffset: number | null;
+  counts: Record<UniversityRequestStatus, number>;
+};

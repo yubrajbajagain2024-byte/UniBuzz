@@ -117,6 +117,11 @@ export const universitySchema = z.object({
   country: optionalText(120),
 });
 export type UniversityInput = z.infer<typeof universitySchema>;
+/** A student's request for a missing university (migration 70): the university's details and a note for the team. */
+export const universityRequestSchema = universitySchema.extend({
+  note: optionalText(500),
+});
+export type UniversityRequestInput = z.infer<typeof universityRequestSchema>;
 
 // ---------------------------------------------------------------------------
 // Apartments

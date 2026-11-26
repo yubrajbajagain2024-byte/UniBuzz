@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { PROFILE_SECTION_NOUNS, PROFILE_VISIBILITY_OPTIONS, USERNAME_RULES, type ProfileSection, type ProfileWithUniversity, type University } from "@apartment-book/shared";
-import { addUniversityAction, updateProfileAction } from "@/lib/actions/profile";
+import { formatDate, PROFILE_SECTION_NOUNS, PROFILE_VISIBILITY_OPTIONS, USERNAME_RULES, type ProfileSection, type ProfileWithUniversity, type University, type UniversityRequest } from "@apartment-book/shared";
+import { requestUniversityAction, updateProfileAction } from "@/lib/actions/profile";
 import { profileHandle, sectionVisibility } from "@/lib/profile";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,30 +123,64 @@ export function ProfileForm({ profile, universities, welcome }: { profile: Profi
   );
 }
 
-export function AddUniversityForm() {
-  const [state, action, pending] = useActionState(addUniversityAction, null);
+const REQUEST_STATUS: Record<UniversityRequest["status"], { label: string; className: string }> = {
+  pending: { label: "Waiting for review", className: "bg-amber-50 text-amber-800 ring-amber-200" },
+  approved: { label: "Added", className: "bg-green-50 text-green-800 ring-green-200" },
+  declined: { label: "Not added", className: "bg-gray-100 text-gray-700 ring-gray-200" },
+};
+
+/**
+ * A university missing from the list is requested, not added: the UniBuzz team reviews each request (migration 70).
+ * `requests`: the student's own, with the team's answer; null where the database does not have requests yet.
+ */
+export function RequestUniversityForm({ requests }: { requests: UniversityRequest[] | null }) {
+  const [state, action, pending] = useActionState(requestUniversityAction, null);
   return (
-    <details className="rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
-      <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-gray-800">Can&apos;t find your university? Add it</summary>
+    <details className="rounded-xl bg-white shadow-sm ring-1 ring-gray-200" open={Boolean(requests?.some((r) => r.status === "pending")) || undefined}>
+      <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-gray-800">Can&apos;t find your university? Ask us to add it</summary>
       <form action={action} className="grid gap-3 border-t border-gray-100 px-5 py-4 sm:grid-cols-3">
+        <p className="text-sm text-gray-600 sm:col-span-3">The UniBuzz team reviews every request. Once it is added, you can choose it above.</p>
         <div className="sm:col-span-3">
           <FormMessage error={state?.error} success={state?.success} />
         </div>
         <Field label="University name" htmlFor="uniName" required error={state?.fieldErrors?.name} className="sm:col-span-3">
-          <Input id="uniName" name="name" required defaultValue={state?.success ? "" : state?.values?.name} />
+          <Input id="uniName" name="name" required maxLength={160} defaultValue={state?.success ? "" : state?.values?.name} />
         </Field>
         <Field label="City" htmlFor="uniCity" error={state?.fieldErrors?.city}>
-          <Input id="uniCity" name="city" defaultValue={state?.success ? "" : state?.values?.city} />
+          <Input id="uniCity" name="city" maxLength={120} defaultValue={state?.success ? "" : state?.values?.city} />
         </Field>
         <Field label="Country" htmlFor="uniCountry" error={state?.fieldErrors?.country}>
-          <Input id="uniCountry" name="country" defaultValue={state?.success ? "" : state?.values?.country} />
+          <Input id="uniCountry" name="country" maxLength={120} defaultValue={state?.success ? "" : state?.values?.country} />
         </Field>
-        <div className="flex items-end">
+        <Field label="Note for the team (optional)" htmlFor="uniNote" error={state?.fieldErrors?.note} className="sm:col-span-3">
+          <Textarea id="uniNote" name="note" maxLength={500} rows={2} defaultValue={state?.success ? "" : state?.values?.note} />
+        </Field>
+        <div className="flex justify-end sm:col-span-3">
           <Button type="submit" variant="secondary" loading={pending}>
-            Add university
+            Send request
           </Button>
         </div>
       </form>
+      {requests && requests.length > 0 ? (
+        <div className="border-t border-gray-100 px-5 py-4">
+          <h3 className="text-sm font-semibold text-gray-800">Your requests</h3>
+          <ul className="mt-2 flex flex-col gap-2">
+            {requests.map((r) => {
+              const status = REQUEST_STATUS[r.status];
+              return (
+                <li key={r.id} className="flex flex-col gap-1 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-gray-900">{r.status === "approved" && r.universityName ? r.universityName : r.name}</span>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${status.className}`}>{status.label}</span>
+                    <span className="text-xs text-gray-500">{formatDate(new Date(r.createdAt).toISOString())}</span>
+                  </div>
+                  {r.response ? <p className="text-xs text-gray-600">{r.response}</p> : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
     </details>
   );
 }

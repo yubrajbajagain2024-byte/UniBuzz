@@ -2268,6 +2268,14 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: string[];
       };
+      request_university: {
+        Args: { p_name: string; p_city?: string | null; p_country?: string | null; p_note?: string | null };
+        Returns: Json;
+      };
+      my_university_requests: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
       mark_notifications_read: {
         Args: { p_ids?: string[] | null };
         Returns: number;
