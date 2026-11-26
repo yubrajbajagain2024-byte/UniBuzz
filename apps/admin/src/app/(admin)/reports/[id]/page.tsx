@@ -37,7 +37,7 @@ async function loadReport(id: string): Promise<ReportRow | null> {
 export default async function ReportPage({ params, searchParams }: Props) {
   const { id } = await params;
   if (!isUuid(id)) notFound();
-  const access = await requireStaff(`/reports/${id}`);
+  const access = await requireStaff(`/reports/${id}`, { permission: "moderation.view" });
   const query = await searchParams;
   const report = await loadReport(id);
   if (!report) notFound();

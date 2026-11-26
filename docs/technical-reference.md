@@ -455,12 +455,15 @@ npx supabase gen types typescript --project-id <your-project-ref> > packages/sha
 
 Map view with pins (Google Maps or Mapbox), university email verification badges, reporting/blocking users, saved searches with email alerts, push notifications, ratings for sellers, and an admin dashboard for moderation.
 
-## CampConnect Admin: sections
+## The Master Admin Portal: sections
 
-The admin app (`apps/admin`) is organised in ten sections, defined once in `apps/admin/src/lib/sections.ts` and
+The staff app (`apps/admin`; shown as the UniBuzz Master Admin Portal since 2026-11-26, CampConnect Admin before) is
+organised in ten sections, defined once in `apps/admin/src/lib/sections.ts` and
 rendered by the sidebar (`components/shell/admin-nav.tsx`: title and what the section holds) and by the tab strip under
 each page title (`components/shell/section-tabs.tsx`). A section is a grouping of existing routes, not a route: every
-page keeps its path, so deep links and the browser check (`apps/admin/e2e/admin.mjs`) still work.
+page keeps its path, so deep links and the browser check (`apps/admin/e2e/admin.mjs`) still work. Who sees a section, a
+tab or a page is one table, `lib/permissions.ts` (default deny): the sidebar and the tabs read it through the shell's
+`PermissionsProvider`, and every page passes its permission to `requireStaff`; the database checks each call again.
 
 | Section | Pages | Reads and writes |
 | --- | --- | --- |
@@ -474,6 +477,18 @@ page keeps its path, so deep links and the browser check (`apps/admin/e2e/admin.
 | Operations | Media jobs `/media`, System health `/operations/health` (`console_system_health`, migration 65), Email `/operations/email` (whether invitations can be sent, the invitations and their emails) | CampConnect Admin's media and staff functions, migration 65 |
 | Support | Requests `/support` (organizations awaiting verification: `events_console_organizations`, `events_console_set_organization`; businesses and appeals counted), Appeals, Issues `/support/issues` (failing media jobs, calendar feeds failing to sync) | migrations 15, 61, 63 |
 | Administration | Staff `/staff`, Audit log `/audit`, Security `/security`, Settings `/settings` (admins: the Buzz rule packs through `console_rule_packs` / `console_set_rule_pack`; the sign-up domains, read-only; where the rest lives) | migrations 14, 15, 41 |
+
+**Audit log** (`/audit`, migration 71): `console_audit_feed()` merges the team's log (`staff_audit_log`), Trust &
+Safety's (`audit_log`) and businesses' (`business_audit_log`) newest first, with a keyset cursor, each log's rules for
+moderators kept; owners and admins also see, on staff entries, where the action came from (`audit_request_context`,
+filled by triggers on the three logs for staff actors only: the gateway's address and browser, the address, browser and
+page the portal's server reports in its `x-portal-*` headers from `lib/request-context.ts`, the endpoint, the session).
+Without 71 the page shows the team's log alone.
+
+**Content-Security-Policy** (`lib/csp.ts`, set by `proxy.ts` on every response): scripts only by a fresh per-response
+nonce with `'strict-dynamic'` (no inline scripts or eval in production), inline styles allowed, images, connections and
+forms limited to the app, the Supabase project, Mux, Google avatars and Google sign-in; no framing. Every page renders per
+request (the root layout awaits `connection()`), and `instrumentation-client.ts` runs zod jitless so it never tries eval.
 
 The staff console functions are called through `apps/admin/src/lib/console/server.ts` (reads) and
 `lib/console/staff-actions.ts` (writes, each checked in the app and again in SQL, where the audit rows are written).

@@ -26,14 +26,14 @@ State University. Sign-up is limited to the email domains on the `universities` 
 - **Calls stay hidden for the launch:** keep their code and records; only the owner turns them on.
 - **Three surfaces, one Supabase project:** UniBuzz for students (Next.js website and Expo app);
   UniBuzz Business at `/business` (its own host once `NEXT_PUBLIC_BUSINESS_SITE_URL` is set), where
-  businesses never start conversations; CampConnect Admin for staff: the separate staff app
-  (`apps/admin`, where the advertising business is run) and, until the two are reconciled, the
-  website's `/admin` Trust & Safety console.
-- **Legacy names stay.** The product was *CampConnect* until 2026-10-26; the staff app keeps the
-  name *CampConnect Admin*. *Apartment Book*, the first name, survives only in identifiers:
-  `@apartment-book/shared`, `@apartment-book/moderation`, the root package `apartment-book`, the
-  app slug / URL scheme / bundle id `apartmentbook`, the Vercel project, the old `origin` URL and
-  old migration comments. Renaming them breaks builds, deep links and the migration history.
+  businesses never start conversations; the UniBuzz Master Admin Portal for staff: the separate
+  staff app (`apps/admin`, where the advertising business is run) and, until the two are reconciled,
+  the website's `/admin` Trust & Safety console.
+- **Legacy names stay.** The product was *CampConnect* until 2026-10-26, the staff app *CampConnect Admin*
+  on screen until 2026-11-26 (its folder, package, Vercel project `campconnect-admin` and address keep it).
+  *Apartment Book*, the first name, survives only in identifiers: `@apartment-book/shared`, `@apartment-book/moderation`,
+  the root package `apartment-book`, the app slug / URL scheme / bundle id `apartmentbook`, the Vercel project,
+  the old `origin` URL and old migration comments. Renaming them breaks builds, deep links and the migration history.
 - **Stack:** Next.js 16.4, React 19.3, Tailwind 4 · Expo SDK 58, React Native 0.88 · Supabase
   (Postgres + PostGIS, auth, realtime, storage, Edge Functions) · LiveKit (calls) · Mux (video) ·
   npm workspaces + Turborepo · Node ≥ 22.18 (`.nvmrc`: 22).
@@ -57,7 +57,7 @@ apps/web/src/
                    (server-only), staff/, business/, mux.ts, env.ts   proxy.ts: auth guard + the portal's host
 apps/web/e2e/      Playwright: home-feed.mjs, release-smoke.mjs (every page of each role), business-sidebar.mjs,
                    password-recovery.mjs (sign-up, confirmation, login, Forgot password, the reset page; staging only)
-apps/admin/src/    CampConnect Admin, the staff app (port 3001; its own Vercel project): overview, reports,
+apps/admin/src/    the Master Admin Portal, the staff app (port 3001; its own Vercel project): overview, reports,
                    flagged, content, users, universities, media, staff, audit, security, analytics, business (lib/console/)
 apps/mobile/       Expo app (expo-router): apps/mobile/CLAUDE.md
 packages/shared/   everything that is not UI: types/ (incl. database.ts), schemas/ (zod), queries/
@@ -78,7 +78,7 @@ How each feature works: [README.md](README.md) and [docs/technical-reference.md]
 ```bash
 npm install                 # once, at the repo root
 npm run dev                 # every app; npm run dev -w web for the website (-- -p 3060 for a port)
-npm run dev:admin           # CampConnect Admin alone, on port 3001
+npm run dev:admin           # the Master Admin Portal alone, on port 3001
 npm run check               # typecheck + lint + build: run before you call work done
 npm run typecheck           # or lint, or build: the same steps one at a time
 npm run test:shared         # packages/shared unit tests, offline
@@ -108,7 +108,7 @@ App, device and EAS commands: [apps/mobile/CLAUDE.md](apps/mobile/CLAUDE.md).
 ## Workflow
 
 - Branch from `main` and land work through a **pull request**. Never push to `main`.
-- **Every push to `main` deploys the website and CampConnect Admin to production** (both Vercel
+- **Every push to `main` deploys the website and the Master Admin Portal to production** (both Vercel
   projects are Git-connected since 2026-11-02; each builds on every push). Merging is deploying: a
   migration the code needs must already be live.
 - **Sunil and Ankur (`ProXteller`) each merge their own pull requests** into `main` once the checks

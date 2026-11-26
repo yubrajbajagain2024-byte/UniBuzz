@@ -119,7 +119,7 @@ export async function deleteAccountAction(): Promise<{ error?: string }> {
     return {
       error:
         message === "Two-factor authentication required"
-          ? "Staff accounts need two-factor sign-in before they can be deleted: confirm it's you at /two-factor and try again, or ask an owner to remove you from the team in CampConnect Admin first."
+          ? "Staff accounts need two-factor sign-in before they can be deleted: confirm it's you at /two-factor and try again, or ask an owner to remove you from the team in the UniBuzz Master Admin Portal first."
           : message,
     };
   }

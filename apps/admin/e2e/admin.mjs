@@ -1,10 +1,12 @@
-// Browser check of CampConnect Admin (apps/admin): signed-out gates, robots and the worker endpoint; with test accounts,
-// the staff flow with two-factor authentication and every page of the app. Usage: start it (npm run dev -w admin), then:
+// Browser check of the UniBuzz Master Admin Portal (apps/admin): signed-out gates, robots, the Content-Security-Policy
+// and the worker endpoint; with test accounts, the staff flow with two-factor authentication and every page of the app,
+// the audit log as each role sees it (migration 71), and no CSP violation anywhere. Usage: start it (npm run dev -w admin), then:
 //   BASE=http://localhost:3001 node apps/admin/e2e/admin.mjs
 // Optional accounts (their checks are skipped with a note when unset):
 //   ADMIN_E2E_EMAIL + ADMIN_E2E_PASSWORD   a staff account; ADMIN_E2E_TOTP_SECRET is its authenticator key (base32) for the 2FA step.
 //                                          An owner or admin also gets Analytics, Business (migration 63) and Universities (70)
-//                                          checked: every view renders, or says it needs its migration; a moderator must not see them.
+//                                          checked: every view renders, or says it needs its migration; a moderator must not see them,
+//                                          nor business entries or request details in the audit log.
 //   E2E_USER_EMAIL + E2E_USER_PASSWORD     an ordinary (non-staff) account, which must land on /no-access
 //   VERCEL_BYPASS                          bypass secret when Vercel Deployment Protection guards the deployment
 //   PLAYWRIGHT_CHANNEL=chrome              use the installed Chrome instead of Playwright's own Chromium
@@ -39,12 +41,13 @@ const expectLogin = (page, next) => { const u = new URL(page.url()); if (u.pathn
 const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || undefined }); // PLAYWRIGHT_CHANNEL=chrome uses the installed Chrome
 // VERCEL_BYPASS: a "Protection Bypass for Automation" secret, when Vercel Deployment Protection is on for the admin project.
 const BYPASS = process.env.VERCEL_BYPASS ? { "x-vercel-protection-bypass": process.env.VERCEL_BYPASS, "x-vercel-set-bypass-cookie": "true" } : undefined;
-async function newPage() { const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, extraHTTPHeaders: BYPASS }); const page = await ctx.newPage(); page.setDefaultTimeout(30000); const at = () => { try { return new URL(page.url()).pathname + new URL(page.url()).search; } catch { return "?"; } }; page.on("pageerror", (e) => errors.push(`${at()}: ${e.message}`)); page.on("console", (m) => { if (m.type() === "error") errors.push(`${at()}: ${m.text().slice(0, 8000)}`); }); return page; }
+async function newPage() { const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, extraHTTPHeaders: BYPASS }); await ctx.addInitScript(() => document.addEventListener("securitypolicyviolation", (e) => console.error(`CSP violation: ${e.violatedDirective} blocked ${e.blockedURI || "inline"} (${e.sourceFile || "?"}:${e.lineNumber})`))); const page = await ctx.newPage(); page.setDefaultTimeout(30000); const at = () => { try { return new URL(page.url()).pathname + new URL(page.url()).search; } catch { return "?"; } }; page.on("pageerror", (e) => errors.push(`${at()}: ${e.message}`)); page.on("console", (m) => { if (m.type() === "error") errors.push(`${at()}: ${m.text().slice(0, 8000)}`); }); return page; }
 try {
   const D = await newPage();
   await step("signed out: every page goes to /login with next= pointing back", async () => {
     for (const path of ["/", "/users", "/reports", "/appeals", "/flagged", "/content", "/events", "/media", "/operations/health", "/operations/email", "/support", "/support/issues", "/universities", "/staff", "/audit", "/security", "/settings"]) { await D.goto(BASE + path); await D.waitForURL((u) => u.pathname === "/login"); expectLogin(D, path); }
-    await D.waitForLoadState("networkidle"); await D.getByRole("heading", { name: "CampConnect Admin" }).waitFor();
+    await D.waitForLoadState("networkidle"); await D.getByRole("heading", { name: "UniBuzz Master Admin Portal" }).waitFor();
+    if (!/UniBuzz Master Admin Portal/.test(await D.title())) throw new Error(`title "${await D.title()}"`);
     if (await D.getByText(/create an account/i).count()) throw new Error("a sign-up link is offered");
     await D.screenshot({ caret: "initial", path: SHOTS + "admin-01-login.png" });
   });
@@ -54,6 +57,23 @@ try {
     if (!/noindex/.test(h["x-robots-tag"] || "")) throw new Error(`x-robots-tag "${h["x-robots-tag"]}"`);
     // Next.js sets its own Cache-Control on dynamic pages (no-cache in dev, private no-store in production), over the proxy's; either way nothing is cacheable.
     if (!/no-store|no-cache/.test(h["cache-control"] || "")) throw new Error(`cache-control "${h["cache-control"]}"`);
+  });
+  await step("Content-Security-Policy: scripts by a fresh nonce only, no framing, no plugins; the login page still runs", async () => {
+    const policies = [];
+    for (let i = 0; i < 2; i++) {
+      const res = await D.request.get(BASE + "/login"); const csp = res.headers()["content-security-policy"] || "";
+      for (const part of ["default-src 'self'", "'strict-dynamic'", "frame-ancestors 'none'", "object-src 'none'", "base-uri 'self'"]) if (!csp.includes(part)) throw new Error(`missing ${part}: ${csp}`);
+      if (/script-src[^;]*'unsafe-inline'/.test(csp)) throw new Error("script-src allows inline scripts");
+      // Upgrading http: requests only where the portal itself is https (on a laptop's http it would break every request).
+      if (BASE.startsWith("https://") !== csp.includes("upgrade-insecure-requests")) throw new Error(`upgrade-insecure-requests on ${BASE}: ${csp}`);
+      const nonce = /'nonce-([^']+)'/.exec(csp)?.[1]; if (!nonce) throw new Error("no nonce: " + csp);
+      const html = await res.text(); const scripts = html.match(/<script\b[^>]*>/g) ?? [];
+      const bare = scripts.filter((t) => !t.includes(`nonce="${nonce}"`)); if (!scripts.length || bare.length) throw new Error(`${bare.length} of ${scripts.length} scripts without this response's nonce: ${bare[0] ?? ""}`);
+      policies.push(nonce);
+    }
+    if (policies[0] === policies[1]) throw new Error("the nonce did not change between responses");
+    const redirect = await D.request.get(BASE + "/reports", { maxRedirects: 0 }); if (!(redirect.headers()["content-security-policy"] || "").includes("frame-ancestors")) throw new Error("a redirect without the policy");
+    await D.goto(BASE + "/login"); await D.waitForFunction(() => typeof window.next === "object", null, { timeout: 15000 }); // hydrated: Next.js's scripts ran
   });
   await step("worker endpoint: refused without the secret (401 or 503), by GET and POST", async () => {
     for (const method of ["get", "post"]) { const r = await D.request[method](BASE + "/api/media/worker"); if (![401, 503].includes(r.status())) throw new Error(`${method} ${r.status()}`); }
@@ -88,6 +108,30 @@ try {
         await D.getByRole("heading", { name: "Reports", exact: true }).first().waitFor(); await D.screenshot({ caret: "initial", path: SHOTS + "admin-04-reports.png" });
         const pages = [["/", "Dashboard"], ["/users", "Users"], ["/users?filter=unverified", "Users"], ["/appeals", "Appeals"], ["/flagged", "Flagged"], ["/content", "Content"], ["/events", "Events"], ["/media", "Media"], ["/operations/health", "System health"], ["/operations/email", "Email"], ["/support", "Support"], ["/support/issues", "Issues"], ["/staff", "Staff"], ["/audit", "Audit log"]];
         for (const [path, heading] of pages) { await D.goto(BASE + path); await D.getByRole("heading", { name: heading, exact: true }).first().waitFor(); await D.screenshot({ caret: "initial", path: SHOTS + `admin-05${path.replace(/[\/?=]/g, "-") || "-dashboard"}.png` }); }
+      });
+      await step("the audit log: every log for owners and admins with where staff actions came from; moderators never business entries or request details", async () => {
+        await D.goto(BASE + "/audit"); await D.waitForLoadState("networkidle");
+        const main = D.locator("main"); const text = await main.innerText();
+        if (/needs migration 20261126000000/.test(text)) { note("audit log: migration 71 is not on this database, so the page shows the team's log as before"); return; }
+        const role = (await D.locator("header").innerText()).toLowerCase(); const moderator = /moderator/.test(role);
+        const logs = D.getByRole("navigation", { name: "Logs" });
+        const businessPill = await logs.getByRole("link", { name: "Business", exact: true }).count();
+        const businessRows = await main.locator('[data-testid="audit-entry"][data-source="business"]').count();
+        const requests = await main.locator("summary", { hasText: "Request" }).count();
+        if (moderator) {
+          if (businessPill || businessRows || requests) throw new Error(`a moderator sees business entries (${businessPill}, ${businessRows}) or request details (${requests})`);
+        } else {
+          if (!businessPill) throw new Error("no Business log for an owner or admin");
+          if (requests) { await main.locator("summary", { hasText: "Request" }).first().click(); await main.getByText("Address the API saw").first().waitFor(); }
+          else note("audit log: no entry with request details yet on this database");
+        }
+        await D.screenshot({ caret: "initial", path: SHOTS + "admin-07-audit.png", fullPage: true });
+        await logs.getByRole("link", { name: "Trust & Safety", exact: true }).click(); await D.waitForURL((u) => u.searchParams.get("source") === "trust_safety");
+        const sources = await main.locator('[data-testid="audit-entry"]').evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute("data-source")))]);
+        if (sources.some((x) => x !== "trust_safety")) throw new Error("the Trust & Safety filter shows " + sources.join(","));
+        const older = main.getByRole("link", { name: "Older entries" });
+        if (await older.count()) { await older.click(); await D.waitForURL((u) => u.searchParams.has("before")); await main.getByRole("link", { name: "Back to the newest" }).waitFor(); }
+        await D.goto(BASE + "/audit?action=not.an.action."); await main.getByText("Nothing matches").waitFor();
       });
       await step("Analytics and Business: shown to owners and admins only, and every view renders", async () => {
         await D.goto(BASE + "/"); await D.waitForLoadState("networkidle");

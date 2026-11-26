@@ -50,7 +50,7 @@ function rows(h: SystemHealth) {
       value: `${plural(h.media.pending, "job")} waiting`,
       detail: h.media.failing > 0 ? `${plural(h.media.failing, "job")} failing: ${h.media.last_error ?? "see Media jobs"}` : h.media.last_done_at ? `${h.media.done_24h} done in 24 h; last at ${new Date(h.media.last_done_at).toLocaleString()}` : "nothing done yet",
     });
-  } else out.push({ state: "none", label: "Media worker", value: "not in this database", detail: "The media queue exists on production only (CampConnect Admin's schema)." });
+  } else out.push({ state: "none", label: "Media worker", value: "not in this database", detail: "The media queue exists on production and staging only (the portal's first migrations, applied outside this repository)." });
   out.push({
     state: h.feeds.failing > 0 ? "bad" : h.feeds.enabled > 0 && (ageMs(h.feeds.last_synced_at) ?? Infinity) > 6 * HOUR ? "warn" : h.feeds.enabled > 0 ? "ok" : "none",
     label: "Event feed sync",
@@ -79,13 +79,13 @@ function rows(h: SystemHealth) {
 
 /** One page for "is everything running": the scheduled jobs, the workers, the sync, the backlog, from migration 65's document. */
 export default async function HealthPage() {
-  const access = await requireStaff("/operations/health");
+  await requireStaff("/operations/health", { permission: "operations.view" });
   const health = await maybeDeployed(fetchSystemHealth());
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="System health" description="Whether the scheduled jobs, the media worker and the feed sync are running, and how much waits for the team. Numbers and times only." actions={health ? <LiveRefresh generatedAt={new Date(health.generated_at).getTime()} /> : null} />
-      <SectionTabs section="operations" admin={access.role !== "moderator"} />
+      <SectionTabs section="operations" />
       {health === null ? (
         <SetupNotice migration="20261117000000_console_health" what="System health" />
       ) : (

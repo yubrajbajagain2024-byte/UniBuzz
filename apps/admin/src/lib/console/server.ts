@@ -3,22 +3,24 @@ import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { roleOf, type Client, type StaffAccess } from "@apartment-book/shared";
 import { requireStaff } from "@/lib/admin";
+import type { Permission } from "@/lib/permissions";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
-  AdCounts, AdRate, AdsAnalytics, AnalyticsOverview, BusinessCounts, BusinessOpsOverview, ConsoleAd, ConsoleAdRow, ConsoleBusiness, ConsoleBusinessRow,
+  AdCounts, AdRate, AdsAnalytics, AuditFeedFilters, AuditFeedPage, AnalyticsOverview, BusinessCounts, BusinessOpsOverview, ConsoleAd, ConsoleAdRow, ConsoleBusiness, ConsoleBusinessRow,
   ConsoleEvent, ConsoleEventsCounts, ConsoleEventsFilter, ConsoleFeed, ConsoleOrganization, ConsolePage, PaymentsPage, QueueCounts, RevenueAnalytics,
   RulePackState, StaffAppeal, StaffPage, SystemHealth, UniversityRequestsPage, UniversityRequestStatus,
 } from "./ops-types";
 import { consoleRpc, toConsoleError } from "./rpc";
 
 /**
- * Analytics and Business are for owners and admins of the staff in a session that passed two-factor sign-in (the
- * admin app's rule: requireStaff sends everyone else to log in, to /no-access, to /security or back to the overview).
+ * Analytics and Business are for owners and admins of the staff in a session that passed two-factor sign-in (their
+ * permissions in lib/permissions.ts: requireStaff sends everyone else to log in, to /no-access, to /security or back to
+ * the overview).
  * Each console_* function checks the same in SQL (ts_require_admin, migration 41).
  */
-export async function requireConsoleAdmin(nextPath: string): Promise<{ access: StaffAccess; supabase: Client }> {
-  const access = await requireStaff(nextPath, { minRole: "admin" });
+export async function requireConsoleAdmin(nextPath: string, permission: Permission = "business.manage"): Promise<{ access: StaffAccess; supabase: Client }> {
+  const access = await requireStaff(nextPath, { permission });
   return { access, supabase: await createClient() };
 }
 
@@ -92,3 +94,7 @@ export const fetchConsoleEvents = (filter: ConsoleEventsFilter = {}) => consoleF
 // --- Universities (migration 70): students' requests, for owners and admins of the staff (ts_require_admin in SQL).
 export const fetchUniversityRequests = (status: UniversityRequestStatus, offset: number, limit: number) =>
   consoleFetch<UniversityRequestsPage>("console_university_requests", { p_status: status, p_limit: limit, p_offset: offset });
+
+// --- The audit log (migration 71): every staff member with a second factor; what each one sees is decided in SQL.
+export const fetchAuditFeed = (filters: AuditFeedFilters, limit = 50) =>
+  consoleFetch<AuditFeedPage>("console_audit_feed", { p_filters: filters, p_limit: limit });

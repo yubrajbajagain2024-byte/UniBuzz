@@ -25,7 +25,7 @@ const PAGE = 50;
 
 /** The campus calendar (migration 61): every event from the feeds and the organizations, to hide, cancel or restore. */
 export default async function EventsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const access = await requireStaff("/events");
+  await requireStaff("/events", { permission: "content.view" });
   const params = await searchParams;
   const raw = firstParam(params.status) ?? "";
   const status = STATUSES.some((s) => s.value === raw) ? raw : "";
@@ -41,7 +41,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
         title="Events"
         description="The campus calendar: events from the university's feeds and from verified organizations. Hiding an event keeps it out of the app even after the next feed sync; organizations awaiting verification are under Support."
       />
-      <SectionTabs section="content" admin={access.role !== "moderator"} />
+      <SectionTabs section="content" />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <nav aria-label="Event status" className="flex flex-wrap gap-2">
           {STATUSES.map((s) => (

@@ -21,7 +21,7 @@ export const metadata: Metadata = { title: "Support" };
  * system: a student reaches the team through reports and appeals, a business through its application and its ads.
  */
 export default async function SupportPage() {
-  const access = await requireStaff("/support");
+  const access = await requireStaff("/support", { permission: "support.view" });
   const admin = hasRole(access, "admin");
   const [organizations, counts, business] = await Promise.all([
     maybeDeployed(fetchConsoleOrganizations({ verified: false, status: "active" })),
@@ -32,7 +32,7 @@ export default async function SupportPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Support" description="Requests waiting on the team. Organizations are verified here; businesses under Business; appeals under Moderation." />
-      <SectionTabs section="support" admin={admin} counts={{ "/support": organizations?.length ?? null, "/appeals": counts?.appeals ?? null }} />
+      <SectionTabs section="support" counts={{ "/support": organizations?.length ?? null, "/appeals": counts?.appeals ?? null }} />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard label="Organizations awaiting verification" value={organizations?.length ?? "–"} hint="their events stay pending until then" icon={BadgeCheck} tone={organizations?.length ? "amber" : "green"} />

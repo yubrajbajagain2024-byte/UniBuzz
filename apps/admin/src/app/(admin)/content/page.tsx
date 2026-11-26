@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { isMissingFunctionError, listHiddenContent, MODERATION_TARGET_TYPES, type HiddenContentRow, type ModerationTargetType } from "@apartment-book/shared";
-import { hasRole, requireStaff } from "@/lib/admin";
+import { requireStaff } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/server";
 import { cn, firstParam } from "@/lib/utils";
 import { FormMessage } from "@/components/ui/field";
@@ -14,7 +14,7 @@ import { SectionTabs } from "@/components/shell/section-tabs";
 export const metadata: Metadata = { title: "Content" };
 
 export default async function ContentPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const access = await requireStaff("/content");
+  await requireStaff("/content", { permission: "content.view" });
   const params = await searchParams;
   const requested = firstParam(params.type);
   const type = (MODERATION_TARGET_TYPES.find((t) => t.value === requested)?.value ?? null) as ModerationTargetType | null;
@@ -34,7 +34,7 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
         title="Content"
         description="Listings, posts, reels, comments, messages and Buzz. Hiding is reversible and the owner keeps seeing their own row with the reason; deleting is permanent and for admins only."
       />
-      <SectionTabs section="content" admin={hasRole(access, "admin")} />
+      <SectionTabs section="content" />
       {firstParam(params.deleted) ? <FormMessage success="The content was deleted permanently. Its files and videos are being removed." /> : null}
       <ContentLookup />
 

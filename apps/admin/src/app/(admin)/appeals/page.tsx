@@ -33,7 +33,7 @@ const day = (ms: number) => new Date(ms).toLocaleDateString("en-US", { year: "nu
  * database (never your own action; suspensions and bans for admins).
  */
 export default async function AppealsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const access = await requireStaff("/appeals");
+  await requireStaff("/appeals", { permission: "moderation.view" });
   const params = await searchParams;
   const raw = firstParam(params.status) ?? "open";
   const status = STATUSES.some((s) => s.value === raw) ? raw : "open";
@@ -45,7 +45,7 @@ export default async function AppealsPage({ searchParams }: { searchParams: Prom
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Appeals" description="People appealing a warning, mute, suspension, ban or removal. Reviewed blind: the sanction, the content and the appeal, never who. You cannot decide an appeal against your own action; suspensions and bans are for admins." />
-      <SectionTabs section="moderation" admin={access.role !== "moderator"} />
+      <SectionTabs section="moderation" />
       <nav aria-label="Appeal status" className="flex flex-wrap gap-2">
         {STATUSES.map((s) => (
           <Link

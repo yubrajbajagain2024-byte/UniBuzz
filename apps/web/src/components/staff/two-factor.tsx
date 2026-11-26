@@ -85,13 +85,13 @@ export function StaffTwoFactor({ doneHref = "/admin", subject = "The staff conso
         </>
       ) : factor ? (
         <p className="text-sm text-gray-700">
-          {subject} needs a code from your authenticator app each time you sign in. It&apos;s the same app as CampConnect Admin.
+          {subject} needs a code from your authenticator app each time you sign in. It&apos;s the same app as the UniBuzz Master Admin Portal.
         </p>
       ) : (
         <>
           <p className="text-sm text-gray-700">
             {subject} needs two-factor sign-in. Add an authenticator app (Google Authenticator, 1Password, Authy or similar) to this
-            account. It&apos;s the same one CampConnect Admin uses.
+            account. It&apos;s the same one the UniBuzz Master Admin Portal uses.
           </p>
           <Button onClick={addAuthenticator} loading={pending}>
             Add an authenticator app

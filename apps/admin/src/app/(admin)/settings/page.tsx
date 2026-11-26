@@ -22,14 +22,14 @@ export const metadata: Metadata = { title: "Settings" };
  * here: which campuses may sign up comes from the universities table, and paused features stay behind their flags.
  */
 export default async function SettingsPage() {
-  const access = await requireStaff("/settings", { minRole: "admin" });
+  const access = await requireStaff("/settings", { permission: "settings.manage" });
   const supabase = await createClient();
   const [packs, universities] = await Promise.all([maybeDeployed(fetchRulePacks()), listUniversities(supabase).catch(() => [])]);
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Settings" description={`What the team can change about ${PRODUCT_NAME} from here, and what is fixed in the code and the database.`} />
-      <SectionTabs section="administration" admin />
+      <SectionTabs section="administration" />
 
       <Card>
         <CardHeader>

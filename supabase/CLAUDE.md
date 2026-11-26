@@ -9,7 +9,8 @@ migration's production status is in [docs/migrations.md](../docs/migrations.md).
   `buzz_*` tables, `snaps`, `staff*`, `account_restrictions`, `media_jobs`, `event_feeds` (staff
   read and write them through `events_console_*`; the website's sync uses the service role),
   `university_requests` (students through `request_university()` / `my_university_requests()`, staff through
-  `console_*university_request*`). `universities` is read by everyone and written by no API role (migration 70):
+  `console_*university_request*`), `audit_request_context` (where staff actions came from: written by the audit logs'
+  triggers, read only by `console_audit_feed()` for owners and admins). `universities` is read by everyone and written by no API role (migration 70):
   its `email_domain` decides who may sign up, so only the owner, the service role and staff functions write it.
   `event_engagement` is written by `record_event_click()` alone and read by its own student.
   `anonymous_listing_owners` is readable by the poster alone. In the `uploads` bucket (public: an
@@ -71,7 +72,9 @@ Supabase's `auth` and `storage` schemas.
   (`student <label>` makes a fresh student per device, since impressions and clicks count once per student, ad and
   hour; `pause <placement>` and `resume <placement>` for the phone's pause check), then `verify` and `cleanup`;
   `university-requests.mjs`, migration 70 applied, checked through Auth, the REST API and the apps' queries,
-  rolled back and applied again (`--restore` leaves it rolled back); `admin-e2e-accounts.mjs`, the staging staff
+  rolled back and applied again (`--restore` leaves it rolled back); `audit-feed.mjs`, migration 71 the same way, a
+  staff admin's real actions recorded with the gateway's view and the portal's headers, the feed for each role
+  (`--restore`); `admin-e2e-accounts.mjs`, the staging staff
   admin, staff moderator and student for CampConnect Admin's browser check (`create`, `env`, `qr`, `delete`);
   `admin-authority.mjs`, migration 67 applied, checked through Auth and the REST API, rolled back and applied again
   (`--restore` leaves it rolled back); `event-engagement.mjs`, events' likes, comments and who is going (migration 69,

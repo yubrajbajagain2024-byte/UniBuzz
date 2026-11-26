@@ -1,28 +1,32 @@
+import type { Permission } from "@/lib/permissions";
+
 /**
- * The ten sections of CampConnect Admin and the pages inside each. The sidebar lists the sections (title and what
- * they hold); a section's pages show as tabs under the page title (SectionTabs). Existing routes keep their paths, so
- * deep links and the browser check still work: a section is a grouping, not a route.
- * adminOnly: owners and admins of the staff only (the pages check it too, as every page does).
+ * The ten sections of the UniBuzz Master Admin Portal and the pages inside each. The sidebar lists the sections (title
+ * and what they hold); a section's pages show as tabs under the page title (SectionTabs). Existing routes keep their
+ * paths, so deep links and the browser check still work: a section is a grouping, not a route.
+ * permission: who sees the link (lib/permissions.ts); the page behind it checks the same permission, and the database
+ * checks the caller again.
  */
 export type SectionId = "dashboard" | "users" | "moderation" | "content" | "universities" | "business" | "analytics" | "operations" | "support" | "administration";
 
-export type SectionTab = { href: string; label: string; adminOnly?: boolean };
+export type SectionTab = { href: string; label: string; permission?: Permission };
 
 export type Section = {
   id: SectionId;
   href: string;
   label: string;
   description: string;
-  adminOnly?: boolean;
+  permission: Permission;
   /** Path prefixes that belong to the section (the sidebar's active state). The dashboard matches "/" exactly. */
   match: string[];
   tabs: SectionTab[];
 };
 
 export const SECTIONS: readonly Section[] = [
-  { id: "dashboard", href: "/", label: "Dashboard", description: "KPIs, alerts and pending decisions", match: [], tabs: [] },
+  { id: "dashboard", permission: "dashboard.view", href: "/", label: "Dashboard", description: "KPIs, alerts and pending decisions", match: [], tabs: [] },
   {
     id: "users",
+    permission: "users.view",
     href: "/users",
     label: "Users",
     description: "Accounts, suspensions, verification",
@@ -36,6 +40,7 @@ export const SECTIONS: readonly Section[] = [
   },
   {
     id: "moderation",
+    permission: "moderation.view",
     href: "/reports",
     label: "Moderation",
     description: "Reports, appeals, automatic hiding",
@@ -48,6 +53,7 @@ export const SECTIONS: readonly Section[] = [
   },
   {
     id: "content",
+    permission: "content.view",
     href: "/content",
     label: "Content",
     description: "Posts, Buzz, Reels, listings, events",
@@ -59,17 +65,18 @@ export const SECTIONS: readonly Section[] = [
   },
   {
     id: "universities",
+    permission: "universities.manage",
     href: "/universities",
     label: "Universities",
     description: "Campuses and students' requests",
-    adminOnly: true,
     match: ["/universities"],
     tabs: [{ href: "/universities", label: "Requests" }],
   },
-  { id: "business", href: "/business", label: "Business & Ads", description: "Advertisers, campaigns, payments", adminOnly: true, match: ["/business"], tabs: [] },
-  { id: "analytics", href: "/analytics", label: "Analytics", description: "Growth, engagement, ads, revenue", adminOnly: true, match: ["/analytics"], tabs: [] },
+  { id: "business", permission: "business.manage", href: "/business", label: "Business & Ads", description: "Advertisers, campaigns, payments", match: ["/business"], tabs: [] },
+  { id: "analytics", permission: "analytics.view", href: "/analytics", label: "Analytics", description: "Growth, engagement, ads, revenue", match: ["/analytics"], tabs: [] },
   {
     id: "operations",
+    permission: "operations.view",
     href: "/media",
     label: "Operations",
     description: "Media jobs, system health, email",
@@ -82,6 +89,7 @@ export const SECTIONS: readonly Section[] = [
   },
   {
     id: "support",
+    permission: "support.view",
     href: "/support",
     label: "Support",
     description: "User requests, appeals, issues",
@@ -94,15 +102,16 @@ export const SECTIONS: readonly Section[] = [
   },
   {
     id: "administration",
+    permission: "staff.view",
     href: "/staff",
     label: "Administration",
     description: "Staff, audit logs, security, settings",
     match: ["/staff", "/audit", "/security", "/settings"],
     tabs: [
       { href: "/staff", label: "Staff" },
-      { href: "/audit", label: "Audit log" },
-      { href: "/security", label: "Security" },
-      { href: "/settings", label: "Settings", adminOnly: true },
+      { href: "/audit", label: "Audit log", permission: "audit.view" },
+      { href: "/security", label: "Security", permission: "security.self" },
+      { href: "/settings", label: "Settings", permission: "settings.manage" },
     ],
   },
 ];

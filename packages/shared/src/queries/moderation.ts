@@ -122,7 +122,7 @@ async function removeMyMessageMedia(supabase: Client, userId: string): Promise<v
 }
 
 /** Shown to the only owner of the staff who tries to delete their account (the database refuses it too, with the same meaning). */
-export const LAST_OWNER_DELETE_MESSAGE = "You are the only owner on the UniBuzz staff. Make someone else an owner in CampConnect Admin before deleting your account.";
+export const LAST_OWNER_DELETE_MESSAGE = "You are the only owner on the UniBuzz staff. Make someone else an owner in the UniBuzz Master Admin Portal before deleting your account.";
 
 /**
  * Permanently delete the signed-in user's account, their uploads and everything they posted. Sign out afterwards.

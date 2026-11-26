@@ -311,3 +311,7 @@ its file in `branches/`.
   zoom in the full-screen viewer, the video timeline and 2× hold, the chat's keyboard lift and Home without dividers
   (second brief); signed-in checks on staging with the seed's new chats and story. PR #112. Still on GitHub as of
   2026-11-15 (to delete).
+- **2026-11-26 21:16 UTC (15:16 CST):** migration 71 (`admin-portal-phase-1`, the portal's one audit view and where staff
+  actions came from) went live alone with the owner's approval, after staging (14/14) and a full verified backup
+  (`before-migration-71`); 14 read-only checks and `verify.mjs --live` after it found no difference (75 migrations).
+  Staff actions are recorded with their request context from then on; nothing changed for students or businesses.

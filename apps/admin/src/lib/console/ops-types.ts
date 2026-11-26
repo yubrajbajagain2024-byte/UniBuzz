@@ -469,3 +469,47 @@ export type UniversityRequestsPage = {
   nextOffset: number | null;
   counts: Record<UniversityRequestStatus, number>;
 };
+
+// --- The audit log (migration 71's console_audit_feed): the three logs merged, newest first.
+/** staff: the team, security and the portal's moderation (staff_audit_log); trust_safety: audit_log; business: business_audit_log. */
+export type AuditFeedSource = "staff" | "trust_safety" | "business";
+/** Where a staff action came from. portal*: what the portal's server reported for the browser; gatewayIp: what the API saw. */
+export type AuditFeedContext = {
+  gatewayIp: string | null;
+  userAgent: string | null;
+  portalIp: string | null;
+  portalUserAgent: string | null;
+  portalPath: string | null;
+  endpoint: string | null;
+  sessionId: string | null;
+  aal: string | null;
+};
+export type AuditFeedEntry = {
+  source: AuditFeedSource;
+  id: string;
+  cursor: string;
+  createdAt: string;
+  actor: { id: string | null; name: string | null; email: string | null; role?: string | null; kind?: string | null } | null;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  reason: string | null;
+  reasonCode?: string | null;
+  queueId?: string | null;
+  details: Record<string, unknown> | null;
+  business: { id: string; name: string | null } | null;
+  /** Owners and admins only (null for moderators, and for rows without it: students', businesses', the system's). */
+  context: AuditFeedContext | null;
+};
+export type AuditFeedFilters = {
+  source?: AuditFeedSource;
+  actor?: string;
+  action?: string;
+  targetType?: string;
+  targetId?: string;
+  business?: string;
+  from?: string;
+  to?: string;
+  before?: string;
+};
+export type AuditFeedPage = { items: AuditFeedEntry[]; nextCursor: string | null; sources: AuditFeedSource[]; contextVisible: boolean };

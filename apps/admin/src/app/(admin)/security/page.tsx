@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getMfaStatus } from "@apartment-book/shared";
-import { hasRole, requireStaff } from "@/lib/admin";
+import { requireStaff } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/server";
 import { firstParam, safeNextPath } from "@/lib/utils";
 import { MfaPanel } from "@/components/security/mfa-panel";
@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Security" };
 
 export default async function SecurityPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   // Enrolment and verification happen before the session is aal2, so this page must not require it.
-  const access = await requireStaff("/security", { mfa: false });
+  await requireStaff("/security", { mfa: false, permission: "security.self" });
   const params = await searchParams;
   const next = safeNextPath(firstParam(params.next));
   const status = await getMfaStatus(await createClient());
@@ -19,7 +19,7 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <PageHeader title="Security" description="Two-factor authentication for your staff account. It is mandatory for every action in this app." />
-      <SectionTabs section="administration" admin={hasRole(access, "admin")} />
+      <SectionTabs section="administration" />
       <MfaPanel status={status} next={next} />
     </div>
   );
