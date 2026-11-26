@@ -47,8 +47,18 @@ function look(e: AuditFeedEntry): { icon: LucideIcon; className: string } {
 function summary(e: AuditFeedEntry): string {
   if (e.source === "staff") return auditSummary(asTeamEntry(e));
   if (e.source === "business") return [e.business?.name, businessAuditDetail(e.details)].filter(Boolean).join(" · ");
-  const target = e.targetType ? typeName(e.targetType) || humanizeAuditAction(e.targetType) : null;
-  return [target, e.reasonCode ? humanizeAuditAction(e.reasonCode) : null, e.reason].filter(Boolean).join(" · ");
+  // A kind of content has its label ("Apartment listing"); another target reads in words, with its name when it has one
+  // that is not an id ("Rule pack baseline").
+  let target: string | null = null;
+  if (e.targetType) {
+    const known = typeName(e.targetType);
+    target = known && known !== e.targetType ? known : humanizeAuditAction(e.targetType);
+    const name = e.targetId ?? "";
+    if (name && name.length <= 40 && !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(name)) target = `${target} ${name}`;
+  }
+  const d = e.details ?? {};
+  const state = e.action === "rule_pack_toggle" && typeof d.enabled === "boolean" ? (d.enabled ? "turned on" : "turned off") : null;
+  return [target, state, e.reasonCode ? humanizeAuditAction(e.reasonCode) : null, e.reason].filter(Boolean).join(" · ");
 }
 
 function href(e: AuditFeedEntry): string | null {

@@ -1,7 +1,7 @@
 # admin-portal-phase-1
 
-- **Owner:** Sunil. **As of 2026-11-26:** branched from `main` at `a0a1a9f` (PR #126); **draft PR #127**, to be merged
-  only after staging (the CSP checked signed in) and the owner's go-ahead. Written by an AI session.
+- **Owner:** Sunil. **As of 2026-11-26:** branched from `main` at `a0a1a9f` (PR #126); **PR #127**, to be merged after 71 is
+  live on production (the owner's approval). Written by an AI session.
 - **Purpose:** Phase 1 of the **UniBuzz Master Admin Portal** roadmap (the owner's approval of 2026-11-25; roadmap in
   [../status.md](../status.md), decisions in [../decisions.md](../decisions.md)): the portal's name on screen, one audit
   view over the three audit logs with where staff actions came from, a Content-Security-Policy, and navigation driven
@@ -61,14 +61,20 @@
 - `npm run check` (typecheck, lint, build: 9 tasks), `npm run test:shared` 316/316, `npm run db:test` 67 suites, 2412
   checks, 0 failures: all pass (2026-11-26, [../testing.md](../testing.md)). The browser check found zod 4 testing
   `new Function` on every page under the new CSP; fixed (zod runs jitless in the browser).
-- **Not run yet:** staging (no staging token on this Mac as of 2026-11-26), and the browser check signed in. PR #127's
-  Vercel previews built (both projects); the portal's preview is behind Vercel's protection, so its CSP was not fetched
-  there (`vercel curl` would add a protection bypass to the project's settings). The portal loads no Vercel scripts;
-  on previews Vercel's toolbar is refused by the CSP, which is expected.
+- **Staging, 2026-11-26:** `supabase/tests/staging/audit-feed.mjs` 14/14 (run `mwxz13dl`): 71 alone, the gateway's view
+  (one IPv4 hop) and the portal's `x-portal-*` headers recorded, the feed per role, 50 entries in 239 ms, the rollback and
+  71 again: **71 is on staging**. `apps/admin/e2e/admin.mjs` passes as the staff admin and the staff moderator against a
+  local production build pointed at staging, with the CSP enforced and no violation. A one-off check through the same
+  build: a request declined in `/universities` carried the browser's page, browser and address to the database, and
+  `/audit` showed them. Fixed on the way: `upgrade-insecure-requests` now follows the portal's own scheme (on a laptop's
+  http it sent every request to https://localhost); the team's university entries name the university and the reply,
+  and Trust & Safety's entries read their target in words ("Rule pack baseline · turned on").
+- PR #127's Vercel previews built; the portal's preview is behind Vercel's protection, so its CSP was not fetched there
+  (`vercel curl` would add a protection bypass to the project's settings). The portal loads no Vercel scripts.
 
-## Rollout (not started: each step waits on the owner)
+## Rollout (step 1 done 2026-11-26; the rest waits on the owner)
 
-1. **Staging:** `supabase/tests/staging/audit-feed.mjs` (applies 71 alone, checks it through Auth and the REST API,
+1. **Staging (done):** `supabase/tests/staging/audit-feed.mjs` (applies 71 alone, checks it through Auth and the REST API,
    rolls it back, applies it again), then the portal's browser check as the staging admin and moderator against a local
    production build pointed at staging (its CSP included), and one decision made in `/universities` through the portal's
    own server whose request details `/audit` must show.

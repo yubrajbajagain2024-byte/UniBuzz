@@ -77,6 +77,9 @@ export function auditSummary(entry: AuditEntry): string {
   if (typeof d.target_type === "string") parts.push(typeName(d.target_type));
   else if (entry.action.startsWith("content.") && entry.targetType) parts.push(typeName(entry.targetType));
   if (typeof d.title === "string" && d.title) parts.push(`“${d.title.slice(0, 80)}”`);
+  // Universities (migration 70): the university's name, and the reply the student reads.
+  if (entry.action.startsWith("university") && typeof d.name === "string" && d.name) parts.push(d.name.slice(0, 120));
+  if (entry.action.startsWith("university_request.") && typeof d.note === "string" && d.note) parts.push(`reply: “${d.note.slice(0, 80)}”`);
   if (typeof d.decision === "string") parts.push(REPORT_DECISIONS.find((x) => x.value === d.decision)?.label ?? d.decision);
   if (typeof d.friendly_name === "string" && d.friendly_name) parts.push(d.friendly_name);
   if (typeof d.kind === "string" && typeof d.ref === "string") parts.push(`${d.kind} ${d.ref}`);
@@ -89,8 +92,10 @@ export function auditSummary(entry: AuditEntry): string {
   return parts.join(" · ");
 }
 
-/** Where a row points: the person, the report or the content it is about. */
+/** Where a row points: the person, the report, the content or the university requests it is about. */
 export function auditHref(entry: AuditEntry): string | null {
+  if (entry.action === "university.create" || entry.action === "university_request.approve" || entry.action === "university_request.link") return "/universities?status=approved";
+  if (entry.action === "university_request.decline") return "/universities?status=declined";
   if (!isUuid(entry.targetId)) return null;
   if (entry.action.startsWith("user.") || entry.action.startsWith("staff.")) return `/users/${entry.targetId}`;
   if (entry.action.startsWith("report.")) return `/reports/${entry.targetId}`;

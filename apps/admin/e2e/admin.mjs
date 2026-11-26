@@ -64,6 +64,8 @@ try {
       const res = await D.request.get(BASE + "/login"); const csp = res.headers()["content-security-policy"] || "";
       for (const part of ["default-src 'self'", "'strict-dynamic'", "frame-ancestors 'none'", "object-src 'none'", "base-uri 'self'"]) if (!csp.includes(part)) throw new Error(`missing ${part}: ${csp}`);
       if (/script-src[^;]*'unsafe-inline'/.test(csp)) throw new Error("script-src allows inline scripts");
+      // Upgrading http: requests only where the portal itself is https (on a laptop's http it would break every request).
+      if (BASE.startsWith("https://") !== csp.includes("upgrade-insecure-requests")) throw new Error(`upgrade-insecure-requests on ${BASE}: ${csp}`);
       const nonce = /'nonce-([^']+)'/.exec(csp)?.[1]; if (!nonce) throw new Error("no nonce: " + csp);
       const html = await res.text(); const scripts = html.match(/<script\b[^>]*>/g) ?? [];
       const bare = scripts.filter((t) => !t.includes(`nonce="${nonce}"`)); if (!scripts.length || bare.length) throw new Error(`${bare.length} of ${scripts.length} scripts without this response's nonce: ${bare[0] ?? ""}`);

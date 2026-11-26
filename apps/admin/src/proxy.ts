@@ -28,7 +28,11 @@ function isSecurityPath(pathname: string): boolean {
 
 export async function proxy(request: NextRequest) {
   const { url, anonKey } = getSupabaseEnv();
-  const csp = contentSecurityPolicy(newNonce(), { supabaseUrl: url, dev: process.env.NODE_ENV === "development" });
+  const csp = contentSecurityPolicy(newNonce(), {
+    supabaseUrl: url,
+    dev: process.env.NODE_ENV === "development",
+    https: request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https",
+  });
   const finish = (res: NextResponse): NextResponse => {
     res.headers.set("Content-Security-Policy", csp);
     // Never indexed, never cached: this is a private tool.

@@ -54,9 +54,9 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
      the staff review the requests in `/universities` ([history.md](history.md), 2026-11-26).
   1. **Name, audit view, CSP, permissions** (`admin-portal-phase-1`; [branches/admin-portal-phase-1.md](branches/admin-portal-phase-1.md)):
      the name UniBuzz Master Admin Portal on screen, one audit view over the three audit logs with where staff actions
-     came from (migration 71, **not on staging or production yet**), a nonce Content-Security-Policy, navigation and
-     page gates from one permission table. Built and tested offline (2026-11-26); staging and the production migration
-     wait on the owner.
+     came from (migration 71: **on staging, not on production**), a nonce Content-Security-Policy, navigation and
+     page gates from one permission table. Tested offline and on staging (2026-11-26, PR #127); the production migration
+     waits on the owner's approval.
   2. Campus scopes and the Campus Admin role, `staff_can()`, every staff function scoped in SQL (before any campus staff).
   3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.
   4. One moderation model: the website console's queue in the portal, one sanction system, safety metrics.

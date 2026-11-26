@@ -11,12 +11,13 @@
  *   moderation previews through signed URLs), Mux posters, Google avatars.
  * - connections: this app (server actions) and the Supabase project (the browser client: REST, Auth, Storage, Realtime).
  * - forms: this app, plus Supabase Auth and Google, where "Continue with Google" is redirected.
- * - nothing may frame the portal, no plugins, no <base> tricks, and every http: request is upgraded on https.
+ * - nothing may frame the portal, no plugins, no <base> tricks, and every http: request is upgraded when the portal itself
+ *   is served over https (`https`: the request's scheme). On a portal served over http (`next start` on a laptop) the
+ *   upgrade would send the browser to https://localhost, which answers nothing.
  */
-export function contentSecurityPolicy(nonce: string, opts: { supabaseUrl: string; dev: boolean }): string {
+export function contentSecurityPolicy(nonce: string, opts: { supabaseUrl: string; dev: boolean; https: boolean }): string {
   const supabase = originOf(opts.supabaseUrl);
   const realtime = supabase ? supabase.replace(/^http/, "ws") : null;
-  const secure = supabase?.startsWith("https://") ?? false;
   const list = (...values: (string | null | false)[]) => values.filter(Boolean).join(" ");
   const directives: [string, string][] = [
     ["default-src", "'self'"],
@@ -35,7 +36,7 @@ export function contentSecurityPolicy(nonce: string, opts: { supabaseUrl: string
     ["frame-ancestors", "'none'"],
   ];
   const policy = directives.map(([k, v]) => `${k} ${v}`);
-  if (secure && !opts.dev) policy.push("upgrade-insecure-requests");
+  if (opts.https) policy.push("upgrade-insecure-requests");
   return policy.join("; ");
 }
 
