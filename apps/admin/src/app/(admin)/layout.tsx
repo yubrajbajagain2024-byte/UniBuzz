@@ -1,4 +1,4 @@
-import { requireStaff } from "@/lib/admin";
+import { getStaffPermissions, requireStaff } from "@/lib/admin";
 import { getCurrentProfile, getCurrentUser } from "@/lib/auth";
 import { AdminShell } from "@/components/shell/admin-shell";
 
@@ -10,10 +10,10 @@ import { AdminShell } from "@/components/shell/admin-shell";
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const access = await requireStaff("/", { mfa: false });
-  const [user, profile] = await Promise.all([getCurrentUser(), getCurrentProfile()]);
+  const [user, profile, permissions] = await Promise.all([getCurrentUser(), getCurrentProfile(), getStaffPermissions()]);
   const name = profile?.full_name || user?.email?.split("@")[0] || "You";
   return (
-    <AdminShell access={access} name={name} email={user?.email ?? null} avatarUrl={profile?.avatar_url ?? null}>
+    <AdminShell access={access} permissions={permissions} name={name} email={user?.email ?? null} avatarUrl={profile?.avatar_url ?? null}>
       {children}
     </AdminShell>
   );

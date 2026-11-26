@@ -9,7 +9,7 @@ import {
   PRODUCT_NAME,
 } from "@/lib/brand";
 import { getMainSiteUrl } from "@/lib/env";
-import { permissionsOf } from "@/lib/permissions";
+import type { Permission } from "@/lib/permissions";
 import { Avatar } from "@/components/ui/avatar";
 import { RoleBadge } from "@/components/staff/role-badge";
 import { AdminNav } from "./admin-nav";
@@ -22,19 +22,22 @@ import { PermissionsProvider } from "./permissions-context";
  */
 export function AdminShell({
   access,
+  permissions,
   name,
   email,
   avatarUrl,
   children,
 }: {
   access: StaffAccess;
+  /** From the database (lib/admin.ts getStaffPermissions): what the sidebar and the section tabs may show. */
+  permissions: readonly Permission[];
   name: string;
   email: string | null;
   avatarUrl: string | null;
   children: ReactNode;
 }) {
   return (
-    <PermissionsProvider permissions={permissionsOf(access)}>
+    <PermissionsProvider permissions={permissions}>
       <div className="flex flex-1 flex-col">
         <header className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm">
           <div className="flex h-14 items-center gap-3 px-3 sm:px-6">

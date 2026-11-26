@@ -1,8 +1,8 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { getMyRestriction, getMyStaffAccess, STAFF_ROLE_RANK, STAFF_ROLES, type StaffAccess, type AdminStaffRole } from "@apartment-book/shared";
+import { getMyRestriction, getMyStaffAccess, getMyStaffPermissions, STAFF_ROLE_RANK, STAFF_ROLES, type StaffAccess, type AdminStaffRole } from "@apartment-book/shared";
 import { getCurrentUser } from "@/lib/auth";
-import { can, type Permission } from "@/lib/permissions";
+import { can, PERMISSIONS, permissionsOf, type Permission } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { errorMessage } from "@/lib/utils";
 
@@ -22,7 +22,28 @@ export const getStaffAccess = cache(async (): Promise<StaffAccess | null> => {
   const [access, restriction] = await Promise.all([getMyStaffAccess(supabase), getMyRestriction(supabase).catch(() => null)]);
   // A suspended staff member has no admin powers (every RPC refuses them).
   if (!access || restriction) return null;
+  // Default deny: a role the portal does not know yet (migration 72's campus_admin, before Phase 2 scopes the pages it
+  // would use) is not let in, rather than compared by a rank it does not have.
+  if (!Object.hasOwn(STAFF_ROLE_RANK, access.role)) return null;
   return access;
+});
+
+/**
+ * What the signed-in staff member may open, as the database decides it (migration 72's admin_my_permissions, the same
+ * table as lib/permissions.ts); where that migration is missing, the portal's own table. Empty for anyone without
+ * access. Cached per request. Only names the portal knows are kept.
+ */
+export const getStaffPermissions = cache(async (): Promise<Permission[]> => {
+  const access = await getStaffAccess();
+  if (!access) return [];
+  try {
+    const fromSql = await getMyStaffPermissions(await createClient());
+    if (!fromSql || fromSql.role !== access.role) return [];
+    return PERMISSIONS.filter((p) => fromSql.permissions.includes(p));
+  } catch (error) {
+    if (/admin_my_permissions|PGRST202|Could not find the function/i.test(errorMessage(error, ""))) return permissionsOf(access);
+    throw error;
+  }
 });
 
 export type RequireStaffOptions = {
@@ -60,7 +81,7 @@ export async function requireStaff(nextPath: string, opts: RequireStaffOptions =
   if (!access) redirect("/no-access");
   if (mfa && !access.mfaVerified) redirect(`/security?next=${encodeURIComponent(nextPath)}`);
   if (!hasRole(access, minRole)) redirect(`/?denied=${minRole}`);
-  if (permission && !can(access, permission)) redirect(`/?denied=${lowestRoleWith(permission) ?? "owner"}`);
+  if (permission && !(await getStaffPermissions()).includes(permission)) redirect(`/?denied=${lowestRoleWith(permission) ?? "owner"}`);
   return access;
 }
 
@@ -80,7 +101,7 @@ export async function requireStaffAction(
   if (!access) return { error: "Not allowed." };
   if (mfa && !access.mfaVerified) return { error: "Verify your two-factor code first." };
   if (!hasRole(access, minRole)) return { error: `You need the ${minRole} role for that.` };
-  if (permission && !can(access, permission)) return { error: `You need the ${lowestRoleWith(permission) ?? "owner"} role for that.` };
+  if (permission && !(await getStaffPermissions()).includes(permission)) return { error: `You need the ${lowestRoleWith(permission) ?? "owner"} role for that.` };
   return { access };
 }
 

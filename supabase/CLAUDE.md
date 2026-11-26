@@ -10,7 +10,8 @@ migration's production status is in [docs/migrations.md](../docs/migrations.md).
   read and write them through `events_console_*`; the website's sync uses the service role),
   `university_requests` (students through `request_university()` / `my_university_requests()`, staff through
   `console_*university_request*`), `audit_request_context` (where staff actions came from: written by the audit logs'
-  triggers, read only by `console_audit_feed()` for owners and admins). `universities` is read by everyone and written by no API role (migration 70):
+  triggers, read only by `console_audit_feed()` for owners and admins), `staff_campuses` (a campus admin's universities,
+  migration 72: read by `staff_can()`, `admin_my_permissions()`). `universities` is read by everyone and written by no API role (migration 70):
   its `email_domain` decides who may sign up, so only the owner, the service role and staff functions write it.
   `event_engagement` is written by `record_event_click()` alone and read by its own student.
   `anonymous_listing_owners` is readable by the poster alone. In the `uploads` bucket (public: an
@@ -21,7 +22,13 @@ migration's production status is in [docs/migrations.md](../docs/migrations.md).
   that adds a column to either must also
   `grant select (that_column) on public.<table> to anon, authenticated`, or the API cannot read it
   and `select *` on that table fails. Never grant SELECT on the whole table.
-- Helpers the API must not call: `revoke all on function … from public, anon, authenticated`.
+- Helpers the API must not call: `revoke all on function … from public, anon, authenticated`. `staff_*` functions are
+  always internal (`tests/permissions-audit.test.mjs` checks it); the portal's API ones are `admin_*` or `console_*`.
+- **PostgREST reads a table whose primary key is two foreign keys as a many-to-many link** between their tables, even
+  when the table is closed to the API. A second link between two tables the apps already embed (a profile's
+  university) makes that embed ambiguous (`PGRST201`) and breaks the apps: point such a table's people at `auth.users`,
+  not `profiles` (migration 72's `staff_campuses`; it broke staging's profile embeds for about 15 minutes on
+  2026-11-26 before this rule).
 - SQL that must run with and without CampConnect Admin's schema (`public.staff`,
   `is_suspended()`): test for it with `to_regclass` / `to_regprocedure`, read optional tables with
   dynamic SQL, and nest the `IF` so plpgsql resolves an optional function only where it exists
@@ -74,7 +81,8 @@ Supabase's `auth` and `storage` schemas.
   `university-requests.mjs`, migration 70 applied, checked through Auth, the REST API and the apps' queries,
   rolled back and applied again (`--restore` leaves it rolled back); `audit-feed.mjs`, migration 71 the same way, a
   staff admin's real actions recorded with the gateway's view and the portal's headers, the feed for each role
-  (`--restore`); `admin-e2e-accounts.mjs`, the staging staff
+  (`--restore`); `staff-scopes.mjs`, migration 72 the same way: a campus admin refused everywhere, the platform's
+  staff unchanged, a profile's university still embeddable (`--restore`); `admin-e2e-accounts.mjs`, the staging staff
   admin, staff moderator and student for CampConnect Admin's browser check (`create`, `env`, `qr`, `delete`);
   `admin-authority.mjs`, migration 67 applied, checked through Auth and the REST API, rolled back and applied again
   (`--restore` leaves it rolled back); `event-engagement.mjs`, events' likes, comments and who is going (migration 69,

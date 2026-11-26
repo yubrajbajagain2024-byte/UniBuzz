@@ -4,8 +4,11 @@ import type { AdminStaffRole, StaffAccess } from "@apartment-book/shared";
  * What each staff role may open in the portal: one table that the sidebar, the section tabs and the page gates all
  * read, so a link shows exactly where its page lets the person in. Default deny: a permission a role is not given here
  * is refused, and a role this table does not know has none. The database stays the authority (every function checks
- * the caller again in SQL, e.g. ts_require_admin); this only decides what to show and where to send people. Phase 2 of
- * the roadmap (docs/status.md) moves the table into SQL (staff_can()) and adds campus admins, limited to their campus.
+ * the caller again in SQL, e.g. ts_require_admin); this only decides what to show and where to send people.
+ * Since migration 72 the database holds the same table (staff_role_permissions(), read through admin_my_permissions() by
+ * lib/admin.ts getStaffPermissions, and staff_can() for SQL); this copy names the permissions for TypeScript and
+ * stands in where 72 is missing. supabase/tests/staff-scopes.test.mjs reads this file and fails if the two differ.
+ * A campus admin (migration 72) has no permissions until Phase 2 scopes an area for them.
  */
 export const PERMISSIONS = [
   "dashboard.view",

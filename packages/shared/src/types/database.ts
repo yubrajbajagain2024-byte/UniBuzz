@@ -2281,6 +2281,11 @@ export type Database = {
         Args: { p_filters?: Json; p_limit?: number };
         Returns: Json;
       };
+      // Migration 72: the caller's own staff role, campuses and permissions.
+      admin_my_permissions: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
       mark_notifications_read: {
         Args: { p_ids?: string[] | null };
         Returns: number;
