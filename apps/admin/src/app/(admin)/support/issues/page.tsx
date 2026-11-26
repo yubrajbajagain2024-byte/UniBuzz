@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Film, Rss } from "lucide-react";
 import { listMediaJobs } from "@apartment-book/shared";
-import { requireStaff, hasRole } from "@/lib/admin";
+import { requireStaff } from "@/lib/admin";
 import { fetchEventFeeds, maybeDeployed } from "@/lib/console/server";
 import { createClient } from "@/lib/supabase/server";
 import { plural } from "@/lib/utils";
@@ -20,7 +20,7 @@ export const metadata: Metadata = { title: "Issues" };
  * campus whose events stop updating).
  */
 export default async function IssuesPage() {
-  const access = await requireStaff("/support/issues");
+  await requireStaff("/support/issues", { permission: "support.view" });
   const supabase = await createClient();
   const [jobs, feeds] = await Promise.all([listMediaJobs(supabase, { pendingOnly: true, limit: 200 }).catch(() => []), maybeDeployed(fetchEventFeeds())]);
   const failing = jobs.filter((j) => j.attempts > 0 && j.lastError);
@@ -29,7 +29,7 @@ export default async function IssuesPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Issues" description="What is failing for people right now: media jobs that keep erroring and calendar feeds that no longer sync. Decisions (reports, appeals, verifications) are under Moderation and Requests." />
-      <SectionTabs section="support" admin={hasRole(access, "admin")} />
+      <SectionTabs section="support" />
 
       <Card>
         <CardHeader className="flex items-center justify-between gap-3">

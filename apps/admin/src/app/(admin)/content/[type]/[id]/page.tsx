@@ -20,7 +20,7 @@ export default async function ContentDetailPage({ params, searchParams }: Props)
   const { type, id } = await params;
   if (!(MODERATION_TARGET_TYPE_VALUES as readonly string[]).includes(type) || !isUuid(id)) notFound();
   const targetType = type as ModerationTargetType;
-  const access = await requireStaff(`/content/${type}/${id}`);
+  const access = await requireStaff(`/content/${type}/${id}`, { permission: "content.view" });
   const query = await searchParams;
   const reportId = isUuid(firstParam(query.report)) ? firstParam(query.report) : undefined;
 

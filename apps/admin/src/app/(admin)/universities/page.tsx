@@ -30,7 +30,7 @@ const PAGE = 50;
  * email domain; opening sign-up to a domain is a separate step for owners.
  */
 export default async function UniversitiesPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  await requireStaff("/universities", { minRole: "admin" });
+  await requireStaff("/universities", { permission: "universities.manage" });
   const params = await searchParams;
   const status = STATUSES.find((s) => s.value === firstParam(params.status))?.value ?? "pending";
   const offset = Math.max(0, Math.min(100_000, Number.parseInt(firstParam(params.offset) ?? "0", 10) || 0));
@@ -51,7 +51,7 @@ export default async function UniversitiesPage({ searchParams }: { searchParams:
         title="Universities"
         description="Students ask for a university missing from the list; the team adds it, links the request to one already listed, or declines it. A university added here has no sign-up domain: opening sign-up is for owners."
       />
-      <SectionTabs section="universities" admin counts={{ "/universities": page?.counts.pending ?? null }} />
+      <SectionTabs section="universities" counts={{ "/universities": page?.counts.pending ?? null }} />
 
       {page === null ? (
         <Card>

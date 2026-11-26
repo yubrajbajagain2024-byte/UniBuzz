@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { contentSecurityPolicy, newNonce } from "@/lib/csp";
 import { getSupabaseEnv } from "@/lib/env";
 import { safeNextPath } from "@/lib/utils";
 
@@ -9,6 +10,10 @@ import { safeNextPath } from "@/lib/utils";
  * endpoint (which checks its own secret) answer; with a session that has not passed
  * the second factor, only /security does. Whether the person is staff is decided by
  * the admin layout (database RPC), and every page and action re-checks in SQL.
+ *
+ * Every response also carries the Content-Security-Policy (lib/csp.ts) with a fresh nonce, which the request carries
+ * on to the page so Next.js can put it on its scripts, and the request carries the page's path (x-portal-path) for the
+ * audit log's request context (lib/request-context.ts). A path the browser sent itself is replaced.
  */
 const PUBLIC_PATHS = ["/login", "/auth/callback", "/auth/confirm", "/auth/accept", "/no-access", "/api/media/worker", "/robots.txt"];
 
@@ -22,11 +27,27 @@ function isSecurityPath(pathname: string): boolean {
 }
 
 export async function proxy(request: NextRequest) {
-  // The worker endpoint authenticates with its own secret (CRON_SECRET); no session is involved.
-  if (request.nextUrl.pathname === "/api/media/worker") return finish(NextResponse.next({ request }));
-
-  let response = NextResponse.next({ request });
   const { url, anonKey } = getSupabaseEnv();
+  const csp = contentSecurityPolicy(newNonce(), { supabaseUrl: url, dev: process.env.NODE_ENV === "development" });
+  const finish = (res: NextResponse): NextResponse => {
+    res.headers.set("Content-Security-Policy", csp);
+    // Never indexed, never cached: this is a private tool.
+    res.headers.set("X-Robots-Tag", "noindex, nofollow");
+    res.headers.set("Cache-Control", "private, no-store");
+    return res;
+  };
+  // The request as the page sees it: its cookies (refreshed below when needed), the policy and the path.
+  const forward = (): NextResponse => {
+    const headers = new Headers(request.headers);
+    headers.set("Content-Security-Policy", csp);
+    headers.set("x-portal-path", request.nextUrl.pathname.slice(0, 200));
+    return NextResponse.next({ request: { headers } });
+  };
+
+  // The worker endpoint authenticates with its own secret (CRON_SECRET); no session is involved.
+  if (request.nextUrl.pathname === "/api/media/worker") return finish(forward());
+
+  let response = forward();
 
   const supabase = createServerClient(url, anonKey, {
     cookies: {
@@ -35,7 +56,7 @@ export async function proxy(request: NextRequest) {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        response = forward();
         cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
       },
     },
@@ -78,13 +99,6 @@ export async function proxy(request: NextRequest) {
   }
 
   return finish(response);
-}
-
-/** Never indexed, never cached: this is a private tool. */
-function finish(res: NextResponse): NextResponse {
-  res.headers.set("X-Robots-Tag", "noindex, nofollow");
-  res.headers.set("Cache-Control", "private, no-store");
-  return res;
 }
 
 /** Copy refreshed auth cookies onto a redirect response so the session is not lost. */

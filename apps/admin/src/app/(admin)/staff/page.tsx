@@ -13,7 +13,7 @@ import { SectionTabs } from "@/components/shell/section-tabs";
 export const metadata: Metadata = { title: "Staff" };
 
 export default async function StaffPage() {
-  const access = await requireStaff("/staff");
+  const access = await requireStaff("/staff", { permission: "staff.view" });
   const supabase = await createClient();
   // Pending invites are admin-only in SQL (admin_invites_list raises "Not allowed" for moderators).
   const canManage = hasRole(access, "admin");
@@ -23,7 +23,7 @@ export default async function StaffPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Staff" description="Who can open this app and what each person may do. Every change is re-checked in the database and written to the audit log." />
-      <SectionTabs section="administration" admin={hasRole(access, "admin")} />
+      <SectionTabs section="administration" />
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-4">
           <StaffTable members={members} me={access} emailsEnabled={emailsEnabled} />

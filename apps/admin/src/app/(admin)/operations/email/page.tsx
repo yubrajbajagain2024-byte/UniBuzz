@@ -32,7 +32,7 @@ function Check({ ok, label, detail }: { ok: boolean; label: string; detail: stri
  * settings live in the Supabase dashboard (scripts/configure-auth-email.mjs reports them).
  */
 export default async function EmailPage() {
-  const access = await requireStaff("/operations/email");
+  const access = await requireStaff("/operations/email", { permission: "operations.view" });
   const admin = hasRole(access, "admin");
   const emailsEnabled = invitationEmailsConfigured();
   const invites = admin ? await listStaffInvites(await createClient()).catch(() => []) : [];
@@ -41,7 +41,7 @@ export default async function EmailPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Email" description="What this app sends and whether it can: staff invitations, through Supabase Auth. Sign-up confirmations and password resets are Auth's own, with the same sender." />
-      <SectionTabs section="operations" admin={admin} />
+      <SectionTabs section="operations" />
 
       <Card>
         <CardHeader>

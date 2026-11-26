@@ -32,7 +32,7 @@ const COUNTS: { key: keyof UserDetail["counts"]; label: string }[] = [
 export default async function UserPage({ params, searchParams }: Props) {
   const { id } = await params;
   if (!isUuid(id)) notFound();
-  const access = await requireStaff(`/users/${id}`);
+  const access = await requireStaff(`/users/${id}`, { permission: "users.view" });
   const query = await searchParams;
   const reportId = isUuid(firstParam(query.report)) ? firstParam(query.report) : undefined;
 

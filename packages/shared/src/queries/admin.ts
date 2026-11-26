@@ -174,3 +174,61 @@ const AUDIT_ACTION_LABELS = new Map<string, string>([
 export function auditActionLabel(action: string): string {
   return AUDIT_ACTION_LABELS.get(action) ?? MODERATION_AUDIT_LABELS.get(action) ?? action;
 }
+
+/** Trust & Safety's log (migration 41's audit_log, written by ts_audit): its decisions, sanctions and appeals. */
+const TRUST_SAFETY_AUDIT_LABELS = new Map<string, string>([
+  ["approve", "Approved"],
+  ["remove", "Removed"],
+  ["remove_and_warn", "Removed and warned"],
+  ["remove_and_mute_24h", "Removed and muted for 24 hours"],
+  ["remove_and_mute_72h", "Removed and muted for 72 hours"],
+  ["remove_and_mute_7d", "Removed and muted for 7 days"],
+  ["warn_only", "Warned"],
+  ["dismiss_reports", "Reports dismissed"],
+  ["lock_thread", "Thread locked"],
+  ["unlock_thread", "Thread unlocked"],
+  ["escalate", "Escalated"],
+  ["escalate_external", "Escalated outside UniBuzz"],
+  ["suspend_7d", "Suspended for 7 days"],
+  ["suspend_30d", "Suspended for 30 days"],
+  ["ban", "Banned"],
+  ["lift_sanction", "Sanction lifted"],
+  ["restore", "Restored"],
+  ["buzz_unmask", "Buzz author revealed"],
+  ["buzz_unmask_subject", "Buzz author revealed (the person)"],
+  ["sanction_apply", "Sanction applied"],
+  ["sanction_lift", "Sanction lifted"],
+  ["sanction_reduce", "Sanction reduced"],
+  ["sanction_warning", "Warning given"],
+  ["sanction_mute", "Muted"],
+  ["sanction_suspension", "Suspended"],
+  ["sanction_ban", "Banned"],
+  ["strike_add", "Strike added"],
+  ["strike_revoke", "Strike withdrawn"],
+  ["appeal_create", "Appeal sent"],
+  ["appeal_decide", "Appeal decided"],
+  ["role_grant", "Account role granted"],
+  ["role_revoke", "Account role removed"],
+  ["rule_pack_toggle", "Rule pack turned on or off"],
+  ["reporter_viewed", "Reporter looked up"],
+  ["dm_context_viewed", "Message context opened"],
+  ["auto_hide", "Hidden automatically"],
+  ["event_feed.create", "Calendar feed added"],
+  ["event_feed.update", "Calendar feed changed"],
+  ["event_feed.delete", "Calendar feed removed"],
+]);
+
+/** "invite_created" → "Invite created", "organization.verify" → "Organization verify": the fallback for any log. */
+export function humanizeAuditAction(action: string): string {
+  const text = action.replace(/[._]+/g, " ").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : action;
+}
+
+/**
+ * Human label for an entry of the portal's audit log (migration 71's console_audit_feed), whichever of the three logs
+ * it comes from. A business's own actions read as written ("Invite created"); the others use the labels above.
+ */
+export function auditFeedActionLabel(source: "staff" | "trust_safety" | "business", action: string): string {
+  if (source === "business") return humanizeAuditAction(action);
+  return AUDIT_ACTION_LABELS.get(action) ?? MODERATION_AUDIT_LABELS.get(action) ?? TRUST_SAFETY_AUDIT_LABELS.get(action) ?? humanizeAuditAction(action);
+}

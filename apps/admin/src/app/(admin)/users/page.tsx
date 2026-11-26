@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { isMissingFunctionError, listRestrictions, listUsers, searchUsers, type AdminUserRow, type UsersFilter } from "@apartment-book/shared";
-import { hasRole, requireStaff } from "@/lib/admin";
+import { requireStaff } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/server";
 import { errorMessage, firstParam } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ const FILTERS: { value: UsersFilter; label: string }[] = [
 ];
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const access = await requireStaff("/users");
+  await requireStaff("/users", { permission: "users.view" });
   const params = await searchParams;
   const q = (firstParam(params.q) ?? "").trim();
   const filter = FILTERS.find((f) => f.value === firstParam(params.filter))?.value ?? "all";
@@ -61,7 +61,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Users" description="Find a person, see what they posted and were reported for, and suspend or unsuspend their account. Suspensions apply to the website and the app at once. Verification lists people whose email is unconfirmed or whose campus is unset." />
-      <SectionTabs section="users" admin={hasRole(access, "admin")} />
+      <SectionTabs section="users" />
       <form action="/users" className="flex gap-2">
         <Input name="q" defaultValue={q} placeholder="Search by name or email" aria-label="Search people" className="max-w-md" />
         <Button type="submit" variant="secondary">

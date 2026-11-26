@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { BarChart3, Boxes, GraduationCap, Headset, LayoutDashboard, Megaphone, Settings, ShieldAlert, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { SECTIONS, sectionOfPath, type SectionId } from "@/lib/sections";
 import { cn } from "@/lib/utils";
+import { useCan } from "./permissions-context";
 
 const ICONS: Record<SectionId, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -21,12 +22,14 @@ const ICONS: Record<SectionId, LucideIcon> = {
 
 /**
  * The ten sections (lib/sections.ts). `sidebar` is the dark vertical list on large screens, each section with what it
- * holds; `tabs` the scrollable strip under the header on phones. Owners and admins see Universities, Business & Ads and Analytics.
+ * holds; `tabs` the scrollable strip under the header on phones. Each section shows to the roles its permission is
+ * given to (lib/permissions.ts): owners and admins also see Universities, Business & Ads and Analytics.
  */
-export function AdminNav({ variant, admin = false }: { variant: "sidebar" | "tabs"; admin?: boolean }) {
+export function AdminNav({ variant }: { variant: "sidebar" | "tabs" }) {
   const pathname = usePathname();
+  const can = useCan();
   const current = sectionOfPath(pathname)?.id ?? null;
-  const items = SECTIONS.filter((s) => admin || !s.adminOnly);
+  const items = SECTIONS.filter((s) => can(s.permission));
 
   if (variant === "sidebar") {
     return (

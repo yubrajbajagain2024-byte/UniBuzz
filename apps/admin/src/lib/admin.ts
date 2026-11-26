@@ -1,7 +1,8 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { getMyRestriction, getMyStaffAccess, STAFF_ROLE_RANK, type StaffAccess, type AdminStaffRole } from "@apartment-book/shared";
+import { getMyRestriction, getMyStaffAccess, STAFF_ROLE_RANK, STAFF_ROLES, type StaffAccess, type AdminStaffRole } from "@apartment-book/shared";
 import { getCurrentUser } from "@/lib/auth";
+import { can, type Permission } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { errorMessage } from "@/lib/utils";
 
@@ -27,6 +28,8 @@ export const getStaffAccess = cache(async (): Promise<StaffAccess | null> => {
 export type RequireStaffOptions = {
   /** Lowest role that may pass. Default "moderator", i.e. any staff member. */
   minRole?: AdminStaffRole;
+  /** What the page or action is (lib/permissions.ts): refused unless the role is given it. Checked on top of minRole. */
+  permission?: Permission;
   /** Require a session that verified the second factor (aal2). Default true; only the Security page turns it off. */
   mfa?: boolean;
 };
@@ -36,20 +39,28 @@ export function hasRole(access: StaffAccess, minRole: AdminStaffRole): boolean {
   return STAFF_ROLE_RANK[access.role] >= STAFF_ROLE_RANK[minRole];
 }
 
+/** The lowest role given a permission, for the "that page needs the … role" note; null if no role has it. */
+function lowestRoleWith(permission: Permission): AdminStaffRole | null {
+  const byRank = [...STAFF_ROLES].sort((a, b) => STAFF_ROLE_RANK[a.value] - STAFF_ROLE_RANK[b.value]);
+  return byRank.find((r) => can(r.value, permission))?.value ?? null;
+}
+
 /**
  * For pages and layouts. Signed out → login, coming back to `nextPath`; not staff →
  * /no-access (a clear answer: this app is for staff only); staff whose session has
- * not verified the second factor → /security; role too low → the overview with a note.
- * Database errors propagate so a broken connection never looks like "not staff".
+ * not verified the second factor → /security; role too low, or a permission the role
+ * is not given → the overview with a note. Database errors propagate so a broken
+ * connection never looks like "not staff".
  */
 export async function requireStaff(nextPath: string, opts: RequireStaffOptions = {}): Promise<StaffAccess> {
-  const { minRole = "moderator", mfa = true } = opts;
+  const { minRole = "moderator", mfa = true, permission } = opts;
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(nextPath)}`);
   const access = await getStaffAccess();
   if (!access) redirect("/no-access");
   if (mfa && !access.mfaVerified) redirect(`/security?next=${encodeURIComponent(nextPath)}`);
   if (!hasRole(access, minRole)) redirect(`/?denied=${minRole}`);
+  if (permission && !can(access, permission)) redirect(`/?denied=${lowestRoleWith(permission) ?? "owner"}`);
   return access;
 }
 
@@ -57,7 +68,7 @@ export async function requireStaff(nextPath: string, opts: RequireStaffOptions =
 export async function requireStaffAction(
   opts: RequireStaffOptions = {},
 ): Promise<{ access: StaffAccess; error?: undefined } | { access?: undefined; error: string }> {
-  const { minRole = "moderator", mfa = true } = opts;
+  const { minRole = "moderator", mfa = true, permission } = opts;
   const user = await getCurrentUser();
   if (!user) return { error: "Log in first." };
   let access: StaffAccess | null;
@@ -69,6 +80,7 @@ export async function requireStaffAction(
   if (!access) return { error: "Not allowed." };
   if (mfa && !access.mfaVerified) return { error: "Verify your two-factor code first." };
   if (!hasRole(access, minRole)) return { error: `You need the ${minRole} role for that.` };
+  if (permission && !can(access, permission)) return { error: `You need the ${lowestRoleWith(permission) ?? "owner"} role for that.` };
   return { access };
 }
 

@@ -10,7 +10,7 @@ import {
   type AutoHiddenRow,
   type AutoHideStatus,
 } from "@apartment-book/shared";
-import { hasRole, requireStaff } from "@/lib/admin";
+import { requireStaff } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/server";
 import { cn, firstParam } from "@/lib/utils";
 import { FormMessage } from "@/components/ui/field";
@@ -24,7 +24,7 @@ export const metadata: Metadata = { title: "Flagged" };
 const TABS: { value: AutoHideStatus | "all"; label: string }[] = [...AUTO_HIDE_STATUSES.map((s) => ({ value: s.value, label: s.label })), { value: "all", label: "All" }];
 
 export default async function FlaggedPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const access = await requireStaff("/flagged");
+  await requireStaff("/flagged", { permission: "moderation.view" });
   const params = await searchParams;
   const requested = firstParam(params.status);
   const status = TABS.find((t) => t.value === requested)?.value ?? "pending";
@@ -46,7 +46,7 @@ export default async function FlaggedPage({ searchParams }: { searchParams: Prom
         title="Flagged"
         description={`Content hidden automatically because ${AUTO_HIDE_THRESHOLD} different people reported it (buzzes can be hidden sooner by Buzz's own threshold). It stays hidden until you restore it, keep it hidden or delete it; its owner was told it is under review.`}
       />
-      <SectionTabs section="moderation" admin={hasRole(access, "admin")} />
+      <SectionTabs section="moderation" />
       {firstParam(params.deleted) ? <FormMessage success="The content was deleted permanently. Its files and videos are being removed." /> : null}
       {needsMigration ? (
         <SetupNotice migration="20261116000000_report_auto_hide" what="Hiding content automatically after reports" />

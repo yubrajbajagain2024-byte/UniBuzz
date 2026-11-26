@@ -54,7 +54,7 @@ function Delta({ current, previous, days, upIsGood = true }: { current: number; 
  * they stand now ("Live" asks again every 30 seconds). Days are Central time.
  */
 export default async function AnalyticsPage({ searchParams }: { searchParams: Params }) {
-  const me = await requireConsoleAdmin("/analytics");
+  const me = await requireConsoleAdmin("/analytics", "analytics.view");
   const params = await searchParams;
   const view = (VIEWS.find((v) => v.value === firstParam(params.view))?.value ?? "overview") as View;
   const days = RANGES.find((r) => String(r) === firstParam(params.range)) ?? 30;

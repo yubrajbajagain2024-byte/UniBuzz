@@ -35,7 +35,7 @@ export const metadata: Metadata = { title: "Dashboard" };
 const cardLink = "inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline";
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const access = await requireStaff("/");
+  const access = await requireStaff("/", { permission: "dashboard.view" });
   const params = await searchParams;
   const denied = STAFF_ROLES.find((r) => r.value === firstParam(params.denied));
   const supabase = await createClient();

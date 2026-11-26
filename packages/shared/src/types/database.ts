@@ -2276,6 +2276,11 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: Json;
       };
+      // Migration 71: the portal's one audit view over the three logs (staff with a second factor; context for owners and admins).
+      console_audit_feed: {
+        Args: { p_filters?: Json; p_limit?: number };
+        Returns: Json;
+      };
       mark_notifications_read: {
         Args: { p_ids?: string[] | null };
         Returns: number;
