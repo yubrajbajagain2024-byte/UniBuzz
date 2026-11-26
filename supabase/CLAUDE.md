@@ -7,7 +7,10 @@ migration's production status is in [docs/migrations.md](../docs/migrations.md).
 
 - Closed to the API entirely, read only through `security definer` functions: `user_activity`, the
   `buzz_*` tables, `snaps`, `staff*`, `account_restrictions`, `media_jobs`, `event_feeds` (staff
-  read and write them through `events_console_*`; the website's sync uses the service role).
+  read and write them through `events_console_*`; the website's sync uses the service role),
+  `university_requests` (students through `request_university()` / `my_university_requests()`, staff through
+  `console_*university_request*`). `universities` is read by everyone and written by no API role (migration 70):
+  its `email_domain` decides who may sign up, so only the owner, the service role and staff functions write it.
   `event_engagement` is written by `record_event_click()` alone and read by its own student.
   `anonymous_listing_owners` is readable by the poster alone. In the `uploads` bucket (public: an
   address serves to anyone who has it), a file is read and listed through the API by its uploader
@@ -67,6 +70,9 @@ Supabase's `auth` and `storage` schemas.
   `--keep` to leave the campaigns live three hours for the website (`apps/web/e2e/sponsored-ads.mjs`) and a phone
   (`student <label>` makes a fresh student per device, since impressions and clicks count once per student, ad and
   hour; `pause <placement>` and `resume <placement>` for the phone's pause check), then `verify` and `cleanup`;
+  `university-requests.mjs`, migration 70 applied, checked through Auth, the REST API and the apps' queries,
+  rolled back and applied again (`--restore` leaves it rolled back); `admin-e2e-accounts.mjs`, the staging staff
+  admin, staff moderator and student for CampConnect Admin's browser check (`create`, `env`, `qr`, `delete`);
   `admin-authority.mjs`, migration 67 applied, checked through Auth and the REST API, rolled back and applied again
   (`--restore` leaves it rolled back); `event-engagement.mjs`, events' likes, comments and who is going (migration 69,
   applied when missing) through the app's own code (`--restore` rolls it back); and

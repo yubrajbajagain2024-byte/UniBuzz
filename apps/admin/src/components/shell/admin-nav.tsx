@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Boxes, Headset, LayoutDashboard, Megaphone, Settings, ShieldAlert, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, Boxes, GraduationCap, Headset, LayoutDashboard, Megaphone, Settings, ShieldAlert, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { SECTIONS, sectionOfPath, type SectionId } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,7 @@ const ICONS: Record<SectionId, LucideIcon> = {
   users: Users,
   moderation: ShieldAlert,
   content: Boxes,
+  universities: GraduationCap,
   business: Megaphone,
   analytics: BarChart3,
   operations: SlidersHorizontal,
@@ -19,8 +20,8 @@ const ICONS: Record<SectionId, LucideIcon> = {
 };
 
 /**
- * The nine sections (lib/sections.ts). `sidebar` is the dark vertical list on large screens, each section with what it
- * holds; `tabs` the scrollable strip under the header on phones. Owners and admins see Business & Ads and Analytics.
+ * The ten sections (lib/sections.ts). `sidebar` is the dark vertical list on large screens, each section with what it
+ * holds; `tabs` the scrollable strip under the header on phones. Owners and admins see Universities, Business & Ads and Analytics.
  */
 export function AdminNav({ variant, admin = false }: { variant: "sidebar" | "tabs"; admin?: boolean }) {
   const pathname = usePathname();

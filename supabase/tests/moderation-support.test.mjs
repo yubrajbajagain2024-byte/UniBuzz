@@ -165,7 +165,8 @@ await expectOk("suspended: can still read feeds, but EVERY write path stops at o
   await fails(() => as(S1, () => db.query("select public.get_or_create_direct_conversation($1)", [S3])), S);
   await fails(() => as(S1, () => db.query("select public.create_group_conversation('Study group', array[$1]::uuid[])", [S2])), S);
   await fails(() => as(S1, () => db.query("insert into public.media (owner_id, provider_upload_id) values ($1,'up2')", [S1])), S);
-  await fails(() => as(S1, () => db.query("insert into public.universities (name) values ('Suspended University')")), S);
+  // Since migration 70 no API role writes universities at all, so the privilege check refuses before the suspension trigger.
+  await fails(() => as(S1, () => db.query("insert into public.universities (name) values ('Suspended University')")), /Your account is suspended|permission denied/);
   await fails(() => as(S1, () => db.query("insert into storage.objects (bucket_id, name, owner) values ('uploads',$1,$2)", [`posts/${S1}/new.jpg`, S1])), /row-level security|suspended/);
   await fails(() => as(S1, () => db.query("insert into storage.objects (bucket_id, name, owner) values ('uploads',$1,$2)", [`buzz/anon/${"ab".repeat(20)}.jpg`, S1])), /row-level security|suspended/);
   await fails(() => as(S1, () => db.query("update public.profiles set bio = 'new bio' where id=$1", [S1])), /row-level security/);

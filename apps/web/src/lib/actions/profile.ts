@@ -3,15 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  createUniversity,
   deleteMyAccount,
   flattenZodError,
   getProfile,
   isProfileVisibility,
   normalizeUsername,
   profileSchema,
+  requestUniversity,
   setShowActiveStatus,
-  universitySchema,
+  universityRequestSchema,
   updateProfile,
   usernameProblem,
   type FieldErrors,
@@ -84,20 +84,24 @@ export async function updateProfileAction(_prev: FormState, formData: FormData):
   return { success: "Profile saved." };
 }
 
-export async function addUniversityAction(_prev: FormState, formData: FormData): Promise<FormState> {
+/**
+ * Ask the UniBuzz team to add a university missing from the list (migration 70). Students no longer add one directly:
+ * the list decides who may sign up, so the team reviews each request in CampConnect Admin and the database refuses
+ * anything else (its messages are written for people).
+ */
+export async function requestUniversityAction(_prev: FormState, formData: FormData): Promise<FormState> {
   await requireUser("/settings/profile");
-  const parsed = universitySchema.safeParse(formToObject(formData));
+  const parsed = universityRequestSchema.safeParse(formToObject(formData));
   if (!parsed.success) {
     return { error: "Please check the university details.", fieldErrors: flattenZodError(parsed.error).fieldErrors, values: formValues(formData) };
   }
   try {
-    await createUniversity(await createClient(), parsed.data);
+    await requestUniversity(await createClient(), parsed.data);
   } catch (error) {
-    const message = errorMessage(error);
-    return { error: message.includes("duplicate") ? "That university is already in the list." : message, values: formValues(formData) };
+    return { error: errorMessage(error), values: formValues(formData) };
   }
-  revalidatePath("/", "layout");
-  return { success: `${parsed.data.name} was added. You can now select it above.` };
+  revalidatePath("/settings/profile");
+  return { success: `Thanks. The UniBuzz team will review ${parsed.data.name}; once it is added you can choose it above.` };
 }
 
 /**

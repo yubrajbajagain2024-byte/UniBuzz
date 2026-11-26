@@ -163,6 +163,11 @@ const AUDIT_ACTION_LABELS = new Map<string, string>([
   ["business.note", "Note added to a business"],
   ["ad_rate.set", "Rate card changed"],
   ["ad.payment_recorded", "Further ad payment recorded"],
+  // Universities (migration 70): students' requests and the universities added from them.
+  ["university.create", "University added"],
+  ["university_request.approve", "University request approved"],
+  ["university_request.link", "University request linked to a listed university"],
+  ["university_request.decline", "University request declined"],
 ]);
 
 /** Human label for an audit `action` (team, security and moderation actions); unknown actions come back unchanged. */

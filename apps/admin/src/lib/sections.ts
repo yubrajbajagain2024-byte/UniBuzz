@@ -1,10 +1,10 @@
 /**
- * The nine sections of CampConnect Admin and the pages inside each. The sidebar lists the sections (title and what
+ * The ten sections of CampConnect Admin and the pages inside each. The sidebar lists the sections (title and what
  * they hold); a section's pages show as tabs under the page title (SectionTabs). Existing routes keep their paths, so
  * deep links and the browser check still work: a section is a grouping, not a route.
  * adminOnly: owners and admins of the staff only (the pages check it too, as every page does).
  */
-export type SectionId = "dashboard" | "users" | "moderation" | "content" | "business" | "analytics" | "operations" | "support" | "administration";
+export type SectionId = "dashboard" | "users" | "moderation" | "content" | "universities" | "business" | "analytics" | "operations" | "support" | "administration";
 
 export type SectionTab = { href: string; label: string; adminOnly?: boolean };
 
@@ -56,6 +56,15 @@ export const SECTIONS: readonly Section[] = [
       { href: "/content", label: "Hidden content" },
       { href: "/events", label: "Events" },
     ],
+  },
+  {
+    id: "universities",
+    href: "/universities",
+    label: "Universities",
+    description: "Campuses and students' requests",
+    adminOnly: true,
+    match: ["/universities"],
+    tabs: [{ href: "/universities", label: "Requests" }],
   },
   { id: "business", href: "/business", label: "Business & Ads", description: "Advertisers, campaigns, payments", adminOnly: true, match: ["/business"], tabs: [] },
   { id: "analytics", href: "/analytics", label: "Analytics", description: "Growth, engagement, ads, revenue", adminOnly: true, match: ["/analytics"], tabs: [] },

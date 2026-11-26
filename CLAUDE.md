@@ -58,7 +58,7 @@ apps/web/src/
 apps/web/e2e/      Playwright: home-feed.mjs, release-smoke.mjs (every page of each role), business-sidebar.mjs,
                    password-recovery.mjs (sign-up, confirmation, login, Forgot password, the reset page; staging only)
 apps/admin/src/    CampConnect Admin, the staff app (port 3001; its own Vercel project): overview, reports,
-                   flagged, content, users, media, staff, audit, security, analytics, business (lib/console/)
+                   flagged, content, users, universities, media, staff, audit, security, analytics, business (lib/console/)
 apps/mobile/       Expo app (expo-router): apps/mobile/CLAUDE.md
 packages/shared/   everything that is not UI: types/ (incl. database.ts), schemas/ (zod), queries/
                    (every read and write), buzz/, trust-safety/, events/ (calendar parsers, the sync

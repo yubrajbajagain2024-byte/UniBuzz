@@ -1,0 +1,95 @@
+# university-requests
+
+- **Owner:** Sunil. **As of 2026-11-26:** branched from `main` at `5a1ef63` (PR #124); kept local until migration 70
+  closed the weakness below on production (2026-11-26 01:37 UTC), then pushed for its PR. Written by an AI session.
+- **Purpose:** Phase 0 of the **UniBuzz Master Admin Portal** roadmap (the owner's approval of 2026-11-25; the roadmap is
+  in [../status.md](../status.md), its decisions in [../decisions.md](../decisions.md)): close student writes to the
+  `universities` table and replace "add your university" with requests the UniBuzz team reviews in CampConnect Admin.
+
+## The weakness (open on production until 2026-11-26 01:37 UTC)
+
+Migration 1's policy `universities_insert` (`for insert to authenticated with check (true)`), never narrowed since, lets
+any signed-in account insert a `universities` row with **any** column through the REST API, `email_domain` included.
+`university_for_email()` then accepts that domain, so the `before insert` trigger on `auth.users` lets anyone with an
+address there sign up as a "verified" student of a made-up university, which breaks "verified university students
+only". Nobody could take over `txstate.edu` (its domain is unique) or change a row (no update policy). Found by the
+admin-portal audit of 2026-11-25 and reproduced offline in PGlite in both migration orders (the "before" checks of
+`university-requests.test.mjs`). Production's read-only checks before the fix found no use of it: `txstate.edu` the only
+domain, no university added since the seed, and the two accounts outside the domain the staff owner and a business
+owner.
+
+## What it changes
+
+- **Migration 70** (`supabase/migrations/20261122000000_university_requests.sql`; rollback beside it in
+  `supabase/rollbacks/`): drops `universities_insert` and leaves anon and authenticated only SELECT on `universities`
+  (the service role, the database owner and the staff functions still write it); adds `university_requests` (closed to
+  the API), `request_university()` and `my_university_requests()` for students, and `console_university_requests()` and
+  `console_decide_university_request()` for owners and admins of the staff with a second factor (`ts_require_admin`).
+  Approving adds a university **without an email domain** (opening sign-up is the owners' separate step, a later
+  phase); linking points a request at a university already listed; approving or linking answers the other pending
+  requests for the same name. Every decision and every university added goes to the staff audit log (`console_audit`).
+  Limits: confirmed, not a business account, not suspended or muted everywhere, 3 pending and 5 a day per student, no
+  name already listed, no second request for the same name. A request is deleted with its student's account.
+- **The rollback** refuses while requests exist, and deliberately does not restore migration 1's open policy: students
+  get back only what the old form sends (a name, a city and a country, never a domain or coordinates).
+- **Website:** Settings › Profile's "Can't find your university? Add it" becomes "Ask us to add it" (`requestUniversityAction`,
+  `RequestUniversityForm`), with an optional note and the student's own requests and the team's replies. `createUniversity`
+  is gone from `packages/shared`; `requestUniversity` and `listMyUniversityRequests` replace it.
+- **CampConnect Admin:** a tenth section, **Universities** (`/universities`, owners and admins), the requests queue (waiting,
+  added or linked, declined) with approve (name, city and country editable), link and decline, the reply and similar
+  names; its pending count on the dashboard; audit labels. (A first change to `hasBusinessRole()` was reverted the same
+  day: migration 63's `console_require_business_admin()` still asks for `profiles.role = 'admin'` on top of the staff
+  role, so the app's check was right; whether to drop that second requirement is for the business phase.)
+- The mobile app has no "add university" and needs nothing.
+
+## Tests (2026-11-25, on this branch)
+
+- `supabase/tests/university-requests.test.mjs`: 96 checks (48 in this repo's order, 48 in production's), in `db:test`.
+  `moderation-support.test.mjs` now accepts "permission denied" for a suspended student's university insert, and 70 is
+  in the five rollout suites' `AHEAD` lists.
+- `npm run typecheck`, `npm run lint`, `npm run build` (the website and CampConnect Admin, `/universities` built),
+  `npm run test:shared` 316/316: all pass. `npm run db:test`: 66 suites, 2350 checks, 0 failures ([../testing.md](../testing.md)).
+- **Staging, 2026-11-25:** `supabase/tests/staging/university-requests.mjs` 19/19 (70 applied alone, checked through
+  Auth, the REST API and the apps' queries, rolled back, applied again: **70 is on staging**); `apps/admin/e2e/admin.mjs`
+  all checks as the staff admin and as a moderator, the app run locally against staging; by hand in the same browser a
+  request declined with a reply that the student reads, audited. Staging test accounts for the browser check:
+  `supabase/tests/staging/admin-e2e-accounts.mjs` (a staff admin with the account's admin role, a staff moderator, a
+  student; authenticators enrolled through Supabase Auth; passwords and keys only in the git-ignored
+  `.admin-e2e.json`). They stay on staging for later runs; `delete` removes them.
+
+## Rollout (done 2026-11-26, the owner's approval of 2026-11-25)
+
+Steps 1 to 5 below ran in order: the read-only checks (as expected), staging (2026-11-25), the full backup
+`~/CampConnect-backups/2026-11-26-before-migration-70` (222 files, checksums verified), 70 applied alone at 01:37:42 UTC,
+then 13 read-only checks and `verify.mjs --live` with no difference. Left: step 6, the merge.
+
+### The plan as approved
+
+1. **Read-only checks on production** (SQL editor or `psql`), before anything else:
+   ```sql
+   select name, email_domain, created_at from public.universities where email_domain is not null order by created_at;
+   select name, city, country, created_at from public.universities where created_at > '2026-09-07' order by created_at;
+   select has_table_privilege('authenticated', 'public.universities', 'INSERT') as students_can_insert;
+   select exists (select 1 from public._migrations where name = '20261122000000_university_requests.sql') as already_applied;
+   ```
+   Expect `txstate.edu` as the only domain, `true`, `false`. Any other domain: stop and decide with the owner (whose
+   accounts signed up through it: `select id, email, created_at from auth.users where split_part(email, '@', 2) = '<domain>'`).
+2. **Staging:** done 2026-11-25 (above); 70 stays applied there.
+3. **Backup:** `node scripts/backup.mjs before-migration-70 --full` (the owner's Mac).
+4. **Apply 70 alone** in one transaction with its `_migrations` row, then `notify pgrst, 'reload schema'`
+   (supabase/CLAUDE.md, "To apply one migration alone"). Between this step and the merge, the website's old "Add it"
+   form answers with a permission error (a rarely used form); nothing else changes for students.
+5. **Verify** (read-only): step 1's privilege check says `false`; `verify.mjs --live` matches; a staff admin opens
+   `/universities` after the merge.
+6. **Push the branch, open the PR, merge** (deploys the website and CampConnect Admin). Then record 70 in
+   docs/migrations.md and docs/history.md.
+- **Rollback:** the rollback file with its `_migrations` delete, newest first, after exporting and deleting any
+  requests. It keeps student writes narrow (no domain).
+
+## Next
+
+- Phase 1 on its own branch (pushable at once): the name "UniBuzz Master Admin Portal" on screen (identifiers unchanged,
+  CLAUDE.md's naming rule changed in the same PR), one audit view over the three audit logs with request context, a
+  Content-Security-Policy, navigation from permissions.
+- The audit found one more gap, for Phase 4's sanction unification; its details stay out of the repository until its
+  fix is live on production (root CLAUDE.md, "Security and privacy").

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { listUniversities } from "@apartment-book/shared";
+import { listMyUniversityRequests, listUniversities } from "@apartment-book/shared";
 import { getCurrentProfile, requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { firstParam } from "@/lib/utils";
-import { AddUniversityForm, ProfileForm } from "@/components/profile/profile-form";
+import { ProfileForm, RequestUniversityForm } from "@/components/profile/profile-form";
 import { DeleteAccount } from "@/components/profile/delete-account";
 import { BuzzSettingsLinks } from "@/components/buzz/settings-links";
 
@@ -18,7 +18,9 @@ export default async function ProfileSettingsPage({
   await requireUser("/settings/profile");
   const params = await searchParams;
   const welcome = firstParam(params.welcome) === "1";
-  const [profile, universities] = await Promise.all([getCurrentProfile(), listUniversities(await createClient())]);
+  const supabase = await createClient();
+  // The student's own university requests (migration 70); null where the database does not have them yet.
+  const [profile, universities, requests] = await Promise.all([getCurrentProfile(), listUniversities(supabase), listMyUniversityRequests(supabase).catch(() => null)]);
   if (!profile) notFound();
 
   return (
@@ -31,7 +33,7 @@ export default async function ProfileSettingsPage({
       </div>
       <ProfileForm profile={profile} universities={universities} welcome={welcome} />
       {welcome ? null : <BuzzSettingsLinks />}
-      <AddUniversityForm />
+      <RequestUniversityForm requests={requests} />
       <DeleteAccount />
     </div>
   );

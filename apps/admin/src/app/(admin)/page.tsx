@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, BadgeCheck, Building2, CheckCircle2, EyeOff, Film, Flag, Megaphone, MessagesSquare, Scale, ShieldCheck, UserCog, Users, UserX } from "lucide-react";
+import { AlertTriangle, ArrowRight, BadgeCheck, Building2, CheckCircle2, EyeOff, Film, Flag, GraduationCap, Megaphone, MessagesSquare, Scale, ShieldCheck, UserCog, Users, UserX } from "lucide-react";
 import {
   getAutoHiddenCounts,
   getMediaJobStats,
@@ -16,7 +16,7 @@ import {
 import { hasRole, requireStaff } from "@/lib/admin";
 import { getCurrentProfile, getCurrentUser } from "@/lib/auth";
 import { PRODUCT_NAME } from "@/lib/brand";
-import { fetchBusinessOpsOverview, fetchEventsCounts, fetchQueueCounts, hasBusinessRole, maybeDeployed } from "@/lib/console/server";
+import { fetchBusinessOpsOverview, fetchEventsCounts, fetchQueueCounts, fetchUniversityRequests, hasBusinessRole, maybeDeployed } from "@/lib/console/server";
 import { createClient } from "@/lib/supabase/server";
 import { firstParam, plural } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
@@ -58,7 +58,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     },
   );
   const admin = hasRole(access, "admin");
-  const [user, profile, openReports, media, staff, recent, suspended, queue, events, business] = await Promise.all([
+  const [user, profile, openReports, media, staff, recent, suspended, queue, events, business, universityRequests] = await Promise.all([
     getCurrentUser(),
     getCurrentProfile(),
     listReports(supabase, { status: "open", limit: 5 }),
@@ -71,6 +71,8 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     maybeDeployed(fetchQueueCounts()),
     maybeDeployed(fetchEventsCounts()),
     admin && (await hasBusinessRole()) ? maybeDeployed(fetchBusinessOpsOverview()) : Promise.resolve(null),
+    // Students' requests for missing universities (migration 70), for admins; null without it.
+    admin ? maybeDeployed(fetchUniversityRequests("pending", 0, 1)) : Promise.resolve(null),
   ]);
   const staffWithoutFactor = staff.filter((m) => m.mfaEnrolled === false).length;
 
@@ -86,6 +88,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     { count: flaggedPending ?? 0, label: "items hidden by reports, waiting for review", href: "/flagged", icon: EyeOff },
     { count: queue?.appeals ?? 0, label: "open appeals", href: "/appeals", icon: Scale },
     { count: events?.organizations_pending ?? 0, label: "organizations awaiting verification", href: "/support", icon: BadgeCheck },
+    { count: universityRequests?.counts.pending ?? 0, label: "university requests from students", href: "/universities", icon: GraduationCap },
     ...(business ? [{ count: business.businesses.pending, label: "businesses awaiting review", href: "/business/advertisers?status=pending", icon: Building2 }, { count: business.ads.inReview, label: "ads in review", href: "/business/campaigns", icon: Megaphone }] : []),
   ].filter((d) => d.count > 0);
   const name = profile?.full_name || user?.email?.split("@")[0] || "You";

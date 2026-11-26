@@ -38,3 +38,5 @@ supabase/.env
 supabase/tests/staging/.rehearsal.json
 # The staging ad-delivery run's kept accounts and their passwords (supabase/tests/staging/ad-delivery.mjs --keep)
 supabase/tests/staging/.ad-delivery.json
+# CampConnect Admin's staging test accounts, their passwords and authenticator keys (supabase/tests/staging/admin-e2e-accounts.mjs)
+supabase/tests/staging/.admin-e2e.json

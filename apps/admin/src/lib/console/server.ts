@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   AdCounts, AdRate, AdsAnalytics, AnalyticsOverview, BusinessCounts, BusinessOpsOverview, ConsoleAd, ConsoleAdRow, ConsoleBusiness, ConsoleBusinessRow,
   ConsoleEvent, ConsoleEventsCounts, ConsoleEventsFilter, ConsoleFeed, ConsoleOrganization, ConsolePage, PaymentsPage, QueueCounts, RevenueAnalytics,
-  RulePackState, StaffAppeal, StaffPage, SystemHealth,
+  RulePackState, StaffAppeal, StaffPage, SystemHealth, UniversityRequestsPage, UniversityRequestStatus,
 } from "./ops-types";
 import { consoleRpc, toConsoleError } from "./rpc";
 
@@ -23,8 +23,9 @@ export async function requireConsoleAdmin(nextPath: string): Promise<{ access: S
 }
 
 /**
- * Whether this admin may run businesses and ads too: Business v2's review functions, which the Business section
- * reuses, also ask for the UniBuzz admin role on the account (profiles.role, granted by the database owner).
+ * Whether this admin may run businesses and ads too: migration 63's console functions (console_require_business_admin)
+ * and the Business v2 functions the section reuses also ask for the UniBuzz admin role on the account (profiles.role,
+ * granted by the database owner), on top of the staff role and the second factor every page already requires.
  */
 export const hasBusinessRole = cache(async (): Promise<boolean> => roleOf(await getCurrentProfile()) === "admin");
 
@@ -87,3 +88,7 @@ export const fetchEventFeeds = () => consoleFetch<ConsoleFeed[]>("events_console
 export const fetchConsoleOrganizations = (filter: { verified?: boolean; status?: string; q?: string } = {}) =>
   consoleFetch<ConsoleOrganization[]>("events_console_organizations", { p_filter: filter });
 export const fetchConsoleEvents = (filter: ConsoleEventsFilter = {}) => consoleFetch<{ items: ConsoleEvent[]; total: number }>("events_console_events", { p_filter: filter });
+
+// --- Universities (migration 70): students' requests, for owners and admins of the staff (ts_require_admin in SQL).
+export const fetchUniversityRequests = (status: UniversityRequestStatus, offset: number, limit: number) =>
+  consoleFetch<UniversityRequestsPage>("console_university_requests", { p_status: status, p_limit: limit, p_offset: offset });
