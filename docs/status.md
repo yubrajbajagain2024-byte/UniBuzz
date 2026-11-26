@@ -52,10 +52,9 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   0. **University requests: done.** Migration 70 live on production since 2026-11-26 01:37 UTC, the website and
      CampConnect Admin since PR #125's merge (18:48 UTC): students ask for a missing university and owners and admins of
      the staff review the requests in `/universities` ([history.md](history.md), 2026-11-26).
-  1. **Name, audit view, CSP, permissions** (`admin-portal-phase-1`; [branches/admin-portal-phase-1.md](branches/admin-portal-phase-1.md)):
-     the name UniBuzz Master Admin Portal on screen, one audit view over the three audit logs with where staff actions
-     came from (migration 71: **live on production since 2026-11-26 21:16 UTC**, on staging too), a nonce Content-Security-Policy, navigation and
-     page gates from one permission table. Tested offline and on staging (2026-11-26); the portal's code follows with PR #127.
+  1. **Name, audit view, CSP, permissions: done.** Migration 71 live since 2026-11-26 21:16 UTC, the portal's code since
+     PR #127's merge (21:21 UTC): the name UniBuzz Master Admin Portal, one audit log with where staff actions came from,
+     a nonce Content-Security-Policy, one permission table ([history.md](history.md), 2026-11-26).
   2. Campus scopes and the Campus Admin role, `staff_can()`, every staff function scoped in SQL (before any campus staff).
   3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.
   4. One moderation model: the website console's queue in the portal, one sanction system, safety metrics.

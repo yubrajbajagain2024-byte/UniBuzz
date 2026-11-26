@@ -315,3 +315,12 @@ its file in `branches/`.
   actions came from) went live alone with the owner's approval, after staging (14/14) and a full verified backup
   (`before-migration-71`); 14 read-only checks and `verify.mjs --live` after it found no difference (75 migrations).
   Staff actions are recorded with their request context from then on; nothing changed for students or businesses.
+- **2026-11-26 21:21 UTC:** PR #127 (`admin-portal-phase-1`, Phase 1 of the Master Admin Portal) merged, deploying the
+  website and the portal (both production builds of `dd22694` ready and serving their addresses; the portal's browser
+  check signed out against production passed: the name, the CSP with its nonce and `upgrade-insecure-requests`, no
+  violation). It brought the name *UniBuzz Master Admin Portal* on screen (identifiers unchanged), `/audit` over the
+  three logs with request details for owners and admins (migration 71, live since 21:16 UTC), the nonce
+  Content-Security-Policy (zod jitless, every page rendered per request), one permission table for the navigation and
+  page gates, `audit-feed.test.mjs` (62) and `tests/staging/audit-feed.mjs`. Found on staging and fixed before the
+  merge: `upgrade-insecure-requests` broke a portal served over http, so it follows the portal's scheme. The branch
+  was deleted.
