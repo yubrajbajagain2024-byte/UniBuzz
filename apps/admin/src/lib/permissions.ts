@@ -8,7 +8,7 @@ import type { AdminStaffRole, StaffAccess } from "@apartment-book/shared";
  * Since migration 72 the database holds the same table (staff_role_permissions(), read through admin_my_permissions() by
  * lib/admin.ts getStaffPermissions, and staff_can() for SQL); this copy names the permissions for TypeScript and
  * stands in where 72 is missing. supabase/tests/staff-scopes.test.mjs reads this file and fails if the two differ.
- * A campus admin (migration 72) has no permissions until Phase 2 scopes an area for them.
+ * Campus admins (CAMPUS_ADMIN below) get each area's permission once SQL scopes that area to their campuses.
  */
 export const PERMISSIONS = [
   "dashboard.view",
@@ -44,6 +44,15 @@ const MODERATOR: readonly Permission[] = [
 
 /** Admins add universities (requests), businesses and ads, analytics, settings, and see where staff actions came from. */
 const ADMIN: readonly Permission[] = [...MODERATOR, "universities.manage", "business.manage", "analytics.view", "audit.context", "settings.manage"];
+
+/**
+ * Campus admins (migration 72's role): only the areas whose functions SQL already scopes to their campuses, so far the
+ * moderation area (migration 73: reports, flagged content and the content they are about). Appeals, under the same
+ * permission, stay refused to them in SQL until Phase 2c scopes sanctions. The portal does not let a campus admin in
+ * yet (lib/admin.ts getStaffAccess knows only the roles in STAFF_ROLE_RANK) until their shell arrives; this list is what
+ * SQL gives them, and supabase/tests/campus-moderation.test.mjs fails if the two differ.
+ */
+export const CAMPUS_ADMIN: readonly Permission[] = ["moderation.view"];
 
 const GRANTS: Readonly<Record<AdminStaffRole, ReadonlySet<Permission>>> = {
   owner: new Set(ADMIN),
