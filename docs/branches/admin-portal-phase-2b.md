@@ -1,7 +1,7 @@
 # admin-portal-phase-2b
 
 - **Owner:** Sunil. **As of 2026-11-26:** branched from `admin-portal-phase-2` (2a, PR #129, migration 72) at `79aa97e`,
-  stacked on it because 73 needs 72. Written by an AI session.
+  stacked on it because 73 needs 72. Draft **PR #130** (base `admin-portal-phase-2`). Written by an AI session.
 - **Purpose:** Phase 2b of the **UniBuzz Master Admin Portal** roadmap ([../status.md](../status.md); 2a in
   [admin-portal-phase-2.md](admin-portal-phase-2.md)): the first area scoped by campus, moderation. Campus admins get
   `moderation.view`, and the functions behind the portal's Reports and Flagged pages, and the content those pages act
