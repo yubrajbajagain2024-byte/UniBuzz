@@ -57,7 +57,10 @@
 - `apps/admin/e2e/admin.mjs` learned the new name, the CSP (header parts, a nonce that changes, every script tag
   carrying it, hydration, a redirect with the policy, any `securitypolicyviolation` counted as a browser error) and the
   audit log for each role. Signed out against a local production build: all checks pass, no violation.
-- Results of `npm run check`, `test:shared`, `db:test` and staging: [../testing.md](../testing.md) once run.
+- `npm run check` (typecheck, lint, build: 9 tasks), `npm run test:shared` 316/316, `npm run db:test` 67 suites, 2412
+  checks, 0 failures: all pass (2026-11-26, [../testing.md](../testing.md)). The browser check found zod 4 testing
+  `new Function` on every page under the new CSP; fixed (zod runs jitless in the browser).
+- **Not run yet:** staging (no staging token on this Mac as of 2026-11-26), and the browser check signed in.
 
 ## Rollout (not started: each step waits on the owner)
 
