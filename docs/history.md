@@ -78,6 +78,16 @@ open work is in [status.md](status.md).
   the staff owner and a business owner). Before it: staging (19/19) and a full backup (`before-migration-70`, 222 files
   verified); after it: 13 read-only checks and `verify.mjs --live` with no difference (74 migrations). Students now request
   missing universities and the team reviews them in CampConnect Admin; Phase 0 of the Master Admin Portal roadmap.
+- **2026-11-26 18:48 UTC:** PR #125 (`university-requests`) merged, deploying the website and CampConnect Admin (both
+  production builds of `ea8ed03` ready and serving their addresses; signed out, `/settings/profile` and `/universities`
+  redirect to sign-in). It brought Settings › Profile's "Ask us to add it" form with the student's own requests and
+  replies, CampConnect Admin's Universities section (`/universities`: approve without an email domain, link, decline,
+  audited), `requestUniversity` and `listMyUniversityRequests` in place of `createUniversity`, the PGlite suite
+  `university-requests.test.mjs` (96 checks), and two staging scripts: `university-requests.mjs` and
+  `admin-e2e-accounts.mjs` (the staging staff admin, staff moderator and student for the portal's browser check, which
+  stay on staging; `delete` removes them). A first change to `hasBusinessRole()` was reverted before the merge:
+  migration 63's `console_require_business_admin()` still asks for `profiles.role = 'admin'` on top of the staff role.
+  The branch was deleted.
 
 ## The AI documentation
 
