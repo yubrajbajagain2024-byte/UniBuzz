@@ -1,13 +1,12 @@
 # university-requests
 
-- **Owner:** Sunil. **As of 2026-11-25:** branched from `main` at `5a1ef63` (PR #124); **local only, not pushed**: it
-  closes a security weakness that is still open on production (below), and the repository is public (root CLAUDE.md,
-  "Security and privacy"). Push it only after migration 70 is live on production. Written by an AI session.
+- **Owner:** Sunil. **As of 2026-11-26:** branched from `main` at `5a1ef63` (PR #124); kept local until migration 70
+  closed the weakness below on production (2026-11-26 01:37 UTC), then pushed for its PR. Written by an AI session.
 - **Purpose:** Phase 0 of the **UniBuzz Master Admin Portal** roadmap (the owner's approval of 2026-11-25; the roadmap is
   in [../status.md](../status.md), its decisions in [../decisions.md](../decisions.md)): close student writes to the
   `universities` table and replace "add your university" with requests the UniBuzz team reviews in CampConnect Admin.
 
-## The weakness (open on production until 70 is applied)
+## The weakness (open on production until 2026-11-26 01:37 UTC)
 
 Migration 1's policy `universities_insert` (`for insert to authenticated with check (true)`), never narrowed since, lets
 any signed-in account insert a `universities` row with **any** column through the REST API, `email_domain` included.
@@ -15,7 +14,9 @@ any signed-in account insert a `universities` row with **any** column through th
 address there sign up as a "verified" student of a made-up university, which breaks "verified university students
 only". Nobody could take over `txstate.edu` (its domain is unique) or change a row (no update policy). Found by the
 admin-portal audit of 2026-11-25 and reproduced offline in PGlite in both migration orders (the "before" checks of
-`university-requests.test.mjs`); **production not checked yet**: the read-only checks below come first.
+`university-requests.test.mjs`). Production's read-only checks before the fix found no use of it: `txstate.edu` the only
+domain, no university added since the seed, and the two accounts outside the domain the staff owner and a business
+owner.
 
 ## What it changes
 
@@ -56,7 +57,13 @@ admin-portal audit of 2026-11-25 and reproduced offline in PGlite in both migrat
   student; authenticators enrolled through Supabase Auth; passwords and keys only in the git-ignored
   `.admin-e2e.json`). They stay on staging for later runs; `delete` removes them.
 
-## Rollout (each production step needs the owner's explicit approval)
+## Rollout (done 2026-11-26, the owner's approval of 2026-11-25)
+
+Steps 1 to 5 below ran in order: the read-only checks (as expected), staging (2026-11-25), the full backup
+`~/CampConnect-backups/2026-11-26-before-migration-70` (222 files, checksums verified), 70 applied alone at 01:37:42 UTC,
+then 13 read-only checks and `verify.mjs --live` with no difference. Left: step 6, the merge.
+
+### The plan as approved
 
 1. **Read-only checks on production** (SQL editor or `psql`), before anything else:
    ```sql

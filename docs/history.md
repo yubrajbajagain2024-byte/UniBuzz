@@ -71,6 +71,13 @@ open work is in [status.md](status.md).
   (a like on one's own story, 20:17 UTC) and 69 (likes, comments and who is going on events, 20:19 UTC) went live,
   after staging, a full verified backup and a zero-difference schema check; production then matched the repo at 73
   migrations.
+- **2026-11-26 01:37 UTC (2026-11-25 19:37 CST):** migration 70 (`university-requests`) went live alone, with the owner's
+  approval, closing a gap open since migration 1: any signed-in account could insert a `universities` row with any
+  column through the API, `email_domain` included, which would have opened sign-up to that domain. Read-only checks first
+  found no use of it (`txstate.edu` the only domain, no university added since the seed, the two non-university accounts
+  the staff owner and a business owner). Before it: staging (19/19) and a full backup (`before-migration-70`, 222 files
+  verified); after it: 13 read-only checks and `verify.mjs --live` with no difference (74 migrations). Students now request
+  missing universities and the team reviews them in CampConnect Admin; Phase 0 of the Master Admin Portal roadmap.
 
 ## The AI documentation
 

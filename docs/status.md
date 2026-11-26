@@ -49,10 +49,11 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 - **UniBuzz Master Admin Portal** (the owner's approval of 2026-11-25): CampConnect Admin (`apps/admin`) grows into the
   one staff portal, in phases, each its own branch and PR, each migration rehearsed offline and on staging and applied
   to production only with the owner's approval and a backup; the decisions are in [decisions.md](decisions.md).
-  0. **University requests** (`university-requests`, local, not pushed until live; [branches/university-requests.md](branches/university-requests.md)):
-     migration 70, students' requests reviewed in the portal instead of adding universities themselves. Built and tested
-     offline and on staging (2026-11-25, 70 on staging); next: the read-only production checks, then the owner's approval
-     for production.
+  0. **University requests** (`university-requests`; [branches/university-requests.md](branches/university-requests.md)):
+     migration 70, students' requests reviewed in the portal instead of adding universities themselves. **Migration 70
+     live on production since 2026-11-26 01:37 UTC** (with the owner's approval, after staging and a verified backup);
+     the website and CampConnect Admin follow with the branch's merge. Until then the website's old "Add it" form answers
+     with a permission error.
   1. The portal's name on screen, one audit view over the three audit logs with request context, a Content-Security-Policy.
   2. Campus scopes and the Campus Admin role, `staff_can()`, every staff function scoped in SQL (before any campus staff).
   3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.
