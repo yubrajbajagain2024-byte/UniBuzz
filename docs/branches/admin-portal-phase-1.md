@@ -72,7 +72,13 @@
 - PR #127's Vercel previews built; the portal's preview is behind Vercel's protection, so its CSP was not fetched there
   (`vercel curl` would add a protection bypass to the project's settings). The portal loads no Vercel scripts.
 
-## Rollout (step 1 done 2026-11-26; the rest waits on the owner)
+## Rollout (steps 1 to 4 done 2026-11-26 with the owner's approval; step 5, the merge, next)
+
+Staging (14/14), the full backup `~/CampConnect-backups/2026-11-26-before-migration-71` (222 files, checksums verified,
+row counts matching the live project), 71 applied alone at 21:16:45 UTC, then 14 read-only checks and `verify.mjs --live`
+with no difference (75 migrations).
+
+### The plan as approved
 
 1. **Staging (done):** `supabase/tests/staging/audit-feed.mjs` (applies 71 alone, checks it through Auth and the REST API,
    rolls it back, applies it again), then the portal's browser check as the staging admin and moderator against a local
