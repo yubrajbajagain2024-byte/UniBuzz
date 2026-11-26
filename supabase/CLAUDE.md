@@ -71,7 +71,9 @@ Supabase's `auth` and `storage` schemas.
   (`student <label>` makes a fresh student per device, since impressions and clicks count once per student, ad and
   hour; `pause <placement>` and `resume <placement>` for the phone's pause check), then `verify` and `cleanup`;
   `university-requests.mjs`, migration 70 applied, checked through Auth, the REST API and the apps' queries,
-  rolled back and applied again (`--restore` leaves it rolled back); `admin-authority.mjs`, migration 67 applied, checked through Auth and the REST API, rolled back and applied again
+  rolled back and applied again (`--restore` leaves it rolled back); `admin-e2e-accounts.mjs`, the staging staff
+  admin, staff moderator and student for CampConnect Admin's browser check (`create`, `env`, `qr`, `delete`);
+  `admin-authority.mjs`, migration 67 applied, checked through Auth and the REST API, rolled back and applied again
   (`--restore` leaves it rolled back); `event-engagement.mjs`, events' likes, comments and who is going (migration 69,
   applied when missing) through the app's own code (`--restore` rolls it back); and
   `release-rehearsal.mjs`, which rehearses a release step by step (see its header) and expects every

@@ -23,20 +23,11 @@ export async function requireConsoleAdmin(nextPath: string): Promise<{ access: S
 }
 
 /**
- * Whether this admin may run businesses and ads too: Business v2's review functions, which the Business section
- * reuses, ask is_admin(). Since migration 67 the database answers that from the staff list (an owner or admin, not
- * suspended, past the second factor) through admin_standing(), whatever profiles.role says; this asks the same
- * function. On a database without 67, the admin role on the account (profiles.role) decides, as it did there.
+ * Whether this admin may run businesses and ads too: migration 63's console functions (console_require_business_admin)
+ * and the Business v2 functions the section reuses also ask for the UniBuzz admin role on the account (profiles.role,
+ * granted by the database owner), on top of the staff role and the second factor every page already requires.
  */
-export const hasBusinessRole = cache(async (): Promise<boolean> => {
-  const supabase = await createClient();
-  try {
-    return (await consoleRpc<string | null>(supabase, "admin_standing")) === "admin";
-  } catch (e) {
-    if (toConsoleError(e).code !== "not_deployed") throw e;
-    return roleOf(await getCurrentProfile()) === "admin";
-  }
-});
+export const hasBusinessRole = cache(async (): Promise<boolean> => roleOf(await getCurrentProfile()) === "admin");
 
 /** A console function's answer; "not found" becomes the not-found page, a missing second factor the Security page. */
 export async function consoleFetch<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {

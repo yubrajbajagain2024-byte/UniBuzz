@@ -36,9 +36,9 @@ admin-portal audit of 2026-11-25 and reproduced offline in PGlite in both migrat
   is gone from `packages/shared`; `requestUniversity` and `listMyUniversityRequests` replace it.
 - **CampConnect Admin:** a tenth section, **Universities** (`/universities`, owners and admins), the requests queue (waiting,
   added or linked, declined) with approve (name, city and country editable), link and decline, the reply and similar
-  names; its pending count on the dashboard; audit labels. Also `hasBusinessRole()` now asks `admin_standing()` (the
-  database's rule since migration 67) instead of `profiles.role`, with the old rule only where 67 is missing, and the
-  Business notices say so.
+  names; its pending count on the dashboard; audit labels. (A first change to `hasBusinessRole()` was reverted the same
+  day: migration 63's `console_require_business_admin()` still asks for `profiles.role = 'admin'` on top of the staff
+  role, so the app's check was right; whether to drop that second requirement is for the business phase.)
 - The mobile app has no "add university" and needs nothing.
 
 ## Tests (2026-11-25, on this branch)
@@ -48,9 +48,13 @@ admin-portal audit of 2026-11-25 and reproduced offline in PGlite in both migrat
   in the five rollout suites' `AHEAD` lists.
 - `npm run typecheck`, `npm run lint`, `npm run build` (the website and CampConnect Admin, `/universities` built),
   `npm run test:shared` 316/316: all pass. `npm run db:test`: 66 suites, 2350 checks, 0 failures ([../testing.md](../testing.md)).
-- **Not run yet:** `supabase/tests/staging/university-requests.mjs` (needs `SUPABASE_ACCESS_TOKEN` and
-  `STAGING_SUPABASE_REF`; it refuses production) and `apps/admin/e2e/admin.mjs` against staging (now checks
-  `/universities` for admins and that a moderator cannot open it).
+- **Staging, 2026-11-25:** `supabase/tests/staging/university-requests.mjs` 19/19 (70 applied alone, checked through
+  Auth, the REST API and the apps' queries, rolled back, applied again: **70 is on staging**); `apps/admin/e2e/admin.mjs`
+  all checks as the staff admin and as a moderator, the app run locally against staging; by hand in the same browser a
+  request declined with a reply that the student reads, audited. Staging test accounts for the browser check:
+  `supabase/tests/staging/admin-e2e-accounts.mjs` (a staff admin with the account's admin role, a staff moderator, a
+  student; authenticators enrolled through Supabase Auth; passwords and keys only in the git-ignored
+  `.admin-e2e.json`). They stay on staging for later runs; `delete` removes them.
 
 ## Rollout (each production step needs the owner's explicit approval)
 
@@ -63,9 +67,7 @@ admin-portal audit of 2026-11-25 and reproduced offline in PGlite in both migrat
    ```
    Expect `txstate.edu` as the only domain, `true`, `false`. Any other domain: stop and decide with the owner (whose
    accounts signed up through it: `select id, email, created_at from auth.users where split_part(email, '@', 2) = '<domain>'`).
-2. **Staging:** `SUPABASE_ACCESS_TOKEN=… STAGING_SUPABASE_REF=… node supabase/tests/staging/university-requests.mjs`
-   (applies 70 alone, checks it through Auth, the REST API and the apps' queries, rolls it back, applies it again,
-   deletes what it made). Then the admin browser check against staging.
+2. **Staging:** done 2026-11-25 (above); 70 stays applied there.
 3. **Backup:** `node scripts/backup.mjs before-migration-70 --full` (the owner's Mac).
 4. **Apply 70 alone** in one transaction with its `_migrations` row, then `notify pgrst, 'reload schema'`
    (supabase/CLAUDE.md, "To apply one migration alone"). Between this step and the merge, the website's old "Add it"

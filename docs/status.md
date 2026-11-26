@@ -51,7 +51,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   to production only with the owner's approval and a backup; the decisions are in [decisions.md](decisions.md).
   0. **University requests** (`university-requests`, local, not pushed until live; [branches/university-requests.md](branches/university-requests.md)):
      migration 70, students' requests reviewed in the portal instead of adding universities themselves. Built and tested
-     offline; next: the read-only production checks, staging, then the owner's approval for production.
+     offline and on staging (2026-11-25, 70 on staging); next: the read-only production checks, then the owner's approval
+     for production.
   1. The portal's name on screen, one audit view over the three audit logs with request context, a Content-Security-Policy.
   2. Campus scopes and the Campus Admin role, `staff_can()`, every staff function scoped in SQL (before any campus staff).
   3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.
