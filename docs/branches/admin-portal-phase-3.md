@@ -1,7 +1,8 @@
 # admin-portal-phase-3
 
-- **Owner:** Sunil. **As of 2026-11-27:** branched from `main` at `9cc6181` (PR #132's merge). Independent of Phase 2's
-  open layers (75, 76): it touches nothing they change. Written by an AI session.
+- **Owner:** Sunil. **As of 2026-11-27:** branched from `main` at `9cc6181` (PR #132's merge); `main` merged in at
+  `ba60b7b` (Phase 2 complete, 75 and 76 live). 77 touches nothing 72 to 76 change (five new functions, no table,
+  policy or trigger) and no function of 78 (`admin-portal-phase-4`). Written by an AI session.
 - **Purpose:** Phase 3 of the **UniBuzz Master Admin Portal** roadmap ([../status.md](../status.md)): universities in
   the portal. Campus details, sign-up domains opened by owners only, and calendar feeds moved from the website's
   console.
@@ -36,6 +37,9 @@
 - Staging: `supabase/tests/staging/university-console.mjs` **9/9** (run `mwykc5r0`, 2026-11-27), so **77 is on staging**.
 - Browser, the portal's dev server against staging, in Chrome: `apps/admin/e2e/admin.mjs` (now also the Campuses list and
   a campus page: details, sign-up, feeds) passes as the staging admin.
+- Again after merging `main` at `ba60b7b`: `npm run check` passes; `db:test` 73 suites, 2,752 checks, 0 failures; `apps/admin/e2e/admin.mjs`
+  passes as the staging admin from this branch against staging (76, 77 and 78 there), the Campuses pages included.
+  Production, read-only: none of 77's five functions exists there yet.
 
 ## Rollout (each step waits on the owner)
 
