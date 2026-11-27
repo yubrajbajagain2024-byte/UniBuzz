@@ -40,11 +40,14 @@
   admin-only, a profile's university embeddable; rolled back and applied again, so **75 is on staging**. Every table's
   row count as at the start (10 log rows stay, append-only).
 
-## Rollout (after 74; each step waits on the owner)
+## Rollout
 
 1. Staging: done (above).
-2. Backup `before-migration-75 --full`, apply alone with its `_migrations` row, read-only checks, `verify.mjs --live`.
-3. Merge after 2c's PR.
+2. Backup `before-migration-75` (full, 220 files, checksums verified, row counts matching the live project).
+3. **Applied 2026-11-27 06:48:49 UTC** with the owner's approval, alone, in one transaction with its `_migrations` row.
+4. Verified (read-only): the owner's answers identical before and after; details in [../migrations.md](../migrations.md);
+   `verify.mjs --live` the same schema.
+5. Merge PR #133 (`main` merged into the branch first).
 
 ## Next (2e)
 

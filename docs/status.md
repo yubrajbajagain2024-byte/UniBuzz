@@ -61,8 +61,8 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
      2026-11-27 00:15 UTC (PR #129). **2b** (migration 73: reports, flags and their content scoped to the campus admin's
      campuses by the author's verified campus) live since 2026-11-27 00:52 UTC (PR #130). **2c** (migration 74:
      users, suspensions and appeals by the student's verified campus; staff accounts in no campus) live since
-     2026-11-27 01:33 UTC (PR #132). **2d** (migration 75, `admin-portal-phase-2d`: the campus calendar by its own
-     campus, hidden content by the author's) on staging, not production. Next: 2e, the campus-admin shell and
+     2026-11-27 01:33 UTC (PR #132). **2d** (migration 75: the campus calendar by its own campus, hidden content by
+     the author's) live since 2026-11-27 06:48 UTC (PR #133). Next: 2e, the campus-admin shell and
      appointing campus admins.
   3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.
   4. One moderation model: the website console's queue in the portal, one sanction system, safety metrics.
