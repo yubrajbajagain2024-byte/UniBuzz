@@ -85,3 +85,74 @@ export async function decideUniversityRequestAction(input: {
     { admin: true },
   );
 }
+
+// --- Universities (migration 77) and their calendar feeds (61): owners and admins; the sign-up domain owners only (SQL).
+
+const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+/** Change a campus's details (name, short name, city, country, time zone, coordinates together). */
+export async function updateUniversityAction(input: {
+  id: string;
+  name: string;
+  shortName: string;
+  city: string;
+  country: string;
+  timezone: string;
+  latitude: number | null;
+  longitude: number | null;
+}): Promise<ActionResult<{ id: string }>> {
+  return run(
+    "console_update_university",
+    {
+      p_id: str(input.id, 64),
+      p_patch: {
+        name: str(input.name, 120),
+        shortName: str(input.shortName, 30),
+        city: str(input.city, 120),
+        country: str(input.country, 120),
+        timezone: str(input.timezone, 64),
+        latitude: num(input.latitude),
+        longitude: num(input.longitude),
+      },
+    },
+    { admin: true },
+  );
+}
+
+/** Open sign-up for a domain, or close it with an empty one (owners only: the database refuses everyone else). */
+export async function setUniversityDomainAction(input: { id: string; domain: string }): Promise<ActionResult<{ id: string; emailDomain: string | null }>> {
+  return run("console_set_university_domain", { p_id: str(input.id, 64), p_domain: str(input.domain, 253) || null }, { admin: true });
+}
+
+/** Add or change a campus's calendar feed (the database checks the address and the kind, and audits it). */
+export async function saveFeedAction(input: {
+  id?: string | null;
+  universityId: string;
+  name: string;
+  url: string;
+  kind: "ics" | "rss";
+  enabled: boolean;
+  defaultCategory: string;
+}): Promise<ActionResult<{ id: string }>> {
+  return run(
+    "events_console_feed_save",
+    {
+      p_feed: {
+        id: str(input.id ?? "", 64) || null,
+        university_id: str(input.universityId, 64),
+        organization_id: null,
+        name: str(input.name, 80),
+        url: str(input.url, 2000),
+        kind: str(input.kind, 10),
+        enabled: input.enabled === true,
+        default_category: str(input.defaultCategory, 20),
+      },
+    },
+    { admin: true },
+  );
+}
+
+/** Remove a calendar feed (its events go with it, as the website's console always did). */
+export async function deleteFeedAction(id: string): Promise<ActionResult<{ id: string; events: number }>> {
+  return run("events_console_feed_delete", { p_id: str(id, 64) }, { admin: true });
+}

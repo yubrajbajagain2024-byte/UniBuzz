@@ -4,7 +4,7 @@
 //   BASE=http://localhost:3001 node apps/admin/e2e/admin.mjs
 // Optional accounts (their checks are skipped with a note when unset):
 //   ADMIN_E2E_EMAIL + ADMIN_E2E_PASSWORD   a staff account; ADMIN_E2E_TOTP_SECRET is its authenticator key (base32) for the 2FA step.
-//                                          An owner or admin also gets Analytics, Business (migration 63) and Universities (70)
+//                                          An owner or admin also gets Analytics, Business (migration 63) and Universities (70; Campuses, 77)
 //                                          checked: every view renders, or says it needs its migration; a moderator must not see them,
 //                                          nor business entries or request details in the audit log.
 //   E2E_USER_EMAIL + E2E_USER_PASSWORD     an ordinary (non-staff) account, which must land on /no-access
@@ -157,6 +157,19 @@ try {
           if (new URL(D.url()).pathname === "/security" || /two-factor code/i.test(text)) throw new Error(`${path}: sent back to the Security page (the aal2 session was lost)`);
           if (!/needs migration 63|needs migration 20261122000000|Buzz rule packs|Who can sign up|not available to this account|need the UniBuzz admin role|Platform|Waiting|Overview|Advertisers|Campaigns|Payments|Rate card|reports|Nothing logged yet|When/.test(text)) throw new Error(`${path}: unexpected page ${text.slice(0, 160)}`);
           await D.screenshot({ caret: "initial", path: SHOTS + `admin-06${path.replace(/[/?=&]/g, "-")}.png`, fullPage: true });
+        }
+        // Campuses (Phase 3, migration 77): the list, then one campus with its details, sign-up and calendar feeds.
+        await D.goto(BASE + "/universities/campuses"); await D.waitForLoadState("networkidle");
+        if (/needs migration 20261202000000|20261202000000_university_console/.test(await D.locator("main").innerText())) note("campuses: migration 77 is not on this database");
+        else {
+          await D.getByRole("heading", { name: "Campuses", exact: true }).first().waitFor();
+          const campus = D.locator("a[href^='/universities/campuses/']").first();
+          if (!(await campus.count())) throw new Error("no campus listed");
+          await campus.click(); await D.getByText("Campus details").first().waitFor(); await D.getByText("Calendar feeds").first().waitFor();
+          const text = await D.locator("main").innerText();
+          if (/Something went wrong|Application error/.test(text)) throw new Error("a campus page failed");
+          if (!/Only owners open or close sign-up|Open sign-up to a domain|Change the domain/.test(text)) throw new Error("no sign-up card on the campus page");
+          await D.screenshot({ caret: "initial", path: SHOTS + "admin-06-campus.png", fullPage: true });
         }
         const first = D.locator("a[href^='/business/campaigns/']").first();
         await D.goto(BASE + "/business/campaigns?status=all");

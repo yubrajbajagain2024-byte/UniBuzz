@@ -8,7 +8,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdCounts, AdRate, AdsAnalytics, AuditFeedFilters, AuditFeedPage, AnalyticsOverview, BusinessCounts, BusinessOpsOverview, ConsoleAd, ConsoleAdRow, ConsoleBusiness, ConsoleBusinessRow,
-  ConsoleEvent, ConsoleEventsCounts, ConsoleEventsFilter, ConsoleFeed, ConsoleOrganization, ConsolePage, PaymentsPage, QueueCounts, RevenueAnalytics,
+  ConsoleEvent, ConsoleEventsCounts, ConsoleEventsFilter, ConsoleFeed, ConsoleOrganization, ConsolePage, ConsoleUniversity, PaymentsPage, QueueCounts, RevenueAnalytics,
   RulePackState, StaffAppeal, StaffPage, SystemHealth, UniversityRequestsPage, UniversityRequestStatus,
 } from "./ops-types";
 import { consoleRpc, toConsoleError } from "./rpc";
@@ -87,6 +87,9 @@ export const fetchRulePacks = () => consoleFetch<RulePackState[]>("console_rule_
 export const fetchSystemHealth = () => consoleFetch<SystemHealth>("console_system_health");
 export const fetchEventsCounts = cache(() => consoleFetch<ConsoleEventsCounts>("events_console_counts"));
 export const fetchEventFeeds = () => consoleFetch<ConsoleFeed[]>("events_console_feeds");
+// Universities (migration 77): owners and admins with a second factor (ts_require_admin).
+export const fetchConsoleUniversities = (q?: string | null) => consoleFetch<ConsoleUniversity[]>("console_universities", { p_q: q ?? null });
+export const fetchConsoleUniversity = (id: string) => consoleFetch<ConsoleUniversity>("console_university", { p_id: id });
 export const fetchConsoleOrganizations = (filter: { verified?: boolean; status?: string; q?: string } = {}) =>
   consoleFetch<ConsoleOrganization[]>("events_console_organizations", { p_filter: filter });
 export const fetchConsoleEvents = (filter: ConsoleEventsFilter = {}) => consoleFetch<{ items: ConsoleEvent[]; total: number }>("events_console_events", { p_filter: filter });

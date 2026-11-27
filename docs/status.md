@@ -65,7 +65,9 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
      the author's) live since 2026-11-27 06:48 UTC (PR #133). **2e** (migration 76: owners appoint campus admins with
      their campuses; the portal's Campus Admin dashboard and permission-only navigation) live since 2026-11-27 07:11 UTC
      (PR #135, merged 2026-11-27 07:15 UTC). **Phase 2 is complete.**
-  3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.
+  3. **Universities** (`admin-portal-phase-3`; [branches/admin-portal-phase-3.md](branches/admin-portal-phase-3.md),
+     migration 77): campus details, sign-up domains opened by owners only, calendar feeds moved from the website; live
+     since 2026-11-27 10:40 UTC (migration 77, PR #138).
   4. **One moderation model** (`admin-portal-phase-4`): **4a** (migration 78: an account-wide Trust & Safety suspension
      or ban ends staff powers too, in the portal, Trust & Safety and the business console) live since 2026-11-27
      07:48 UTC. Next: 4b, the website console's queue in the portal; 4c, one sanction system; 4d, safety metrics.

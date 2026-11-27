@@ -29,7 +29,7 @@ const REST = [
 // was; 64 replaces ts_snapshot() and ts_set_content_status() again, so 62's rollback would not restore its schema
 // under it (rollbacks run newest first). 66 (calls paused) goes to production on its own (calls-paused.test.mjs).
 // 67 (admin authority) goes to production on its own (admin-authority.test.mjs); left out until it is live.
-const AHEAD = ["20261116000000_report_auto_hide.sql", "20261118000000_calls_paused.sql", "20261119000000_admin_authority.sql", "20261120000000_story_self_like.sql", "20261121000000_event_engagement.sql", "20261122000000_university_requests.sql", "20261126000000_audit_feed.sql", "20261127000000_staff_scopes.sql", "20261128000000_campus_moderation.sql", "20261129000000_campus_users.sql", "20261130000000_campus_events.sql", "20261201000000_campus_appointments.sql", "20261203000000_staff_standing.sql"];
+const AHEAD = ["20261116000000_report_auto_hide.sql", "20261118000000_calls_paused.sql", "20261119000000_admin_authority.sql", "20261120000000_story_self_like.sql", "20261121000000_event_engagement.sql", "20261122000000_university_requests.sql", "20261126000000_audit_feed.sql", "20261127000000_staff_scopes.sql", "20261128000000_campus_moderation.sql", "20261129000000_campus_users.sql", "20261130000000_campus_events.sql", "20261201000000_campus_appointments.sql", "20261202000000_university_console.sql", "20261203000000_staff_standing.sql"];
 const check = (cond, message) => { if (!cond) throw new Error(message); };
 
 const { db, mk, as } = await boot({ live: true, skip: [...REST, ACTIONS, ...AHEAD] });

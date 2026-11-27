@@ -347,6 +347,25 @@ export interface ConsoleEventsCounts {
   events_upcoming: number;
 }
 
+/** A university as the portal's Universities section shows it (migration 77's console_universities and console_university). */
+export interface ConsoleUniversity {
+  id: string;
+  name: string;
+  shortName: string | null;
+  city: string | null;
+  country: string | null;
+  /** The domain students sign up with; null while sign-up is closed (owners open it). */
+  emailDomain: string | null;
+  timezone: string;
+  latitude: number | null;
+  longitude: number | null;
+  createdAt: number;
+  /** Confirmed accounts signing in with emailDomain: the students verified at this campus. */
+  verifiedStudents: number;
+  feeds: number;
+  upcomingEvents: number;
+}
+
 export interface ConsoleFeed {
   id: string;
   university_id: string;
