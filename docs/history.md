@@ -411,3 +411,11 @@ its file in `branches/`.
   (`before-migration-77`); the owner's answers and every university row identical before and after (hashed),
   read-only checks and `verify.mjs --live` with no difference (82 migrations). Owners and admins can now edit campus
   details in the portal; only owners open or close a sign-up domain.
+- **2026-11-27 18:15 UTC:** PR #138 (`admin-portal-phase-3`, Phase 3 of the Master Admin Portal) merged, deploying the
+  website and the portal (both production builds of `7b73861` completed and serving their addresses). It brought
+  migration 77 (live since 10:40 UTC) and the portal's Universities > Campuses: every campus with search; a campus's
+  details (owners and admins), its sign-up card (owners open or close a domain; a domain in use is never changed or
+  closed from the portal), and its calendar feeds moved from the website's console. Tests: `university-console.test.mjs`
+  (52, mutation-checked), staging `university-console.mjs` 9/9, `apps/admin/e2e/admin.mjs` with the Campuses pages;
+  `db:test` on the merged branch 74 suites, 2774 checks, 0 failures. The branches `admin-portal-phase-3` and
+  `admin-portal-phase-4` and their files were deleted; Phase 4 continues on `admin-portal-phase-4b`.
