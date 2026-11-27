@@ -29,10 +29,20 @@
 - Native fingerprint: `49dc2a1…` on `main` to `355f83e…` here (44 sources: autolinking and the native packages), so
   **a new native build is required**. Existing builds will not take an update made from this branch, by design.
 
-## Next steps (each waits on the owner)
+## Native builds (2026-11-27, with the owner's approval)
 
-1. A `preview` build from this branch (`npx eas-cli@latest build --profile preview --platform ios`, then Android, from
-   `apps/mobile`), installed and checked on a tester's iPhone: sign-in, Home, Stories, Reels, messages, camera,
+- EAS `preview` builds from this branch at `80d7d29` (internal distribution, channel `preview`), both **finished**:
+  iOS `02f69997` (about 6 minutes) and Android `0f72ddb9` (about 25 minutes). Their install pages are on expo.dev
+  under the project's builds (signed in to the team's account) until 2026-12-11; the download links are kept out of
+  this public repository.
+- `eas fingerprint:compare` against this branch: both match (iOS `13d1b42…`, Android `cfe89d9…`).
+- The iOS build installs on the four iPhones registered to the Apple team; another phone is registered with
+  `npx eas-cli@latest device:create` (from `apps/mobile`) and needs a new iOS build after it.
+- Not checked here: running either build (no Android emulator on the owner's Mac; the iOS build is for devices).
+
+## Next steps
+
+1. The owner and testers install both builds and check sign-in, Home, Stories, Reels, messages, camera and
    notifications.
-2. Merge only once testers have that build: after the merge, an `eas update` from `main` carries the new fingerprint
-   and stops reaching the builds testers have now.
+2. Merge only after that: an `eas update` from `main` then carries the new fingerprint and stops reaching the builds
+   testers had before.
