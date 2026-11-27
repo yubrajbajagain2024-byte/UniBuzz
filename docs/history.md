@@ -369,4 +369,10 @@ its file in `branches/`.
   (hashed), read-only checks and `verify.mjs --live` with no difference (79 migrations).
 - **2026-11-27 06:49 UTC:** PR #137 (docs: PR #132's merge) and PR #136 (Next.js 16.4.3 to 16.4.6 in the website and the
   portal: seven moderate advisories fixed, and 16.4.3's `next build` refused to finish locally) merged with the owner's
-  approval.
+  approval; both production builds of `68615c2` completed and serve their addresses (the portal's script nonce intact).
+- **2026-11-27 07:00 UTC:** PR #133 (`admin-portal-phase-2d`, Phase 2d of the Master Admin Portal) merged, deploying the
+  website and the portal (both production builds of `5ec437d` completed and serving their addresses). It brought
+  migration 75 (live since 06:48 UTC): the campus calendar (events, organizations, feeds read-only) and hidden content
+  answering a campus admin for their own campus only, `security.self` for their own account,
+  `campus-events.test.mjs` (41) and `tests/staging/campus-events.mjs` (14/14). Phase 2e (76) continues on
+  `admin-portal-phase-2e` (PR #135). The branch was deleted.
