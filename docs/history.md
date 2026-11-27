@@ -403,3 +403,11 @@ its file in `branches/`.
   The branch was kept local and unpushed until then. Before it: staging 7/7, the portal's browser checks on staging, a
   full verified backup (`before-migration-78`); after it: the owner's answers identical (hashed), read-only checks and
   `verify.mjs --live` with no difference (81 migrations). Nobody's access changed (no staff member was sanctioned).
+- **2026-11-27 10:37 UTC:** PR #143 (`admin-portal-phase-4`, Phase 4a) merged, deploying the website and the portal
+  (both production builds of `4af1b89` completed). It brought migration 78 (live since 07:48 UTC) and the portal's
+  `/no-access` for a sanctioned staff member.
+- **2026-11-27 10:40 UTC (04:40 CST):** migration 77 (`admin-portal-phase-3`, Phase 3: universities in the portal)
+  went live alone with the owner's approval, after 78, following staging (9/9) and a full verified backup
+  (`before-migration-77`); the owner's answers and every university row identical before and after (hashed),
+  read-only checks and `verify.mjs --live` with no difference (82 migrations). Owners and admins can now edit campus
+  details in the portal; only owners open or close a sign-up domain.

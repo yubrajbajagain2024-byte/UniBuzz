@@ -41,8 +41,11 @@
   passes as the staging admin from this branch against staging (76, 77 and 78 there), the Campuses pages included.
   Production, read-only: none of 77's five functions exists there yet.
 
-## Rollout (each step waits on the owner)
+## Rollout
 
 1. Staging: done (above).
-2. Backup, apply 77 alone with its `_migrations` row, read-only checks, `verify.mjs --live`.
-3. Merge the PR.
+2. Backup `before-migration-77` (full, 220 files, checksums verified, row counts matching the live project).
+3. **Applied 2026-11-27 10:40:29 UTC** with the owner's approval, alone, after 78, in one transaction with its
+   `_migrations` row. Verified (read-only): the owner's answers and every university row identical before and after;
+   details in [../migrations.md](../migrations.md); `verify.mjs --live` the same schema.
+4. `main` merged in again (78, Phase 4a); merge the PR after its checks pass.
