@@ -14,7 +14,8 @@
 --    as a campus admin with those campuses at once; anyone else gets an invitation carrying them, sent and claimed the
 --    usual way (migration 18's email, binding and expiry). 1 to 20 existing universities; never yourself, never someone
 --    already on the staff. admin_campus_admin_set_campuses(user, universities) (owners): a campus admin's campuses,
---    replaced. admin_staff_campuses() (the staff list's readers): who acts for which campuses, members and invitations.
+--    replaced. admin_staff_campuses() (the staff list's readers): who acts for which campuses; invitations (an email
+--    address each) only for owners and admins, as admin_invites_list() keeps them from moderators.
 --    Each change is in staff_audit_log with the universities.
 -- 5. staff_invite_for_caller() (resend, the email's result, withdraw): a campus admin's invitation is the owners' alone.
 --    staff_claim_invite(): it is claimed only while its inviter is still an owner, and brings its campuses.
@@ -315,7 +316,8 @@ $fn$
   execute 'revoke all on function public.admin_campus_admin_set_campuses(uuid, uuid[]) from public, anon';
   execute 'grant execute on function public.admin_campus_admin_set_campuses(uuid, uuid[]) to authenticated';
 
-  -- Who acts for which campuses, for the staff list (its readers: moderators and up, as admin_staff_list).
+  -- Who acts for which campuses, for the staff list (its readers: moderators and up, as admin_staff_list). Invitations
+  -- name an email address, so they are for owners and admins only, as admin_invites_list() rules.
   execute $ddl$
 create or replace function public.admin_staff_campuses()
 returns jsonb
@@ -324,8 +326,10 @@ stable
 security definer
 set search_path = public
 as $fn$
+declare
+  v_caller public.staff;
 begin
-  perform public.staff_require('moderator');
+  v_caller := public.staff_require('moderator');
   return jsonb_build_object(
     'members', coalesce((
       select jsonb_agg(jsonb_build_object('userId', s.user_id, 'universities', coalesce((
@@ -336,7 +340,7 @@ begin
       select jsonb_agg(jsonb_build_object('email', i.email, 'universities', coalesce((
         select jsonb_agg(jsonb_build_object('id', u.id, 'name', u.name) order by u.name)
         from public.universities u where u.id = any (i.university_ids)), '[]'::jsonb)) order by i.created_at)
-      from public.staff_invites i where i.role = 'campus_admin'), '[]'::jsonb));
+      from public.staff_invites i where i.role = 'campus_admin' and v_caller.role in ('owner', 'admin')), '[]'::jsonb));
 end;
 $fn$
   $ddl$;

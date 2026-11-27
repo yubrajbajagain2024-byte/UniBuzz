@@ -178,6 +178,7 @@ await check("an owner invites a new address: the invitation carries the campuses
   expect((await adminQueries.appointCampusAdmin(ownerAal2, { email: INVITED, universityIds: [TX] })) === "invited", "not invited");
   const c = await adminQueries.getStaffCampuses(ownerAal2);
   expect(c.invitations.some((i) => i.email === INVITED && i.universities[0]?.id === TX), JSON.stringify(c.invitations));
+  expect((await adminQueries.getStaffCampuses(modAal2)).invitations.length === 0, "a moderator sees invitations (email addresses)");
   await refused(adminQueries.resendStaffInvite(adminAal2, INVITED), /Not allowed/);
   await refused(adminQueries.revokeStaffInvite(adminAal2, INVITED), /Not allowed/);
 });

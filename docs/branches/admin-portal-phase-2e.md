@@ -16,7 +16,9 @@
   - `admin_campus_admin_add(email, universities)` (**owners**, second factor): an existing confirmed account joins at once
     with its campuses; anyone else gets an invitation carrying them (migration 18's email, binding and expiry). 1 to 20
     existing universities; never yourself or someone already on the staff. `admin_campus_admin_set_campuses()` (owners).
-    `admin_staff_campuses()` (the staff list's readers). Every change in `staff_audit_log` with the universities.
+    `admin_staff_campuses()` (the staff list's readers; invitations, which name an email address, for owners and admins
+    only, as `admin_invites_list()` rules: found in review before production, fixed and re-rehearsed). Every change in
+    `staff_audit_log` with the universities.
   - `staff_invite_for_caller()` (resend, the email's result, withdraw): campus admin invitations are the owners' alone.
     `staff_claim_invite()`: claimed only while the inviter is still an owner, bringing the campuses.
   - Unchanged: `admin_staff_add` and `admin_staff_set_role` still refuse the role; admins may still remove a campus admin
@@ -52,8 +54,8 @@
 - 75's suites now check 75's own set (76 is the newest to change the table).
 - `npm run check` passes; `test:shared` 321/321; `db:test` 72 suites, 2700 checks, 0 failures
   ([../testing.md](../testing.md)).
-- Staging: `supabase/tests/staging/campus-appointments.mjs` **12/12** (run `mwyar4ku`, 2026-11-27), so **76 is on
-  staging**. A first run (`mwyao5x7`) passed its 11 checks but stopped in cleanup: staging keeps no owner of its own, so
+- Staging: `supabase/tests/staging/campus-appointments.mjs` **12/12** (run `mwyar4ku`, 2026-11-27), and again after the
+  invitation fix (run `mwybdf4y`, 12/12, with a moderator now seeing no invitation), so **76 is on staging**. A first run (`mwyao5x7`) passed its 11 checks but stopped in cleanup: staging keeps no owner of its own, so
   the run's throwaway owner was the last one and the last-owner guard refused its removal; its rows were removed by hand
   with the guard set aside for that one delete, the cleanup now does the same, and 76 was rolled back and rehearsed
   again.

@@ -148,10 +148,12 @@ for (const live of [true, false]) {
     check(i.role === "campus_admin" && i.invited_by === OWNER && same(i.university_ids, [TX, OTHER]), JSON.stringify(i));
     check((await lastLog("invite.create")).details.role === "campus_admin", "log");
   });
-  await expectOk(tag + "the staff list's readers see who acts for which campuses, members and invitations", async () => {
+  await expectOk(tag + "the staff list's readers see who acts for which campuses; invitations (email addresses) only owners and admins", async () => {
     const c = await asVal(MOD, "select public.admin_staff_campuses()");
     check(c.members.length === 1 && c.members[0].userId === STUDENT && c.members[0].universities[0].id === TX, JSON.stringify(c.members));
-    check(c.invitations.length === 1 && c.invitations[0].universities.length === 2, JSON.stringify(c.invitations));
+    check(c.invitations.length === 0, `a moderator sees invitations: ${JSON.stringify(c.invitations)}`);
+    const a = await asVal(ADMIN, "select public.admin_staff_campuses()");
+    check(a.invitations.length === 1 && a.invitations[0].email === "new.campus@txstate.edu" && a.invitations[0].universities.length === 2, JSON.stringify(a.invitations));
   });
   await expectError(tag + "a student cannot read them", () => asVal(STUDENT2, "select public.admin_staff_campuses()"), "Not allowed");
   await expectError(tag + "an admin cannot resend a campus admin's invitation", () => asVal(ADMIN, "select public.admin_invite_resend('new.campus@txstate.edu')"), "Not allowed");
