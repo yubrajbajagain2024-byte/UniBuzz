@@ -363,3 +363,10 @@ its file in `branches/`.
   students only, staff accounts in no campus, `campus-users.test.mjs` (68) and `tests/staging/campus-users.mjs` (14/14).
   Phases 2d and 2e (75, 76) continue on `admin-portal-phase-2d` (PR #133) and `admin-portal-phase-2e` (PR #135). The
   branch was deleted.
+- **2026-11-27 06:48 UTC (00:48 CST):** migration 75 (`admin-portal-phase-2d`, Phase 2d: events, organizations and the
+  content browser scoped by campus) went live alone with the owner's approval, after staging (14/14) and a full verified
+  backup (`before-migration-75`); the owner's events console and hidden content answers identical before and after
+  (hashed), read-only checks and `verify.mjs --live` with no difference (79 migrations).
+- **2026-11-27 06:49 UTC:** PR #137 (docs: PR #132's merge) and PR #136 (Next.js 16.4.3 to 16.4.6 in the website and the
+  portal: seven moderate advisories fixed, and 16.4.3's `next build` refused to finish locally) merged with the owner's
+  approval.
