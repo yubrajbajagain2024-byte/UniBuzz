@@ -357,3 +357,9 @@ its file in `branches/`.
   before and after (hashed), read-only checks and `verify.mjs --live` with no difference (78 migrations). Staff accounts
   belong to no campus; only owners and admins may suspend a campus admin; nothing changed for students, businesses or
   the current staff.
+- **2026-11-27 01:40 UTC:** PR #132 (`admin-portal-phase-2c`, Phase 2c of the Master Admin Portal) merged, deploying the
+  website and the portal (both production builds of `9cc6181` completed and serving their addresses). It brought
+  migration 74 (live since 01:33 UTC): users, suspensions and appeals answering a campus admin for their own verified
+  students only, staff accounts in no campus, `campus-users.test.mjs` (68) and `tests/staging/campus-users.mjs` (14/14).
+  Phases 2d and 2e (75, 76) continue on `admin-portal-phase-2d` (PR #133) and `admin-portal-phase-2e` (PR #135). The
+  branch was deleted.
