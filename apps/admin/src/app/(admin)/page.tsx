@@ -11,9 +11,10 @@ import {
   listRestrictions,
   listStaff,
   STAFF_ROLES,
+  CAMPUS_ADMIN_ROLE,
   type OverviewStats,
 } from "@apartment-book/shared";
-import { hasRole, requireStaff } from "@/lib/admin";
+import { getStaffAccess, hasRole, isCampusAdmin, requireStaff } from "@/lib/admin";
 import { getCurrentProfile, getCurrentUser } from "@/lib/auth";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { fetchBusinessOpsOverview, fetchEventsCounts, fetchQueueCounts, fetchUniversityRequests, hasBusinessRole, maybeDeployed } from "@/lib/console/server";
@@ -25,6 +26,7 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormMessage } from "@/components/ui/field";
 import { SetupNotice } from "@/components/ui/setup-notice";
 import { AuditRow } from "@/components/audit/audit-list";
+import { CampusOverview } from "@/components/overview/campus-overview";
 import { StatCard } from "@/components/overview/stat-card";
 import { ReportRowSummary } from "@/components/reports/report-list";
 import { PageHeader } from "@/components/shell/page-header";
@@ -35,6 +37,10 @@ export const metadata: Metadata = { title: "Dashboard" };
 const cardLink = "inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline";
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  // A campus admin's "/" is their campus overview (campus.overview), built from scoped functions only; the platform's
+  // dashboard below (dashboard.view) is never theirs.
+  const peek = await getStaffAccess();
+  if (peek && isCampusAdmin(peek.role)) return <CampusOverview />;
   const access = await requireStaff("/", { permission: "dashboard.view" });
   const params = await searchParams;
   const denied = STAFF_ROLES.find((r) => r.value === firstParam(params.denied));
@@ -116,7 +122,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         <StatCard label="People" value={stats?.usersTotal ?? "–"} hint={stats ? `${stats.usersNew7d} new this week · ${stats.usersActive24h} active today` : undefined} href="/users" icon={Users} tone="brand" />
         <StatCard label="Listings" value={stats?.listingsTotal ?? "–"} hint="apartments, items and roommate posts" icon={Building2} />
         <StatCard label="Posts and Buzz" value={stats ? `${stats.postsTotal} · ${stats.buzzTotal}` : "–"} hint="posts and reels · Buzz threads" icon={MessagesSquare} />
-        <StatCard label="Staff" value={staff.length} hint={STAFF_ROLES.map((r) => `${staff.filter((m) => m.role === r.value).length} ${r.label.toLowerCase()}`).join(" · ")} href="/staff" icon={UserCog} tone="brand" />
+        <StatCard label="Staff" value={staff.length} hint={[...STAFF_ROLES, CAMPUS_ADMIN_ROLE].map((r) => `${staff.filter((m) => m.role === r.value).length} ${r.label.toLowerCase()}`).join(" · ")} href="/staff" icon={UserCog} tone="brand" />
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-2">

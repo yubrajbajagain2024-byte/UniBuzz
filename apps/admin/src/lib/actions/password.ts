@@ -23,7 +23,7 @@ const schema = z
  * to /security, where two-factor setup is mandatory before anything else works.
  */
 export async function setPasswordAction(_prev: PasswordState, formData: FormData): Promise<PasswordState> {
-  const gate = await requireStaffAction({ mfa: false });
+  const gate = await requireStaffAction({ mfa: false, permission: "security.self" });
   if (gate.error) return { error: gate.error };
   const supabase = await createClient();
   let enrolled: boolean;

@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { STAFF_ROLES, type Database, type AdminStaffRole } from "@apartment-book/shared";
+import { STAFF_ROLE_LABELS, type Database, type StaffListRole } from "@apartment-book/shared";
 import { getSiteUrl, getSupabaseEnv } from "@/lib/env";
 import { createServiceClient } from "@/lib/supabase/service";
 import { errorMessage } from "@/lib/utils";
@@ -41,8 +41,8 @@ export function emailErrorMessage(error: unknown): string {
   return raw;
 }
 
-function roleLabel(role: AdminStaffRole): string {
-  return STAFF_ROLES.find((r) => r.value === role)?.label ?? role;
+function roleLabel(role: StaffListRole): string {
+  return STAFF_ROLE_LABELS[role] ?? role;
 }
 
 /**
@@ -51,7 +51,7 @@ function roleLabel(role: AdminStaffRole): string {
  * so the database can bind the invitation to it (admin_invite_email_result).
  * not_configured: this deployment has no service-role key, so nothing was sent.
  */
-export async function sendInvitationEmail(email: string, role: AdminStaffRole): Promise<EmailSendResult> {
+export async function sendInvitationEmail(email: string, role: StaffListRole): Promise<EmailSendResult> {
   const admin = createServiceClient();
   if (!admin) return { status: "not_configured" };
   try {

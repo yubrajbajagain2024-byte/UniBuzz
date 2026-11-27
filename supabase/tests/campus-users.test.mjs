@@ -24,11 +24,11 @@ const check = (cond, message) => {
   if (!cond) throw new Error(message);
 };
 
-// The portal's own table (apps/admin/src/lib/permissions.ts): 74 is the newest scoping migration, so its campus admin's
-// set is the portal's CAMPUS_ADMIN list.
+// The portal's own table (apps/admin/src/lib/permissions.ts) for the platform's roles. The campus admin's set is the
+// one 74 gives (later migrations add to it; the newest one's suite compares it with the portal's CAMPUS_ADMIN list).
 const portal = fs.readFileSync(path.join(HERE, "..", "..", "apps", "admin", "src", "lib", "permissions.ts"), "utf8");
 const listIn = (text) => [...text.matchAll(/"([a-z]+\.[a-z]+)"/g)].map((m) => m[1]);
-const PORTAL_CAMPUS_ADMIN = listIn(/export const CAMPUS_ADMIN: readonly Permission\[\] = \[([\s\S]*?)\];/.exec(portal)?.[1] ?? "");
+const PORTAL_CAMPUS_ADMIN = ["moderation.view", "users.view"];
 const PORTAL_MODERATOR = listIn(/const MODERATOR: readonly Permission\[\] = \[([\s\S]*?)\];/.exec(portal)?.[1] ?? "");
 if (PORTAL_CAMPUS_ADMIN.length < 2 || PORTAL_MODERATOR.length < 5) throw new Error("could not read the portal's permission table");
 const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
@@ -155,7 +155,7 @@ for (const live of [true, false]) {
     for (const k of Object.keys(before)) check(JSON.stringify(after[k]) === JSON.stringify(before[k]), `${k} changed`);
     check(before.modAppeals.items.length === 4, `the moderator saw ${before.modAppeals.items.length} appeals`);
   });
-  await expectOk(tag + "the table: campus admins get the portal's CAMPUS_ADMIN list (moderation.view, users.view); the moderator keeps the portal's list", async () => {
+  await expectOk(tag + "the table: campus admins get moderation.view and users.view; the moderator keeps the portal's list", async () => {
     check(same(await val("select public.staff_role_permissions('campus_admin')"), PORTAL_CAMPUS_ADMIN), "campus admin");
     check(same(await val("select public.staff_role_permissions('moderator')"), PORTAL_MODERATOR), "moderator");
     check(same((await asVal(CAMPUS, "select public.admin_my_permissions()")).permissions, PORTAL_CAMPUS_ADMIN), "admin_my_permissions");

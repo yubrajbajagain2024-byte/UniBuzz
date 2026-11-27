@@ -44,7 +44,7 @@ function isWrongCode(error: unknown): boolean {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- useActionState always passes (state, formData)
 export async function startEnrollmentAction(_prev: MfaFormState, _formData: FormData): Promise<MfaFormState> {
-  const gate = await requireStaffAction({ mfa: false });
+  const gate = await requireStaffAction({ mfa: false, permission: "security.self" });
   if (gate.error) return { step: "idle", error: gate.error };
   try {
     const supabase = await createClient();
@@ -62,7 +62,7 @@ export async function confirmEnrollmentAction(prev: MfaFormState, formData: Form
   // Whatever happens, keep the enrolment the user is looking at (the secret cannot be fetched
   // again), but not the previous error: a stale field error would hide the new message.
   const keep: NonNullable<MfaFormState> = { step: "enrolling", enrollment: prev?.enrollment };
-  const gate = await requireStaffAction({ mfa: false });
+  const gate = await requireStaffAction({ mfa: false, permission: "security.self" });
   if (gate.error) return { ...keep, error: gate.error };
   const factorId = String(formData.get("factorId") ?? "");
   const next = safeNextPath(String(formData.get("next") ?? ""));
@@ -88,7 +88,7 @@ export async function confirmEnrollmentAction(prev: MfaFormState, formData: Form
 }
 
 export async function verifyMfaAction(_prev: MfaFormState, formData: FormData): Promise<MfaFormState> {
-  const gate = await requireStaffAction({ mfa: false });
+  const gate = await requireStaffAction({ mfa: false, permission: "security.self" });
   if (gate.error) return { step: "idle", error: gate.error };
   const next = safeNextPath(String(formData.get("next") ?? ""));
   const parsed = totpCodeSchema.safeParse(formToObject(formData));
@@ -111,7 +111,7 @@ export async function verifyMfaAction(_prev: MfaFormState, formData: FormData): 
 }
 
 export async function removeFactorAction(factorId: string): Promise<{ error?: string }> {
-  const gate = await requireStaffAction({ mfa: true });
+  const gate = await requireStaffAction({ mfa: true, permission: "security.self" });
   if (gate.error) return { error: gate.error };
   try {
     const supabase = await createClient();

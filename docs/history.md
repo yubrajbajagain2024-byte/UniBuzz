@@ -357,3 +357,30 @@ its file in `branches/`.
   before and after (hashed), read-only checks and `verify.mjs --live` with no difference (78 migrations). Staff accounts
   belong to no campus; only owners and admins may suspend a campus admin; nothing changed for students, businesses or
   the current staff.
+- **2026-11-27 01:40 UTC:** PR #132 (`admin-portal-phase-2c`, Phase 2c of the Master Admin Portal) merged, deploying the
+  website and the portal (both production builds of `9cc6181` completed and serving their addresses). It brought
+  migration 74 (live since 01:33 UTC): users, suspensions and appeals answering a campus admin for their own verified
+  students only, staff accounts in no campus, `campus-users.test.mjs` (68) and `tests/staging/campus-users.mjs` (14/14).
+  Phases 2d and 2e (75, 76) continue on `admin-portal-phase-2d` (PR #133) and `admin-portal-phase-2e` (PR #135). The
+  branch was deleted.
+- **2026-11-27 06:48 UTC (00:48 CST):** migration 75 (`admin-portal-phase-2d`, Phase 2d: events, organizations and the
+  content browser scoped by campus) went live alone with the owner's approval, after staging (14/14) and a full verified
+  backup (`before-migration-75`); the owner's events console and hidden content answers identical before and after
+  (hashed), read-only checks and `verify.mjs --live` with no difference (79 migrations).
+- **2026-11-27 06:49 UTC:** PR #137 (docs: PR #132's merge) and PR #136 (Next.js 16.4.3 to 16.4.6 in the website and the
+  portal: seven moderate advisories fixed, and 16.4.3's `next build` refused to finish locally) merged with the owner's
+  approval; both production builds of `68615c2` completed and serve their addresses (the portal's script nonce intact).
+- **2026-11-27 07:00 UTC:** PR #133 (`admin-portal-phase-2d`, Phase 2d of the Master Admin Portal) merged, deploying the
+  website and the portal (both production builds of `5ec437d` completed and serving their addresses). It brought
+  migration 75 (live since 06:48 UTC): the campus calendar (events, organizations, feeds read-only) and hidden content
+  answering a campus admin for their own campus only, `security.self` for their own account,
+  `campus-events.test.mjs` (41) and `tests/staging/campus-events.mjs` (14/14). Phase 2e (76) continues on
+  `admin-portal-phase-2e` (PR #135). The branch was deleted.
+- **2026-11-27 07:11 UTC (01:11 CST):** migration 76 (`admin-portal-phase-2e`, Phase 2e: appointing campus admins)
+  went live alone with the owner's approval, after staging (12/12, again after a review fix that keeps campus admin
+  invitations' email addresses from moderators) and a full verified backup (`before-migration-76`); the owner's team,
+  invitations and permissions identical before and after (hashed), read-only checks and `verify.mjs --live` with no
+  difference (80 migrations). Owners may now appoint campus admins with their campuses.
+- **2026-11-27 07:11 UTC:** PR #139 (npm overrides: `node-forge` 1.4.4, `typescript-eslint` 8.74.0; advisories 20 to 13,
+  the rest inside Expo SDK 58's tooling, left for a mobile release with a native build) merged with the owner's
+  approval.

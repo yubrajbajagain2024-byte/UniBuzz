@@ -1,5 +1,5 @@
-import { STAFF_ROLE_VALUES, type AdminStaffRole } from "../constants";
-import type { AuditEntry, Client, InviteEmailStatus, StaffAccess, StaffInvite, StaffMember, StaffPermissions } from "../types/models";
+import { STAFF_ROLE_VALUES, type AdminStaffRole, type StaffListRole } from "../constants";
+import type { AuditEntry, Client, InviteEmailStatus, StaffAccess, StaffCampuses, StaffInvite, StaffMember, StaffPermissions } from "../types/models";
 import { MODERATION_AUDIT_LABELS } from "./admin-moderation";
 
 /**
@@ -16,7 +16,7 @@ export async function getMyStaffAccess(supabase: Client): Promise<StaffAccess | 
   if (error) throw error;
   const row = data?.[0];
   if (!row) return null;
-  return { userId: row.user_id, role: row.role as AdminStaffRole, mfaVerified: row.mfa_verified, mfaEnrolled: row.mfa_enrolled, lastOwner: row.last_owner };
+  return { userId: row.user_id, role: row.role as StaffListRole, mfaVerified: row.mfa_verified, mfaEnrolled: row.mfa_enrolled, lastOwner: row.last_owner };
 }
 
 /**
@@ -29,6 +29,32 @@ export async function getMyStaffPermissions(supabase: Client): Promise<StaffPerm
   return (data as StaffPermissions | null) ?? null;
 }
 
+/**
+ * Appoint a campus admin with their campuses (owners, aal2; migration 76): an existing confirmed account joins at once
+ * ('added'), anyone else gets an invitation carrying the campuses ('invited'), sent like any other invitation.
+ */
+export async function appointCampusAdmin(supabase: Client, input: { email: string; universityIds: string[] }): Promise<"added" | "invited"> {
+  const { data, error } = await supabase.rpc("admin_campus_admin_add", { p_email: input.email, p_universities: input.universityIds });
+  if (error) throw error;
+  return data as "added" | "invited";
+}
+
+/** Replace a campus admin's campuses (owners, aal2; 1 to 20; audited). */
+export async function setCampusAdminCampuses(supabase: Client, userId: string, universityIds: string[]): Promise<void> {
+  const { error } = await supabase.rpc("admin_campus_admin_set_campuses", { p_user_id: userId, p_universities: universityIds });
+  if (error) throw error;
+}
+
+/** Who acts for which campuses: campus admins on the staff and invitations to the role (moderator+, aal2). Empty where migration 76 is missing. */
+export async function getStaffCampuses(supabase: Client): Promise<StaffCampuses> {
+  const { data, error } = await supabase.rpc("admin_staff_campuses");
+  if (error) {
+    if (/admin_staff_campuses|PGRST202|Could not find the function/i.test(error.message ?? "")) return { members: [], invitations: [] };
+    throw error;
+  }
+  return (data as StaffCampuses | null) ?? { members: [], invitations: [] };
+}
+
 /** Everyone on the team, owners first (moderator+, aal2). For a moderator, mfaEnrolled is null on every row but their own. */
 export async function listStaff(supabase: Client): Promise<StaffMember[]> {
   const { data, error } = await supabase.rpc("admin_staff_list");
@@ -38,7 +64,7 @@ export async function listStaff(supabase: Client): Promise<StaffMember[]> {
     email: r.email,
     fullName: r.full_name,
     avatarUrl: r.avatar_url,
-    role: r.role as AdminStaffRole,
+    role: r.role as StaffListRole,
     grantedBy: r.granted_by,
     grantedByName: r.granted_by_name,
     createdAt: r.created_at,
@@ -52,7 +78,7 @@ export async function listStaffInvites(supabase: Client): Promise<StaffInvite[]>
   if (error) throw error;
   return (data ?? []).map((r) => ({
     email: r.email,
-    role: r.role as AdminStaffRole,
+    role: r.role as StaffListRole,
     invitedBy: r.invited_by,
     invitedByName: r.invited_by_name,
     createdAt: r.created_at,
@@ -77,10 +103,10 @@ export async function recordInviteEmail(supabase: Client, input: { email: string
 }
 
 /** Renew a pending invitation for another 7 days before its email is sent again (admin+, aal2). Returns its role. */
-export async function resendStaffInvite(supabase: Client, email: string): Promise<AdminStaffRole> {
+export async function resendStaffInvite(supabase: Client, email: string): Promise<StaffListRole> {
   const { data, error } = await supabase.rpc("admin_invite_resend", { p_email: email });
   if (error) throw error;
-  return data as AdminStaffRole;
+  return data as StaffListRole;
 }
 
 /**
@@ -134,23 +160,30 @@ export async function listAuditLog(supabase: Client, opts: { limit?: number; bef
 // The database stays the authority: it re-checks every one of these.
 // ---------------------------------------------------------------------------
 
-/** Owners may grant any role; admins only moderator; moderators none. */
-export function canAssignRole(caller: AdminStaffRole, target: AdminStaffRole): boolean {
+/**
+ * Whether `caller` may grant `target` (or manage an invitation to it): owners any role, campus admins included
+ * (migration 76: only owners appoint them); admins only moderator; moderators and campus admins none.
+ */
+export function canAssignRole(caller: StaffListRole, target: StaffListRole): boolean {
   if (caller === "owner") return true;
   if (caller === "admin") return target === "moderator";
   return false;
 }
 
-/** The roles `caller` may pick when adding someone or changing a role, in rank order. */
-export function assignableStaffRoles(caller: AdminStaffRole): AdminStaffRole[] {
+/** The platform roles `caller` may pick when adding someone or changing a role, in rank order (campus admins are appointed with their campuses instead: appointCampusAdmin). */
+export function assignableStaffRoles(caller: StaffListRole): AdminStaffRole[] {
   return STAFF_ROLE_VALUES.filter((role) => canAssignRole(caller, role));
 }
 
-/** Whether `caller` may change or remove `member`: never themselves; owners anyone else; admins only moderators. */
-export function canChangeMember(caller: StaffAccess | { role: AdminStaffRole; userId: string }, member: { role: AdminStaffRole; userId: string }): boolean {
+/**
+ * Whether `caller` may change or remove `member`: never themselves; owners anyone else; admins moderators and campus
+ * admins (taking access away, or giving a role an admin may give anyone, as admin_staff_set_role and admin_staff_remove
+ * allow in SQL); moderators and campus admins nobody.
+ */
+export function canChangeMember(caller: StaffAccess | { role: StaffListRole; userId: string }, member: { role: StaffListRole; userId: string }): boolean {
   if (caller.userId === member.userId) return false;
   if (caller.role === "owner") return true;
-  if (caller.role === "admin") return member.role === "moderator";
+  if (caller.role === "admin") return member.role === "moderator" || member.role === "campus_admin";
   return false;
 }
 

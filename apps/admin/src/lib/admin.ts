@@ -1,8 +1,9 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { getMyRestriction, getMyStaffAccess, getMyStaffPermissions, STAFF_ROLE_RANK, STAFF_ROLES, type StaffAccess, type AdminStaffRole } from "@apartment-book/shared";
+import { getMyRestriction, getMyStaffAccess, getMyStaffPermissions, isPlatformRole, STAFF_ROLE_RANK, STAFF_ROLES, type StaffAccess, type StaffListRole, type StaffPermissions, type AdminStaffRole } from "@apartment-book/shared";
 import { getCurrentUser } from "@/lib/auth";
 import { can, PERMISSIONS, permissionsOf, type Permission } from "@/lib/permissions";
+import { SECTIONS } from "@/lib/sections";
 import { createClient } from "@/lib/supabase/server";
 import { errorMessage } from "@/lib/utils";
 
@@ -22,10 +23,20 @@ export const getStaffAccess = cache(async (): Promise<StaffAccess | null> => {
   const [access, restriction] = await Promise.all([getMyStaffAccess(supabase), getMyRestriction(supabase).catch(() => null)]);
   // A suspended staff member has no admin powers (every RPC refuses them).
   if (!access || restriction) return null;
-  // Default deny: a role the portal does not know yet (migration 72's campus_admin, before Phase 2 scopes the pages it
-  // would use) is not let in, rather than compared by a rank it does not have.
-  if (!Object.hasOwn(STAFF_ROLE_RANK, access.role)) return null;
+  // Default deny: only the roles the portal knows are let in: the platform's three, and campus admins (Phase 2), who
+  // pass a page or an action by permission alone (requireStaff), never by a rank they do not have.
+  if (!isPlatformRole(access.role) && access.role !== "campus_admin") return null;
   return access;
+});
+
+/** The signed-in staff member's row from admin_my_permissions() (migration 72), or null where it is missing. Cached per request. */
+const getPermissionsRow = cache(async (): Promise<StaffPermissions | null | "missing"> => {
+  try {
+    return await getMyStaffPermissions(await createClient());
+  } catch (error) {
+    if (/admin_my_permissions|PGRST202|Could not find the function/i.test(errorMessage(error, ""))) return "missing";
+    throw error;
+  }
 });
 
 /**
@@ -36,28 +47,50 @@ export const getStaffAccess = cache(async (): Promise<StaffAccess | null> => {
 export const getStaffPermissions = cache(async (): Promise<Permission[]> => {
   const access = await getStaffAccess();
   if (!access) return [];
-  try {
-    const fromSql = await getMyStaffPermissions(await createClient());
-    if (!fromSql || fromSql.role !== access.role) return [];
-    return PERMISSIONS.filter((p) => fromSql.permissions.includes(p));
-  } catch (error) {
-    if (/admin_my_permissions|PGRST202|Could not find the function/i.test(errorMessage(error, ""))) return permissionsOf(access);
-    throw error;
-  }
+  const fromSql = await getPermissionsRow();
+  // Where migration 72 is missing, the portal's own table (a campus admin cannot exist there).
+  if (fromSql === "missing") return isPlatformRole(access.role) ? permissionsOf(access) : [];
+  if (!fromSql || fromSql.role !== access.role) return [];
+  return PERMISSIONS.filter((p) => fromSql.permissions.includes(p));
 });
 
+/** A campus admin's campuses (names for the header and their dashboard); empty for the platform's staff and anyone else. */
+export const getMyCampuses = cache(async (): Promise<{ id: string; name: string }[]> => {
+  const access = await getStaffAccess();
+  if (!access || access.role !== "campus_admin") return [];
+  const fromSql = await getPermissionsRow();
+  return fromSql && fromSql !== "missing" && fromSql.role === "campus_admin" ? fromSql.universities : [];
+});
+
+/** Where to send a staff member a page refused: the first section they may open (never `from` itself), or /no-access. */
+export function homeFor(permissions: readonly Permission[], from: string): string {
+  const path = from.split("?")[0];
+  const section = SECTIONS.find((s) => permissions.includes(s.permission) && s.href !== path);
+  return section?.href ?? "/no-access";
+}
+
 export type RequireStaffOptions = {
-  /** Lowest role that may pass. Default "moderator", i.e. any staff member. */
+  /** Lowest platform role that may pass. Default "moderator", i.e. any of the platform's staff. A campus admin never passes a minRole. */
   minRole?: AdminStaffRole;
-  /** What the page or action is (lib/permissions.ts): refused unless the role is given it. Checked on top of minRole. */
+  /**
+   * What the page or action is (lib/permissions.ts): refused unless the role is given it. Checked on top of minRole.
+   * The only way a campus admin passes: a page or action that names no permission refuses them (default deny).
+   */
   permission?: Permission;
   /** Require a session that verified the second factor (aal2). Default true; only the Security page turns it off. */
   mfa?: boolean;
+  /** The layout: any staff member may see the frame (each page inside it checks its own permission). */
+  shell?: boolean;
 };
 
-/** Whether `access` is at least `minRole` (owner > admin > moderator). */
+/** Whether `access` is at least `minRole` (owner > admin > moderator). Never true for a campus admin, who has no rank. */
 export function hasRole(access: StaffAccess, minRole: AdminStaffRole): boolean {
-  return STAFF_ROLE_RANK[access.role] >= STAFF_ROLE_RANK[minRole];
+  return isPlatformRole(access.role) && STAFF_ROLE_RANK[access.role] >= STAFF_ROLE_RANK[minRole];
+}
+
+/** Whether `role` is a campus admin: let in by permission alone, for their own campuses (SQL scopes every call). */
+export function isCampusAdmin(role: StaffListRole): boolean {
+  return role === "campus_admin";
 }
 
 /** The lowest role given a permission, for the "that page needs the … role" note; null if no role has it. */
@@ -80,6 +113,12 @@ export async function requireStaff(nextPath: string, opts: RequireStaffOptions =
   const access = await getStaffAccess();
   if (!access) redirect("/no-access");
   if (mfa && !access.mfaVerified) redirect(`/security?next=${encodeURIComponent(nextPath)}`);
+  if (isCampusAdmin(access.role)) {
+    if (opts.shell) return access;
+    const held = await getStaffPermissions();
+    if (!permission || opts.minRole || !held.includes(permission)) redirect(homeFor(held, nextPath));
+    return access;
+  }
   if (!hasRole(access, minRole)) redirect(`/?denied=${minRole}`);
   if (permission && !(await getStaffPermissions()).includes(permission)) redirect(`/?denied=${lowestRoleWith(permission) ?? "owner"}`);
   return access;
@@ -100,6 +139,10 @@ export async function requireStaffAction(
   }
   if (!access) return { error: "Not allowed." };
   if (mfa && !access.mfaVerified) return { error: "Verify your two-factor code first." };
+  if (isCampusAdmin(access.role)) {
+    if (!permission || opts.minRole || !(await getStaffPermissions()).includes(permission)) return { error: "Not allowed." };
+    return { access };
+  }
   if (!hasRole(access, minRole)) return { error: `You need the ${minRole} role for that.` };
   if (permission && !(await getStaffPermissions()).includes(permission)) return { error: `You need the ${lowestRoleWith(permission) ?? "owner"} role for that.` };
   return { access };
@@ -117,11 +160,14 @@ export function adminErrorMessage(error: unknown): string {
 }
 
 /**
- * Whether `me` may suspend or unsuspend `target`: never yourself, and a staff target
- * needs a strictly higher role. The same rule migration 15 applies in SQL.
+ * Whether `me` may suspend or unsuspend `target`: never yourself; a staff target needs a strictly higher platform role
+ * (migration 15), and a campus admin an owner or an admin (74); a campus admin never acts on anyone on the staff (74:
+ * staff belong to no campus). The database applies the same rules.
  */
-export function canModerateUser(me: StaffAccess, target: { userId: string; staffRole: AdminStaffRole | null }): boolean {
+export function canModerateUser(me: StaffAccess, target: { userId: string; staffRole: StaffListRole | null }): boolean {
   if (me.userId === target.userId) return false;
   if (!target.staffRole) return true;
-  return STAFF_ROLE_RANK[me.role] > STAFF_ROLE_RANK[target.staffRole];
+  if (!isPlatformRole(me.role)) return false;
+  if (target.staffRole === "campus_admin") return STAFF_ROLE_RANK[me.role] >= STAFF_ROLE_RANK.admin;
+  return isPlatformRole(target.staffRole) && STAFF_ROLE_RANK[me.role] > STAFF_ROLE_RANK[target.staffRole];
 }

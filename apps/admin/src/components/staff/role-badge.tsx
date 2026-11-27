@@ -1,17 +1,17 @@
-import { STAFF_ROLES, type AdminStaffRole } from "@apartment-book/shared";
+import { STAFF_ROLE_LABELS, type StaffListRole } from "@apartment-book/shared";
 import { Badge } from "@/components/ui/badge";
 
-const TONES: Record<AdminStaffRole, "blue" | "green" | "gray"> = { owner: "blue", admin: "green", moderator: "gray" };
+const TONES: Record<StaffListRole, "blue" | "green" | "gray" | "amber"> = { owner: "blue", admin: "green", moderator: "gray", campus_admin: "amber" };
 
-/** "Owner", "Admin" or "Moderator". */
-export function roleLabel(role: AdminStaffRole): string {
-  return STAFF_ROLES.find((r) => r.value === role)?.label ?? role;
+/** "Owner", "Admin", "Moderator" or "Campus admin". */
+export function roleLabel(role: StaffListRole): string {
+  return STAFF_ROLE_LABELS[role] ?? role;
 }
 
-/** Role pill: owner indigo, admin green, moderator gray. Works in server and client components. */
-export function RoleBadge({ role, className }: { role: AdminStaffRole; className?: string }) {
+/** Role pill: owner indigo, admin green, moderator gray, campus admin amber. Works in server and client components. */
+export function RoleBadge({ role, className }: { role: StaffListRole; className?: string }) {
   return (
-    <Badge tone={TONES[role]} className={className}>
+    <Badge tone={TONES[role] ?? "gray"} className={className}>
       {roleLabel(role)}
     </Badge>
   );

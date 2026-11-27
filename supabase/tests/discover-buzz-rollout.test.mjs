@@ -26,7 +26,7 @@ const REST = [
 // Others going to production on their own, left out until they are live. 62 (story actions) went live on 2026-11-02 and
 // 66 (calls paused) on 2026-11-05, so production's state includes both; 67 (admin authority, admin-authority.test.mjs)
 // waits.
-const AHEAD = ["20261119000000_admin_authority.sql", "20261120000000_story_self_like.sql", "20261121000000_event_engagement.sql", "20261122000000_university_requests.sql", "20261126000000_audit_feed.sql", "20261127000000_staff_scopes.sql", "20261128000000_campus_moderation.sql", "20261129000000_campus_users.sql", "20261202000000_university_console.sql"];
+const AHEAD = ["20261119000000_admin_authority.sql", "20261120000000_story_self_like.sql", "20261121000000_event_engagement.sql", "20261122000000_university_requests.sql", "20261126000000_audit_feed.sql", "20261127000000_staff_scopes.sql", "20261128000000_campus_moderation.sql", "20261129000000_campus_users.sql", "20261130000000_campus_events.sql", "20261201000000_campus_appointments.sql", "20261202000000_university_console.sql"];
 const check = (cond, message) => { if (!cond) throw new Error(message); };
 
 const { db, mk, as, asAnon, asService } = await boot({ live: true, skip: [...DISCOVER, ...BUZZ, ...REST, ...AHEAD] });
