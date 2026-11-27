@@ -351,3 +351,9 @@ its file in `branches/`.
   `university_id`), `campus-moderation.test.mjs` (58) and `tests/staging/campus-moderation.mjs` (15/15). Phases 2c and
   2d (74, 75) continue on `admin-portal-phase-2c` (PR #132) and `admin-portal-phase-2d` (PR #133). The branch was
   deleted.
+- **2026-11-27 01:33 UTC (2026-11-26 19:33 CST):** migration 74 (`admin-portal-phase-2c`, Phase 2c: users, suspensions
+  and appeals scoped by campus) went live alone with the owner's approval, after staging (14/14) and a full verified
+  backup (`before-migration-74`); the owner's users, search, student page, restriction and appeals answers identical
+  before and after (hashed), read-only checks and `verify.mjs --live` with no difference (78 migrations). Staff accounts
+  belong to no campus; only owners and admins may suspend a campus admin; nothing changed for students, businesses or
+  the current staff.

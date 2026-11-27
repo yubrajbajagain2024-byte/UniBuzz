@@ -131,7 +131,7 @@ export interface StaffQueueItemDetail extends StaffQueueItem {
     reporter: StaffUserSummary | null;
     createdAt: number;
   }[];
-  history: { action: string; actorRole: "moderator" | "admin" | "system"; actorName: string | null; note: string | null; createdAt: number }[];
+  history: { action: string; actorRole: "moderator" | "admin" | "campus_admin" | "system"; actorName: string | null; note: string | null; createdAt: number }[];
   author: StaffAuthorPanel | StaffBlindAuthorPanel;
   suggestion: { action: StaffActionId; reason: string } | null;
   /** Buzz threads: whether replies are locked (when the thread context says). */
