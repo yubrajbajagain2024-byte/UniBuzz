@@ -65,12 +65,13 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
      the author's) live since 2026-11-27 06:48 UTC (PR #133). **2e** (migration 76: owners appoint campus admins with
      their campuses; the portal's Campus Admin dashboard and permission-only navigation) live since 2026-11-27 07:11 UTC
      (PR #135, merged 2026-11-27 07:15 UTC). **Phase 2 is complete.**
-  3. **Universities** (`admin-portal-phase-3`; [branches/admin-portal-phase-3.md](branches/admin-portal-phase-3.md),
-     migration 77): campus details, sign-up domains opened by owners only, calendar feeds moved from the website; live
-     since 2026-11-27 10:40 UTC (migration 77, PR #138).
-  4. **One moderation model** (`admin-portal-phase-4`): **4a** (migration 78: an account-wide Trust & Safety suspension
-     or ban ends staff powers too, in the portal, Trust & Safety and the business console) live since 2026-11-27
-     07:48 UTC. Next: 4b, the website console's queue in the portal; 4c, one sanction system; 4d, safety metrics.
+  3. **Universities** (migration 77): campus details, sign-up domains opened by owners only, calendar feeds moved from the website; live
+     since 2026-11-27 10:40 UTC (migration 77; PR #138 merged 18:15 UTC).
+  4. **One moderation model**: **4a** (migration 78: an account-wide Trust & Safety suspension or ban ends staff powers
+     too, in the portal, Trust & Safety and the business console) live since 2026-11-27 07:48 UTC (PR #143). **4b**
+     (`admin-portal-phase-4b`; [branches/admin-portal-phase-4b.md](branches/admin-portal-phase-4b.md), no migration):
+     the website console's review queue in the portal for the platform's staff, browser-checked on staging; its PR
+     waits on the owner. Next: 4c, one sanction system; 4d, safety metrics.
   5. Organizations and departments: directory, editing, members and ownership, official departments.
   6. A content browser. 7. Business and ads: the portal's parity with `/business/admin`, owner-only financial approvals.
   8. Platform settings. 9. The website's staff tools retired after verified parity. 10. Scale and hardening.

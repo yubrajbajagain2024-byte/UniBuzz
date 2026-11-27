@@ -94,6 +94,10 @@ await step("every page they may open renders", async () => {
   }
   const tabs = await page.goto(BASE + "/users").then(() => page.getByRole("navigation", { name: /Users pages/ }).innerText().catch(() => ""));
   if (/Staff accounts/.test(tabs)) throw new Error("the Staff accounts tab shows for a campus admin");
+  // The review queue is the platform's (Phase 4b): its tab never shows for a campus admin.
+  const modTabs = await page.goto(BASE + "/reports").then(() => page.getByRole("navigation", { name: /Moderation pages/ }).innerText().catch(() => ""));
+  if (!/Reports/.test(modTabs)) throw new Error("the Moderation tabs did not render");
+  if (/\bQueue\b/.test(modTabs)) throw new Error("the Queue tab shows for a campus admin");
 });
 await step("their own Security page opens (their second factor and password)", async () => {
   await page.goto(BASE + "/security");
@@ -101,7 +105,7 @@ await step("their own Security page opens (their second factor and password)", a
   if (new URL(page.url()).pathname !== "/security") throw new Error(`sent to ${page.url()}`);
 });
 await step("every page they may not open sends them back to their overview, never rendering it", async () => {
-  for (const path of ["/staff", "/audit", "/analytics", "/business", "/universities", "/settings", "/media", "/operations/health", "/operations/email", "/support", "/support/issues"]) {
+  for (const path of ["/queue", "/staff", "/audit", "/analytics", "/business", "/universities", "/settings", "/media", "/operations/health", "/operations/email", "/support", "/support/issues"]) {
     const res = await page.goto(BASE + path);
     await page.getByRole("heading", { name: "My campus", exact: true }).first().waitFor();
     const at = new URL(page.url()).pathname;

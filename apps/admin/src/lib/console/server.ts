@@ -11,6 +11,7 @@ import type {
   ConsoleEvent, ConsoleEventsCounts, ConsoleEventsFilter, ConsoleFeed, ConsoleOrganization, ConsolePage, ConsoleUniversity, PaymentsPage, QueueCounts, RevenueAnalytics,
   RulePackState, StaffAppeal, StaffPage, SystemHealth, UniversityRequestsPage, UniversityRequestStatus,
 } from "./ops-types";
+import type { QueueFilters, QueueView, StaffQueueItem, StaffQueueItemDetail } from "./queue-types";
 import { consoleRpc, toConsoleError } from "./rpc";
 
 /**
@@ -81,6 +82,11 @@ export function requireUuid(id: string): string {
 // The pages call requireStaff first; each function checks the caller again in SQL (ts_require_staff / ts_require_admin).
 
 export const fetchQueueCounts = cache(() => consoleFetch<QueueCounts>("console_queue_counts"));
+/** One page of a queue view (console_queue: what each role may see, Escalated for admins only, never an author). */
+export const fetchQueue = (view: QueueView, offset: number, limit: number, filters: QueueFilters) =>
+  consoleFetch<StaffPage<StaffQueueItem>>("console_queue", { p_view: view, p_limit: limit, p_offset: offset, p_filters: filters });
+/** One queue item (console_queue_item). Opening it claims it for 10 minutes, so it is read only when the page is opened. */
+export const fetchQueueItem = (id: string) => consoleFetch<StaffQueueItemDetail>("console_queue_item", { p_id: id });
 export const fetchAppeals = (view: string, offset: number, limit: number) =>
   consoleFetch<StaffPage<StaffAppeal>>("console_appeals", { p_view: view, p_limit: limit, p_offset: offset });
 export const fetchRulePacks = () => consoleFetch<RulePackState[]>("console_rule_packs");

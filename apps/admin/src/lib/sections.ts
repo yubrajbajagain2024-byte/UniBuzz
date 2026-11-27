@@ -1,3 +1,4 @@
+import type { AdminStaffRole } from "@apartment-book/shared";
 import type { Permission } from "@/lib/permissions";
 
 /**
@@ -9,7 +10,8 @@ import type { Permission } from "@/lib/permissions";
  */
 export type SectionId = "dashboard" | "campus" | "users" | "moderation" | "content" | "universities" | "business" | "analytics" | "operations" | "support" | "administration";
 
-export type SectionTab = { href: string; label: string; permission?: Permission };
+/** `minRole`: the platform's staff only, of that rank or above (a campus admin never passes one), as the page itself rules. */
+export type SectionTab = { href: string; label: string; permission?: Permission; minRole?: AdminStaffRole };
 
 export type Section = {
   id: SectionId;
@@ -46,9 +48,11 @@ export const SECTIONS: readonly Section[] = [
     permission: "moderation.view",
     href: "/reports",
     label: "Moderation",
-    description: "Reports, appeals, automatic hiding",
-    match: ["/reports", "/appeals", "/flagged"],
+    description: "Queue, reports, appeals, automatic hiding",
+    match: ["/queue", "/reports", "/appeals", "/flagged"],
     tabs: [
+      // Trust & Safety's review queue (Phase 4b): the platform's staff only; SQL refuses campus admins (ts_require_staff).
+      { href: "/queue", label: "Queue", minRole: "moderator" },
       { href: "/reports", label: "Reports" },
       { href: "/appeals", label: "Appeals" },
       { href: "/flagged", label: "Automatic hiding" },

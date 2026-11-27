@@ -17,9 +17,25 @@ const SOFT: Record<Tone, string> = {
   violet: "bg-violet-50 text-violet-700",
 };
 
-export function Pill({ tone = "gray", className, children, title }: { tone?: Tone; className?: string; children: ReactNode; title?: string }) {
+const OUTLINE: Record<Tone, string> = {
+  gray: "ring-gray-300 text-gray-700",
+  blue: "ring-brand-200 text-brand-700",
+  green: "ring-green-300 text-green-800",
+  amber: "ring-amber-300 text-amber-800",
+  red: "ring-red-300 text-red-700",
+  violet: "ring-violet-300 text-violet-700",
+};
+
+export function Pill({ tone = "gray", variant = "soft", className, children, title }: { tone?: Tone; variant?: "soft" | "outline"; className?: string; children: ReactNode; title?: string }) {
   return (
-    <span title={title} className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium", SOFT[tone], className)}>
+    <span
+      title={title}
+      className={cn(
+        "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium",
+        variant === "soft" ? SOFT[tone] : cn("bg-white ring-1 ring-inset", OUTLINE[tone]),
+        className,
+      )}
+    >
       {children}
     </span>
   );

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, BadgeCheck, Building2, CheckCircle2, EyeOff, Film, Flag, GraduationCap, Megaphone, MessagesSquare, Scale, ShieldCheck, UserCog, Users, UserX } from "lucide-react";
+import { AlertTriangle, ArrowRight, BadgeCheck, Building2, CheckCircle2, EyeOff, Film, Flag, GraduationCap, Inbox, Megaphone, MessagesSquare, Scale, ShieldCheck, UserCog, Users, UserX } from "lucide-react";
 import {
   getAutoHiddenCounts,
   getMediaJobStats,
@@ -92,6 +92,9 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const decisions: { count: number; label: string; href: string; icon: typeof Flag }[] = [
     { count: stats?.reportsOpen ?? openReports.length, label: "open reports", href: "/reports", icon: Flag },
     { count: flaggedPending ?? 0, label: "items hidden by reports, waiting for review", href: "/flagged", icon: EyeOff },
+    { count: queue?.priority ?? 0, label: "items in the review queue", href: "/queue", icon: Inbox },
+    // Escalated items are the admins' own (console_queue_counts gives moderators none).
+    ...(access.role === "owner" || access.role === "admin" ? [{ count: queue?.escalated ?? 0, label: "escalated items waiting for an admin", href: "/queue?view=escalated", icon: Inbox }] : []),
     { count: queue?.appeals ?? 0, label: "open appeals", href: "/appeals", icon: Scale },
     { count: events?.organizations_pending ?? 0, label: "organizations awaiting verification", href: "/support", icon: BadgeCheck },
     { count: universityRequests?.counts.pending ?? 0, label: "university requests from students", href: "/universities", icon: GraduationCap },

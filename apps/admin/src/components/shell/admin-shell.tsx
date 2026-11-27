@@ -40,7 +40,7 @@ export function AdminShell({
   children: ReactNode;
 }) {
   return (
-    <PermissionsProvider permissions={permissions}>
+    <PermissionsProvider permissions={permissions} role={access.role}>
       <div className="flex flex-1 flex-col">
         <header className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm">
           <div className="flex h-14 items-center gap-3 px-3 sm:px-6">
