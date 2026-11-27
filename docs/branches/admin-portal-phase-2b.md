@@ -41,12 +41,16 @@
   missing list filter, scoping by the row's own `university_id`, and a missing check on hide each fail it.
 - 73 in the five rollout suites' `AHEAD` lists; `npm run check` passes; `db:test` 69 suites, 2550 checks, 0 failures
   ([../testing.md](../testing.md)).
-- `supabase/tests/staging/campus-moderation.mjs` written, **not run yet** (needs `SUPABASE_ACCESS_TOKEN` and
-  `STAGING_SUPABASE_REF` from the owner; needs 72 on staging, which it is).
+- Staging: `supabase/tests/staging/campus-moderation.mjs` **15/15** (run `mwy8fr9z`, 2026-11-27): through the portal's
+  own queries, students of two campuses (a throwaway sign-up domain on a second university, removed after), the staff
+  admin's and moderator's answers unchanged, the campus admin's reports, flags and content in and out of scope, every
+  other area refused, the helpers closed, a profile's university embeddable; rolled back (refused again) and applied
+  again, so **73 is on staging**. Everything made deleted; every table's row count as at the start (10 log rows stay,
+  append-only); staging's only sign-up domain is `txstate.edu` again.
 
-## Rollout (after 72 is live, and waits on the owner)
+## Rollout (72 live since 2026-11-27 00:15 UTC; 73 waits on the owner)
 
-1. Staging: `staging/campus-moderation.mjs` (applies 73 there, rolls it back, applies it again).
+1. Staging: done (above).
 2. Backup: `node scripts/backup.mjs before-migration-73 --full`.
 3. Apply 73 alone in one transaction with its `_migrations` row, then `notify pgrst, 'reload schema'` (owner's approval).
 4. Verify (read-only): the ten functions' grants, the helpers closed, `staff_role_permissions('campus_admin')`, a
