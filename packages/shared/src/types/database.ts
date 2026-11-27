@@ -2286,6 +2286,19 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: Json;
       };
+      // Migration 76: appointing campus admins (owners) and who acts for which campuses (the staff list's readers).
+      admin_campus_admin_add: {
+        Args: { p_email: string; p_universities: string[] };
+        Returns: string;
+      };
+      admin_campus_admin_set_campuses: {
+        Args: { p_user_id: string; p_universities: string[] };
+        Returns: undefined;
+      };
+      admin_staff_campuses: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
       mark_notifications_read: {
         Args: { p_ids?: string[] | null };
         Returns: number;

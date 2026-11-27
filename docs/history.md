@@ -376,3 +376,11 @@ its file in `branches/`.
   answering a campus admin for their own campus only, `security.self` for their own account,
   `campus-events.test.mjs` (41) and `tests/staging/campus-events.mjs` (14/14). Phase 2e (76) continues on
   `admin-portal-phase-2e` (PR #135). The branch was deleted.
+- **2026-11-27 07:11 UTC (01:11 CST):** migration 76 (`admin-portal-phase-2e`, Phase 2e: appointing campus admins)
+  went live alone with the owner's approval, after staging (12/12, again after a review fix that keeps campus admin
+  invitations' email addresses from moderators) and a full verified backup (`before-migration-76`); the owner's team,
+  invitations and permissions identical before and after (hashed), read-only checks and `verify.mjs --live` with no
+  difference (80 migrations). Owners may now appoint campus admins with their campuses.
+- **2026-11-27 07:11 UTC:** PR #139 (npm overrides: `node-forge` 1.4.4, `typescript-eslint` 8.74.0; advisories 20 to 13,
+  the rest inside Expo SDK 58's tooling, left for a mobile release with a native build) merged with the owner's
+  approval.

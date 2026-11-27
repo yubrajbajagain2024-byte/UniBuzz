@@ -40,7 +40,7 @@ function EmailState({ invite }: { invite: StaffInvite }) {
 }
 
 /** Roles promised to addresses that have not accepted yet, with what happened to their email. */
-export function InvitesList({ invites, me, emailsEnabled }: { invites: StaffInvite[]; me: StaffAccess; emailsEnabled: boolean }) {
+export function InvitesList({ invites, me, emailsEnabled, campusesByEmail = {} }: { invites: StaffInvite[]; me: StaffAccess; emailsEnabled: boolean; campusesByEmail?: Readonly<Record<string, readonly { id: string; name: string }[]>> }) {
   const router = useRouter();
   const [messages, setMessages] = useState<Record<string, { error?: string; success?: string } | undefined>>({});
 
@@ -61,7 +61,8 @@ export function InvitesList({ invites, me, emailsEnabled }: { invites: StaffInvi
       ) : (
         <ul className="divide-y divide-gray-100">
           {invites.map((invite) => {
-            // Owners may act on any invitation; admins only on moderator ones. SQL re-checks this.
+            // Owners may act on any invitation (campus admins' included: only owners appoint them); admins only on
+            // moderator ones. SQL re-checks this.
             const canManage = canAssignRole(me.role, invite.role);
             const message = messages[invite.email];
             return (
@@ -94,6 +95,12 @@ export function InvitesList({ invites, me, emailsEnabled }: { invites: StaffInvi
                         ) : null}
                         {invite.accountCreated ? " · waiting for them to open the link" : ""}
                       </p>
+                      {invite.role === "campus_admin" ? (
+                        <p className="text-xs text-gray-600">
+                          <span className="font-medium text-gray-700">Campuses:</span>{" "}
+                          {(campusesByEmail[invite.email] ?? []).map((c) => c.name).join(", ") || "none"}
+                        </p>
+                      ) : null}
                       {invite.emailStatus === "failed" && invite.emailError ? <p className="mt-1 text-xs break-words text-red-700">{invite.emailError}</p> : null}
                     </div>
                   </div>

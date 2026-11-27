@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Boxes, GraduationCap, Headset, LayoutDashboard, Megaphone, Settings, ShieldAlert, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, Boxes, GraduationCap, Headset, LayoutDashboard, Megaphone, School, Settings, ShieldAlert, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { SECTIONS, sectionOfPath, type SectionId } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 import { useCan } from "./permissions-context";
 
 const ICONS: Record<SectionId, LucideIcon> = {
   dashboard: LayoutDashboard,
+  campus: School,
   users: Users,
   moderation: ShieldAlert,
   content: Boxes,
@@ -35,7 +36,8 @@ export function AdminNav({ variant }: { variant: "sidebar" | "tabs" }) {
     return (
       <nav aria-label="Admin" className="flex flex-col gap-0.5">
         {items.map((section) => {
-          const active = current === section.id;
+          // Two sections live at "/" (the platform's dashboard, a campus admin's overview); each person sees one of them.
+          const active = section.href === "/" ? pathname === "/" : current === section.id;
           const Icon = ICONS[section.id];
           return (
             <Link
@@ -62,7 +64,7 @@ export function AdminNav({ variant }: { variant: "sidebar" | "tabs" }) {
   return (
     <nav aria-label="Admin" className="no-scrollbar -mb-px flex gap-1 overflow-x-auto px-3 sm:px-6">
       {items.map((section) => {
-        const active = current === section.id;
+        const active = section.href === "/" ? pathname === "/" : current === section.id;
         const Icon = ICONS[section.id];
         return (
           <Link

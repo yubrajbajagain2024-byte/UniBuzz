@@ -49,9 +49,8 @@ const ROLLBACK = "supabase/rollbacks/20261130000000_campus_events.down.sql";
 const dash = await import(new URL("packages/shared/src/queries/admin-dashboard.ts", ROOT));
 const mod = await import(new URL("packages/shared/src/queries/admin-moderation.ts", ROOT));
 const adminQueries = await import(new URL("packages/shared/src/queries/admin.ts", ROOT));
-const portal = read("apps/admin/src/lib/permissions.ts");
-const listIn = (text) => [...text.matchAll(/"([a-z]+\.[a-z]+)"/g)].map((m) => m[1]);
-const PORTAL_CAMPUS_ADMIN = listIn(/export const CAMPUS_ADMIN: readonly Permission\[\] = \[([\s\S]*?)\];/.exec(portal)?.[1] ?? "");
+// The set 75 gives campus admins (later migrations add to it).
+const PORTAL_CAMPUS_ADMIN = ["moderation.view", "users.view", "content.view", "security.self"];
 const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
 
 async function mgmt(method, path, body) {
@@ -190,7 +189,7 @@ await check("the staff admin and moderator get the same answers as before 75", a
   const after = JSON.stringify({ e: await ourEvents(modAal2), o: await ourOrgs(modAal2), f: await ourFeeds(adminAal2), h: await ourHidden(modAal2) });
   expect(after === before, "changed");
 });
-await check("the campus admin's permissions are the portal's CAMPUS_ADMIN list", async () => {
+await check("the campus admin's permissions are 75's", async () => {
   const p = await adminQueries.getMyStaffPermissions(campusAal2);
   expect(p.role === "campus_admin" && !p.platform && same(p.permissions, PORTAL_CAMPUS_ADMIN), JSON.stringify(p));
 });

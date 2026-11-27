@@ -7,7 +7,7 @@ import type { Permission } from "@/lib/permissions";
  * permission: who sees the link (lib/permissions.ts); the page behind it checks the same permission, and the database
  * checks the caller again.
  */
-export type SectionId = "dashboard" | "users" | "moderation" | "content" | "universities" | "business" | "analytics" | "operations" | "support" | "administration";
+export type SectionId = "dashboard" | "campus" | "users" | "moderation" | "content" | "universities" | "business" | "analytics" | "operations" | "support" | "administration";
 
 export type SectionTab = { href: string; label: string; permission?: Permission };
 
@@ -24,6 +24,9 @@ export type Section = {
 
 export const SECTIONS: readonly Section[] = [
   { id: "dashboard", permission: "dashboard.view", href: "/", label: "Dashboard", description: "KPIs, alerts and pending decisions", match: [], tabs: [] },
+  // A campus admin's own overview at the same address (they never have dashboard.view, the platform's staff never
+  // campus.overview): their campuses' reports, flags, appeals, students and calendar, all from scoped functions.
+  { id: "campus", permission: "campus.overview", href: "/", label: "My campus", description: "What needs you on your campuses", match: [], tabs: [] },
   {
     id: "users",
     permission: "users.view",
@@ -35,7 +38,7 @@ export const SECTIONS: readonly Section[] = [
       { href: "/users", label: "Accounts" },
       { href: "/users?filter=suspended", label: "Suspensions" },
       { href: "/users?filter=unverified", label: "Verification" },
-      { href: "/users?filter=staff", label: "Staff accounts" },
+      { href: "/users?filter=staff", label: "Staff accounts", permission: "staff.view" },
     ],
   },
   {
