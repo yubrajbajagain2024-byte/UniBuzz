@@ -70,7 +70,10 @@ export const SECTIONS: readonly Section[] = [
     label: "Universities",
     description: "Campuses and students' requests",
     match: ["/universities"],
-    tabs: [{ href: "/universities", label: "Requests" }],
+    tabs: [
+      { href: "/universities", label: "Requests" },
+      { href: "/universities/campuses", label: "Campuses" },
+    ],
   },
   { id: "business", permission: "business.manage", href: "/business", label: "Business & Ads", description: "Advertisers, campaigns, payments", match: ["/business"], tabs: [] },
   { id: "analytics", permission: "analytics.view", href: "/analytics", label: "Analytics", description: "Growth, engagement, ads, revenue", match: ["/analytics"], tabs: [] },

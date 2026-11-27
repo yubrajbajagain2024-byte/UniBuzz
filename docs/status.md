@@ -62,7 +62,9 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
      campuses by the author's verified campus) live since 2026-11-27 00:52 UTC (PR #130). **2c** (migration 74:
      users, suspensions and appeals by the student's verified campus; staff accounts in no campus) live since
      2026-11-27 01:33 UTC (PR #132). Next: 2d (75), then 2e, the campus-admin shell and appointing campus admins.
-  3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.
+  3. **Universities** (`admin-portal-phase-3`; [branches/admin-portal-phase-3.md](branches/admin-portal-phase-3.md),
+     migration 77): campus details, sign-up domains opened by owners only, calendar feeds moved from the website; on
+     staging, browser-checked, not production (2026-11-27).
   4. One moderation model: the website console's queue in the portal, one sanction system, safety metrics.
   5. Organizations and departments: directory, editing, members and ownership, official departments.
   6. A content browser. 7. Business and ads: the portal's parity with `/business/admin`, owner-only financial approvals.

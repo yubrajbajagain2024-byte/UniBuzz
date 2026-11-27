@@ -86,7 +86,8 @@ Supabase's `auth` and `storage` schemas.
   same way (needs 72): students of two campuses, a campus admin's reports, flags and content through the portal's
   queries, in and out of scope (`--restore`); `campus-users.mjs`, migration 74 the same way (needs 73): users,
   suspensions and appeals for a campus admin in and out of scope, the new suspension rule (`--restore`);
-  `admin-e2e-accounts.mjs`, the staging staff
+  `university-console.mjs`, migration 77 the same way (needs 72): campus details changed and put back, an owner opening
+  and closing a throwaway domain, the rules refusing the rest (`--restore`); `admin-e2e-accounts.mjs`, the staging staff
   admin, staff moderator and student for CampConnect Admin's browser check (`create`, `env`, `qr`, `delete`);
   `admin-authority.mjs`, migration 67 applied, checked through Auth and the REST API, rolled back and applied again
   (`--restore` leaves it rolled back); `event-engagement.mjs`, events' likes, comments and who is going (migration 69,
