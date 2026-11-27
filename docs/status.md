@@ -58,8 +58,10 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   2. **Campus scopes** (2a merged, PR #129; [history.md](history.md), 2026-11-27): in
      layers, default deny until scoped. **2a** (migration 72: the Campus Admin role with no permissions, `staff_campuses`,
      the role resolvers default-deny, the permission table in SQL, the portal reading it) live on production since
-     2026-11-27 00:15 UTC (PR #129). Next: 2b to 2d scope moderation, users, events and organizations, then the screens
-     to appoint campus admins.
+     2026-11-27 00:15 UTC (PR #129). **2b** (migration 73: reports, flags and their content scoped to the campus admin's
+     campuses by the author's verified campus) live since 2026-11-27 00:52 UTC (PR #130). Next: 2c users, sanctions and
+     appeals (74), 2d events, organizations and hidden content (75), then 2e, the campus-admin shell and the screens to
+     appoint campus admins.
   3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.
   4. One moderation model: the website console's queue in the portal, one sanction system, safety metrics.
   5. Organizations and departments: directory, editing, members and ownership, official departments.

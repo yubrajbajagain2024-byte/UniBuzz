@@ -338,3 +338,9 @@ its file in `branches/`.
   `staff_require_can`, `admin_my_permissions`), the portal reading it, `staff-scopes.test.mjs` (80) and
   `tests/staging/staff-scopes.mjs` (17/17). Phase 2b (migration 73) continues on `admin-portal-phase-2b` (PR #130). The
   branch was deleted.
+- **2026-11-27 00:52 UTC (2026-11-26 18:52 CST):** migration 73 (`admin-portal-phase-2b`, Phase 2b: the moderation area
+  scoped by campus) went live alone with the owner's approval, after staging (15/15) and a full verified backup
+  (`before-migration-73`); the owner's report and flag answers identical before and after (hashed), read-only checks and
+  `verify.mjs --live` with no difference (77 migrations). Campus admins (none exist yet) may use reports, flagged items
+  and the content behind them for their own students only; nothing changed for students, businesses or the current
+  staff.
