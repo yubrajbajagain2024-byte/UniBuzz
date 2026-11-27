@@ -59,9 +59,9 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
      layers, default deny until scoped. **2a** (migration 72: the Campus Admin role with no permissions, `staff_campuses`,
      the role resolvers default-deny, the permission table in SQL, the portal reading it) live on production since
      2026-11-27 00:15 UTC (PR #129). **2b** (migration 73: reports, flags and their content scoped to the campus admin's
-     campuses by the author's verified campus) live since 2026-11-27 00:52 UTC (PR #130). **2c** (migration 74,
-     `admin-portal-phase-2c`: users, suspensions and appeals by the student's verified campus; staff accounts in no
-     campus) on staging, not production. **2d** (migration 75, `admin-portal-phase-2d`: the campus calendar by its own
+     campuses by the author's verified campus) live since 2026-11-27 00:52 UTC (PR #130). **2c** (migration 74:
+     users, suspensions and appeals by the student's verified campus; staff accounts in no campus) live since
+     2026-11-27 01:33 UTC (PR #132). **2d** (migration 75, `admin-portal-phase-2d`: the campus calendar by its own
      campus, hidden content by the author's) on staging, not production. Next: 2e, the campus-admin shell and
      appointing campus admins.
   3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.

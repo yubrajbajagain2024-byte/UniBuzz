@@ -3,7 +3,7 @@
 - **Owner:** Sunil. **As of 2026-11-27:** branched from `admin-portal-phase-2c` (2c, PR #132, migration 74), stacked on
   it because 75 needs 74. Written by an AI session.
 - **Purpose:** Phase 2d of the **UniBuzz Master Admin Portal** roadmap ([../status.md](../status.md); 2c in
-  [admin-portal-phase-2c.md](admin-portal-phase-2c.md)): the last area a campus admin needs, the Events page (their
+  [../history.md](../history.md)): the last area a campus admin needs, the Events page (their
   campus's calendar) and the Content page (hidden content), so every permission they hold is scoped in SQL. After it
   comes 2e: the portal's campus-admin shell and the owners' screens to appoint campus admins.
 
