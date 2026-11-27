@@ -59,9 +59,10 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
      layers, default deny until scoped. **2a** (migration 72: the Campus Admin role with no permissions, `staff_campuses`,
      the role resolvers default-deny, the permission table in SQL, the portal reading it) is on staging, not production
      (2026-11-26; PR #129). **2b** (migration 73, `admin-portal-phase-2b`, stacked on 2a: reports, flags and their
-     content scoped to the campus admin's campuses by the author's verified campus) passes offline, not yet on staging.
-     Next: 2c users, sanctions and appeals; 2d events and organizations, the campus-admin shell, the screens to appoint
-     campus admins.
+     content scoped to the campus admin's campuses by the author's verified campus) on staging, not production.
+     **2c** (migration 74, `admin-portal-phase-2c`, stacked on 2b: users, suspensions and appeals by the student's
+     verified campus; staff accounts in no campus) on staging, not production. Next: 2d events and organizations, the campus-admin
+     shell, the screens to appoint campus admins.
   3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.
   4. One moderation model: the website console's queue in the portal, one sanction system, safety metrics.
   5. Organizations and departments: directory, editing, members and ownership, official departments.

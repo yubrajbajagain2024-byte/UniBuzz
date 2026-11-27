@@ -46,13 +46,14 @@ const MODERATOR: readonly Permission[] = [
 const ADMIN: readonly Permission[] = [...MODERATOR, "universities.manage", "business.manage", "analytics.view", "audit.context", "settings.manage"];
 
 /**
- * Campus admins (migration 72's role): only the areas whose functions SQL already scopes to their campuses, so far the
- * moderation area (migration 73: reports, flagged content and the content they are about). Appeals, under the same
- * permission, stay refused to them in SQL until Phase 2c scopes sanctions. The portal does not let a campus admin in
- * yet (lib/admin.ts getStaffAccess knows only the roles in STAFF_ROLE_RANK) until their shell arrives; this list is what
- * SQL gives them, and supabase/tests/campus-moderation.test.mjs fails if the two differ.
+ * Campus admins (migration 72's role): only the areas whose functions SQL already scopes to their campuses, always to
+ * the verified students of their own campuses: moderation (migration 73: reports, flagged content and the content they
+ * are about; 74: appeals) and users (74: the list, search, a student's page, suspensions). The portal does not let a
+ * campus admin in yet (lib/admin.ts getStaffAccess knows only the roles in STAFF_ROLE_RANK) until their shell arrives;
+ * this list is what SQL gives them, and the newest scoping migration's suite (supabase/tests/campus-users.test.mjs)
+ * fails if the two differ.
  */
-export const CAMPUS_ADMIN: readonly Permission[] = ["moderation.view"];
+export const CAMPUS_ADMIN: readonly Permission[] = ["moderation.view", "users.view"];
 
 const GRANTS: Readonly<Record<AdminStaffRole, ReadonlySet<Permission>>> = {
   owner: new Set(ADMIN),

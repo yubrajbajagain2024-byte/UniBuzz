@@ -24,12 +24,13 @@ const check = (cond, message) => {
   if (!cond) throw new Error(message);
 };
 
-// The portal's own table (apps/admin/src/lib/permissions.ts).
+// The portal's own table (apps/admin/src/lib/permissions.ts) for the platform's roles. The campus admin's set is the
+// one 73 gives (later migrations add to it; the newest one's suite compares it with the portal's CAMPUS_ADMIN list).
 const portal = fs.readFileSync(path.join(HERE, "..", "..", "apps", "admin", "src", "lib", "permissions.ts"), "utf8");
 const listIn = (text) => [...text.matchAll(/"([a-z]+\.[a-z]+)"/g)].map((m) => m[1]);
-const PORTAL_CAMPUS_ADMIN = listIn(/export const CAMPUS_ADMIN: readonly Permission\[\] = \[([\s\S]*?)\];/.exec(portal)?.[1] ?? "");
+const PORTAL_CAMPUS_ADMIN = ["moderation.view"];
 const PORTAL_MODERATOR = listIn(/const MODERATOR: readonly Permission\[\] = \[([\s\S]*?)\];/.exec(portal)?.[1] ?? "");
-if (PORTAL_CAMPUS_ADMIN.length === 0 || PORTAL_MODERATOR.length < 5) throw new Error("could not read the portal's permission table");
+if (PORTAL_MODERATOR.length < 5) throw new Error("could not read the portal's permission table");
 const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
 
 // The ten functions 73 replaces, by signature, for the rollback's word-for-word check.
@@ -122,7 +123,7 @@ for (const live of [true, false]) {
     // ---------------------------------------------------------------------------
     // This repo's schema: the table and the helpers only
     // ---------------------------------------------------------------------------
-    await expectOk(tag + "campus admins get moderation.view, as the portal's table says; the platform's roles are unchanged", async () => {
+    await expectOk(tag + "campus admins get moderation.view; the platform's roles are the portal's, unchanged", async () => {
       check(same(await val("select public.staff_role_permissions('campus_admin')"), PORTAL_CAMPUS_ADMIN), "campus admin");
       check(same(await val("select public.staff_role_permissions('moderator')"), PORTAL_MODERATOR), "moderator");
       check((await val("select cardinality(public.staff_role_permissions('nobody'))")) === 0, "an unknown role");
@@ -220,7 +221,7 @@ for (const live of [true, false]) {
     check(before.modReports.length === Object.keys(R).length && before.modReports.every((r) => r.reporter_email), "the moderator sees every report and every email");
     check(before.modCounts.pending === 2, JSON.stringify(before.modCounts));
   });
-  await expectOk(tag + "the table: campus admins get moderation.view, the portal's own list", async () => {
+  await expectOk(tag + "the table: campus admins get moderation.view; the moderator keeps the portal's list", async () => {
     const p = await asVal(CAMPUS, "select public.admin_my_permissions()");
     check(p.role === "campus_admin" && !p.platform && same(p.permissions, PORTAL_CAMPUS_ADMIN), JSON.stringify(p));
     check(same((await asVal(MOD, "select public.admin_my_permissions()")).permissions, PORTAL_MODERATOR), "moderator");
