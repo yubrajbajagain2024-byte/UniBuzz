@@ -64,7 +64,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
      2026-11-27 01:33 UTC (PR #132). **2d** (migration 75: the campus calendar by its own campus, hidden content by
      the author's) live since 2026-11-27 06:48 UTC (PR #133). **2e** (migration 76: owners appoint campus admins with
      their campuses; the portal's Campus Admin dashboard and permission-only navigation) live since 2026-11-27 07:11 UTC
-     (PR #135). Phase 2 is complete once PR #135 is merged.
+     (PR #135, merged 2026-11-27 07:15 UTC). **Phase 2 is complete.**
   3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.
   4. One moderation model: the website console's queue in the portal, one sanction system, safety metrics.
   5. Organizations and departments: directory, editing, members and ownership, official departments.
