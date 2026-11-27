@@ -22,6 +22,14 @@ export const getStaffAccess = cache(async (): Promise<StaffAccess | null> => {
   const [access, restriction] = await Promise.all([getMyStaffAccess(supabase), getMyRestriction(supabase).catch(() => null)]);
   // A suspended staff member has no admin powers (every RPC refuses them).
   if (!access || restriction) return null;
+  // Nor one under an account-wide sanction in Trust & Safety (migration 78): the database answers
+  // admin_my_permissions() with nothing for them, so the portal goes no further than /no-access. Where migration 72 is
+  // missing the function is too, and nothing changes.
+  try {
+    if ((await getMyStaffPermissions(supabase)) === null) return null;
+  } catch (error) {
+    if (!/admin_my_permissions|PGRST202|Could not find the function/i.test(errorMessage(error, ""))) throw error;
+  }
   // Default deny: a role the portal does not know yet (migration 72's campus_admin, before Phase 2 scopes the pages it
   // would use) is not let in, rather than compared by a rank it does not have.
   if (!Object.hasOwn(STAFF_ROLE_RANK, access.role)) return null;
