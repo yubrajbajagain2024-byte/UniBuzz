@@ -1,8 +1,8 @@
 # admin-portal-phase-4
 
 - **Owner:** Sunil. **As of 2026-11-27:** branched from `main` at `68615c2`, `main` merged in at `ba60b7b` (Phase 2e,
-  migration 76). Written by an AI session. Kept local and unpushed until migration 78 is live (root CLAUDE.md,
-  "Security and privacy").
+  migration 76). Written by an AI session. Kept local and unpushed until migration 78 was live (root CLAUDE.md,
+  "Security and privacy"); `main` merged in again at `a6379e5`.
 - **Purpose:** Phase 4 of the **UniBuzz Master Admin Portal** roadmap ([../status.md](../status.md)): one moderation
   model. 4a, here: one standing for the staff across both sanction systems (migration 78). Then 4b, the website
   console's queue in the portal; 4c, one sanction system; 4d, safety metrics.
@@ -39,7 +39,8 @@
 ## Rollout
 
 1. Staging: done (above).
-2. The owner's approval, then a full verified backup `before-migration-78`.
-3. Apply 78 alone in one transaction with its `_migrations` row (ahead of 77, which keeps its older file name and is
-   applied later on its own); verify the owner's answers are identical before and after, and `verify.mjs --live`.
-4. Only then push this branch and open its PR; merge it after its checks pass.
+2. Backup `before-migration-78` (full, 220 files, checksums verified, row counts matching the live project).
+3. **Applied 2026-11-27 07:48:27 UTC** with the owner's approval, alone, in one transaction with its `_migrations` row,
+   ahead of 77. Verified (read-only): the owner's answers identical before and after; details in
+   [../migrations.md](../migrations.md); `verify.mjs --live` the same schema.
+4. This branch pushed and its PR opened only after that; merge it after its checks pass.
