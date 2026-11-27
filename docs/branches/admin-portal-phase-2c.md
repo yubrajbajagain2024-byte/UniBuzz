@@ -3,7 +3,7 @@
 - **Owner:** Sunil. **As of 2026-11-27:** branched from `admin-portal-phase-2b` (2b, PR #130, migration 73) at
   `98f051b`, stacked on it because 74 needs 73. Written by an AI session.
 - **Purpose:** Phase 2c of the **UniBuzz Master Admin Portal** roadmap ([../status.md](../status.md); 2b in
-  [admin-portal-phase-2b.md](admin-portal-phase-2b.md)): users, suspensions and appeals scoped by campus. Campus admins
+  [../history.md](../history.md)): users, suspensions and appeals scoped by campus. Campus admins
   get `users.view`, and Appeals (under `moderation.view`, refused to them until now) opens for their own students.
 
 ## What 2c changes
@@ -45,11 +45,14 @@
   helpers closed, a profile's university embeddable; rolled back and applied again, so **74 is on staging**. Every
   table's row count as at the start (10 log rows stay, append-only).
 
-## Rollout (after 73; each step waits on the owner)
+## Rollout
 
 1. Staging: done (above).
-2. Backup `before-migration-74 --full`, apply alone with its `_migrations` row, read-only checks, `verify.mjs --live`.
-3. Merge after 2b's PR.
+2. Backup `before-migration-74` (full, 222 files, checksums verified, row counts matching the live project).
+3. **Applied 2026-11-27 01:33:57 UTC** with the owner's approval, alone, in one transaction with its `_migrations` row.
+4. Verified (read-only): the owner's answers identical before and after; details in [../migrations.md](../migrations.md);
+   `verify.mjs --live` the same schema.
+5. Merge PR #132 (`main` merged into the branch first).
 
 ## Next
 
