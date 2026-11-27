@@ -395,3 +395,11 @@ its file in `branches/`.
   `campus-appointments.test.mjs` (41, mutation-checked), `staff-roles.test.mjs` (5), staging
   `campus-appointments.mjs` 12/12, the browser check `apps/admin/e2e/campus-admin.mjs` 8/8 as staging's campus admin
   and `apps/admin/e2e/admin.mjs` as its admin and moderator. The branch and its file were deleted.
+- **2026-11-27 07:45 UTC:** PR #141 (docs: Phase 2 complete) merged with the owner's approval.
+- **2026-11-27 07:48 UTC (01:48 CST):** migration 78 (`admin-portal-phase-4`, Phase 4a: one standing for the staff
+  across both sanction systems) went live alone with the owner's approval, ahead of 77. Until then only CampConnect
+  Admin's own suspension ended staff powers; an account-wide Trust & Safety suspension or ban now does too
+  (`staff_role_of()`, `admin_standing()`, `staff_require()`), and the portal sends such an account to `/no-access`.
+  The branch was kept local and unpushed until then. Before it: staging 7/7, the portal's browser checks on staging, a
+  full verified backup (`before-migration-78`); after it: the owner's answers identical (hashed), read-only checks and
+  `verify.mjs --live` with no difference (81 migrations). Nobody's access changed (no staff member was sanctioned).
