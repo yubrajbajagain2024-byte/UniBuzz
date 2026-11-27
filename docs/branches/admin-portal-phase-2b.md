@@ -1,9 +1,10 @@
 # admin-portal-phase-2b
 
-- **Owner:** Sunil. **As of 2026-11-26:** branched from `admin-portal-phase-2` (2a, PR #129, migration 72) at `79aa97e`,
-  stacked on it because 73 needs 72. Draft **PR #130** (base `admin-portal-phase-2`). Written by an AI session.
+- **Owner:** Sunil. **As of 2026-11-27:** branched from `admin-portal-phase-2` (2a, PR #129, migration 72; merged, its
+  notes in [../history.md](../history.md)) at `79aa97e`, stacked on it because 73 needs 72. **PR #130** (base `main`
+  since 2a's merge). Written by an AI session.
 - **Purpose:** Phase 2b of the **UniBuzz Master Admin Portal** roadmap ([../status.md](../status.md); 2a in
-  [admin-portal-phase-2.md](admin-portal-phase-2.md)): the first area scoped by campus, moderation. Campus admins get
+  [../history.md](../history.md)): the first area scoped by campus, moderation. Campus admins get
   `moderation.view`, and the functions behind the portal's Reports and Flagged pages, and the content those pages act
   on, answer a campus admin for their own campuses only.
 
@@ -48,14 +49,14 @@
   again, so **73 is on staging**. Everything made deleted; every table's row count as at the start (10 log rows stay,
   append-only); staging's only sign-up domain is `txstate.edu` again.
 
-## Rollout (72 live since 2026-11-27 00:15 UTC; 73 waits on the owner)
+## Rollout
 
 1. Staging: done (above).
-2. Backup: `node scripts/backup.mjs before-migration-73 --full`.
-3. Apply 73 alone in one transaction with its `_migrations` row, then `notify pgrst, 'reload schema'` (owner's approval).
-4. Verify (read-only): the ten functions' grants, the helpers closed, `staff_role_permissions('campus_admin')`, a
-   profile's university still embeddable, `verify.mjs --live`.
-5. Merge the PR after 2a's.
+2. Backup: `before-migration-73` (full, 222 files, checksums verified, row counts matching the live project).
+3. **Applied 2026-11-27 00:52:46 UTC** with the owner's approval, alone, in one transaction with its `_migrations` row.
+4. Verified (read-only): the owner's answers identical before and after; details in [../migrations.md](../migrations.md);
+   `verify.mjs --live` the same schema.
+5. Merge PR #130 (`main` merged into the branch first).
 - **Rollback:** the rollback file with its `_migrations` delete; nothing is refused (campus admins only lose 73's powers).
 
 ## Next

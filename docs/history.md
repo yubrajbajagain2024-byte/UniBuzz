@@ -324,3 +324,23 @@ its file in `branches/`.
   page gates, `audit-feed.test.mjs` (62) and `tests/staging/audit-feed.mjs`. Found on staging and fixed before the
   merge: `upgrade-insecure-requests` broke a portal served over http, so it follows the portal's scheme. The branch
   was deleted.
+- **2026-11-27 00:15 UTC (2026-11-26 18:15 CST):** migration 72 (`admin-portal-phase-2`, Phase 2a: campus scopes for
+  the staff, default deny) went live alone with the owner's approval, after staging (17/17) and a full verified backup
+  (`before-migration-72`); read-only checks and `verify.mjs --live` after it found no difference (76 migrations). The
+  Campus Admin role exists with no permissions and nobody holds it; the role resolvers refuse roles they do not know;
+  nothing changed for students, businesses or the current staff.
+- **2026-11-27 00:21 UTC:** PR #129 (`admin-portal-phase-2`, Phase 2a of the Master Admin Portal) merged, deploying the
+  website and the portal (both production builds of `3aa39ad` completed and serving their addresses at 00:24 UTC: the
+  website's login page, the portal's under its name with a fresh script nonce, signed-out visitors sent to log in). It
+  brought migration 72 (live since 00:15 UTC): the Campus Admin role with no permissions, `staff_campuses` (its people
+  as `auth.users`, after staging found that a `profiles` key made every profile-to-university embed ambiguous), the
+  role resolvers default-deny, the permission table in SQL (`staff_role_permissions`, `staff_can`,
+  `staff_require_can`, `admin_my_permissions`), the portal reading it, `staff-scopes.test.mjs` (80) and
+  `tests/staging/staff-scopes.mjs` (17/17). Phase 2b (migration 73) continues on `admin-portal-phase-2b` (PR #130). The
+  branch was deleted.
+- **2026-11-27 00:52 UTC (2026-11-26 18:52 CST):** migration 73 (`admin-portal-phase-2b`, Phase 2b: the moderation area
+  scoped by campus) went live alone with the owner's approval, after staging (15/15) and a full verified backup
+  (`before-migration-73`); the owner's report and flag answers identical before and after (hashed), read-only checks and
+  `verify.mjs --live` with no difference (77 migrations). Campus admins (none exist yet) may use reports, flagged items
+  and the content behind them for their own students only; nothing changed for students, businesses or the current
+  staff.
