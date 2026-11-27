@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { PostAudience, AUTO_HIDE_STATUSES, MEDIA_JOB_KINDS, MODERATION_TARGET_TYPES, REPORT_DECISIONS, AdminStaffRole } from "../constants";
+import type { PostAudience, AUTO_HIDE_STATUSES, MEDIA_JOB_KINDS, MODERATION_TARGET_TYPES, REPORT_DECISIONS, AdminStaffRole, StaffListRole } from "../constants";
 import type { Database, Json } from "./database";
 import type { MessageAttachment } from "../message-media";
 
@@ -343,13 +343,13 @@ export type Paginated<T> = {
 // CampConnect Admin (apps/admin): its staff (owner > admin > moderator), invitations and audit log
 
 /** The signed-in user's place on the team (from admin_me). lastOwner: the only owner, who cannot step back until there is another. */
-export type StaffAccess = { userId: string; role: AdminStaffRole; mfaVerified: boolean; mfaEnrolled: boolean; lastOwner: boolean };
+export type StaffAccess = { userId: string; role: StaffListRole; mfaVerified: boolean; mfaEnrolled: boolean; lastOwner: boolean };
 /** mfaEnrolled is null when the caller may not know: moderators see it on their own row only. */
-export type StaffMember = { userId: string; email: string | null; fullName: string; avatarUrl: string | null; role: AdminStaffRole; grantedBy: string | null; grantedByName: string | null; createdAt: string; mfaEnrolled: boolean | null };
+export type StaffMember = { userId: string; email: string | null; fullName: string; avatarUrl: string | null; role: StaffListRole; grantedBy: string | null; grantedByName: string | null; createdAt: string; mfaEnrolled: boolean | null };
 /** A role promised to an email address that has not confirmed an account yet. */
 export type StaffInvite = {
   email: string;
-  role: AdminStaffRole;
+  role: StaffListRole;
   invitedBy: string | null;
   invitedByName: string | null;
   createdAt: string;
@@ -370,6 +370,8 @@ export type InviteEmailStatus = "not_sent" | "sent" | "failed";
  * (campus_admin included), whether it is platform-wide, a campus admin's universities, the permissions (the portal's
  * names, decided in SQL) and whether this session passed the second factor.
  */
+/** Who acts for which campuses (migration 76's admin_staff_campuses): campus admins on the staff, and invitations to the role. */
+export type StaffCampuses = { members: { userId: string; universities: { id: string; name: string }[] }[]; invitations: { email: string; universities: { id: string; name: string }[] }[] };
 export type StaffPermissions = { role: string; platform: boolean; universities: { id: string; name: string }[]; permissions: string[]; mfaVerified: boolean };
 export type AuditEntry = { id: number; actorId: string | null; actorEmail: string | null; actorName: string | null; action: string; targetType: string | null; targetId: string | null; details: Record<string, unknown>; createdAt: string };
 export type MfaFactorSummary = { id: string; friendlyName: string | null; status: "verified" | "unverified"; createdAt: string };
@@ -420,7 +422,7 @@ export type UserSearchResult = {
   universityName: string | null;
   createdAt: string;
   suspended: boolean;
-  staffRole: AdminStaffRole | null;
+  staffRole: StaffListRole | null;
 };
 /** One entry of a person's suspension history (admin_user_get.restrictions). */
 export type UserRestriction = {
@@ -449,7 +451,7 @@ export type UserDetail = {
   university: string | null;
   createdAt: string;
   lastSeenAt: string | null;
-  staffRole: AdminStaffRole | null;
+  staffRole: StaffListRole | null;
   /** From auth.users: Supabase refuses sign-in while this is in the future. Set by every suspension, cleared when it is lifted. */
   bannedUntil: string | null;
   counts: { apartments: number; items: number; roommatePosts: number; posts: number; comments: number; reportsFiled: number; reportsAgainst: number };
@@ -548,7 +550,7 @@ export type AdminUserRow = {
   createdAt: string;
   lastSeenAt: string | null;
   suspended: boolean;
-  staffRole: AdminStaffRole | null;
+  staffRole: StaffListRole | null;
 };
 export type AutoHideStatus = (typeof AUTO_HIDE_STATUSES)[number]["value"];
 /**

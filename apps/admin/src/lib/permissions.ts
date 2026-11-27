@@ -1,4 +1,4 @@
-import type { AdminStaffRole, StaffAccess } from "@apartment-book/shared";
+import type { StaffAccess, StaffListRole } from "@apartment-book/shared";
 
 /**
  * What each staff role may open in the portal: one table that the sidebar, the section tabs and the page gates all
@@ -12,6 +12,7 @@ import type { AdminStaffRole, StaffAccess } from "@apartment-book/shared";
  */
 export const PERMISSIONS = [
   "dashboard.view",
+  "campus.overview",
   "users.view",
   "moderation.view",
   "content.view",
@@ -46,29 +47,31 @@ const MODERATOR: readonly Permission[] = [
 const ADMIN: readonly Permission[] = [...MODERATOR, "universities.manage", "business.manage", "analytics.view", "audit.context", "settings.manage"];
 
 /**
- * Campus admins (migration 72's role): only the areas whose functions SQL already scopes to their campuses, always to
- * the verified students of their own campuses: moderation (migration 73: reports, flagged content and the content they
- * are about; 74: appeals) and users (74: the list, search, a student's page, suspensions). The portal does not let a
- * campus admin in yet (lib/admin.ts getStaffAccess knows only the roles in STAFF_ROLE_RANK) until their shell arrives;
- * this list is what SQL gives them, and the newest scoping migration's suite (supabase/tests/campus-users.test.mjs)
- * fails if the two differ.
+ * Campus admins (migration 72's role): only the areas whose functions SQL already scopes to their own campuses:
+ * moderation (migration 73: reports, flagged content and the content they are about; 74: appeals),
+ * users (74: the list, search, a student's page, suspensions; their verified students, never staff) and content (75:
+ * hidden content, and the Events page, their campus's calendar); their own Security page (security.self: their
+ * second factor and password, nothing about anyone else); and their campus dashboard (campus.overview, 76: built only
+ * from the scoped functions above). This list is what SQL gives them; the suite of the newest migration to change it
+ * (supabase/tests/campus-appointments.test.mjs) fails if the two differ.
  */
-export const CAMPUS_ADMIN: readonly Permission[] = ["moderation.view", "users.view"];
+export const CAMPUS_ADMIN: readonly Permission[] = ["campus.overview", "moderation.view", "users.view", "content.view", "security.self"];
 
-const GRANTS: Readonly<Record<AdminStaffRole, ReadonlySet<Permission>>> = {
+const GRANTS: Readonly<Record<StaffListRole, ReadonlySet<Permission>>> = {
   owner: new Set(ADMIN),
   admin: new Set(ADMIN),
   moderator: new Set(MODERATOR),
+  campus_admin: new Set(CAMPUS_ADMIN),
 };
 
 /** Whether this role (or staff member) may do `permission`. Unknown roles and permissions are refused. */
-export function can(who: StaffAccess | AdminStaffRole | null | undefined, permission: Permission): boolean {
+export function can(who: StaffAccess | StaffListRole | null | undefined, permission: Permission): boolean {
   const role = typeof who === "string" ? who : who?.role;
   if (!role || !Object.hasOwn(GRANTS, role)) return false;
   return GRANTS[role].has(permission);
 }
 
 /** The permissions of a role, for client components (the sidebar) that cannot receive a function. */
-export function permissionsOf(who: StaffAccess | AdminStaffRole | null | undefined): Permission[] {
+export function permissionsOf(who: StaffAccess | StaffListRole | null | undefined): Permission[] {
   return PERMISSIONS.filter((p) => can(who, p));
 }

@@ -15,7 +15,7 @@ import { catalog, diffCatalogs, isBuzz, BUZZ_DATA_SQL, DATA_HELPER_SQL, DROP_DAT
 // Migrations that go to production on their own, as 58 to 62 and 66 did, are left out here until they are live, so the
 // database starts in production's state as it is. 66 (calls paused) went live on 2026-11-05; 67 (admin authority,
 // admin-authority.test.mjs) and 68 (liking your own story, story-self-like.test.mjs) wait.
-const AHEAD = ["20261119000000_admin_authority.sql", "20261120000000_story_self_like.sql", "20261121000000_event_engagement.sql", "20261122000000_university_requests.sql", "20261126000000_audit_feed.sql", "20261127000000_staff_scopes.sql", "20261128000000_campus_moderation.sql", "20261129000000_campus_users.sql", "20261203000000_staff_standing.sql"];
+const AHEAD = ["20261119000000_admin_authority.sql", "20261120000000_story_self_like.sql", "20261121000000_event_engagement.sql", "20261122000000_university_requests.sql", "20261126000000_audit_feed.sql", "20261127000000_staff_scopes.sql", "20261128000000_campus_moderation.sql", "20261129000000_campus_users.sql", "20261130000000_campus_events.sql", "20261201000000_campus_appointments.sql", "20261203000000_staff_standing.sql"];
 const PENDING = [
   "20261103000300_discover.sql",
   "20261104000100_discover_audience.sql",

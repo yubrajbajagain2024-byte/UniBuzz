@@ -460,6 +460,18 @@ export const STAFF_ROLES = [
 export type AdminStaffRole = (typeof STAFF_ROLES)[number]["value"];
 export const STAFF_ROLE_VALUES = STAFF_ROLES.map((r) => r.value) as [AdminStaffRole, ...AdminStaffRole[]];
 export const STAFF_ROLE_RANK: Record<AdminStaffRole, number> = { owner: 3, admin: 2, moderator: 1 };
+/**
+ * Every role on the staff list: the platform's three above, and campus admins (migration 72), who act for their own
+ * campuses only. A campus admin has no rank: what they may do is given by permission (staff_role_permissions() in SQL,
+ * apps/admin lib/permissions.ts), never by comparing ranks, so code that ranks roles must take AdminStaffRole only.
+ */
+export type StaffListRole = AdminStaffRole | "campus_admin";
+export const CAMPUS_ADMIN_ROLE = { value: "campus_admin", label: "Campus admin", description: "Moderation, students and the events calendar of their own campuses only. Appointed by owners." } as const;
+export const STAFF_ROLE_LABELS: Record<StaffListRole, string> = { owner: "Owner", admin: "Admin", moderator: "Moderator", campus_admin: "Campus admin" };
+/** Whether a role is one of the platform's three (owner, admin, moderator), the ones with a rank. */
+export function isPlatformRole(role: string | null | undefined): role is AdminStaffRole {
+  return role === "owner" || role === "admin" || role === "moderator";
+}
 
 /** The eight kinds of content staff can hide, restore and delete: the names reports.target_type uses ('profile' is handled by suspension instead). */
 export const MODERATION_TARGET_TYPES = [
