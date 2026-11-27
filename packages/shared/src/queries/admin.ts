@@ -1,5 +1,5 @@
 import { STAFF_ROLE_VALUES, type AdminStaffRole } from "../constants";
-import type { AuditEntry, Client, InviteEmailStatus, StaffAccess, StaffInvite, StaffMember } from "../types/models";
+import type { AuditEntry, Client, InviteEmailStatus, StaffAccess, StaffInvite, StaffMember, StaffPermissions } from "../types/models";
 import { MODERATION_AUDIT_LABELS } from "./admin-moderation";
 
 /**
@@ -17,6 +17,16 @@ export async function getMyStaffAccess(supabase: Client): Promise<StaffAccess | 
   const row = data?.[0];
   if (!row) return null;
   return { userId: row.user_id, role: row.role as AdminStaffRole, mfaVerified: row.mfa_verified, mfaEnrolled: row.mfa_enrolled, lastOwner: row.last_owner };
+}
+
+/**
+ * The caller's own role, campuses and permissions as the database decides them (migration 72's admin_my_permissions), or
+ * null for anyone not on the staff (or suspended). Throws where the migration is missing, so the caller can fall back.
+ */
+export async function getMyStaffPermissions(supabase: Client): Promise<StaffPermissions | null> {
+  const { data, error } = await supabase.rpc("admin_my_permissions");
+  if (error) throw error;
+  return (data as StaffPermissions | null) ?? null;
 }
 
 /** Everyone on the team, owners first (moderator+, aal2). For a moderator, mfaEnrolled is null on every row but their own. */

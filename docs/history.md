@@ -324,3 +324,8 @@ its file in `branches/`.
   page gates, `audit-feed.test.mjs` (62) and `tests/staging/audit-feed.mjs`. Found on staging and fixed before the
   merge: `upgrade-insecure-requests` broke a portal served over http, so it follows the portal's scheme. The branch
   was deleted.
+- **2026-11-27 00:15 UTC (2026-11-26 18:15 CST):** migration 72 (`admin-portal-phase-2`, Phase 2a: campus scopes for
+  the staff, default deny) went live alone with the owner's approval, after staging (17/17) and a full verified backup
+  (`before-migration-72`); read-only checks and `verify.mjs --live` after it found no difference (76 migrations). The
+  Campus Admin role exists with no permissions and nobody holds it; the role resolvers refuse roles they do not know;
+  nothing changed for students, businesses or the current staff.

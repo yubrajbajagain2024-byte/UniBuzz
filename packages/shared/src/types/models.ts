@@ -365,6 +365,12 @@ export type StaffInvite = {
   accountCreated: boolean;
 };
 export type InviteEmailStatus = "not_sent" | "sent" | "failed";
+/**
+ * The signed-in staff member's place on the staff from SQL (migration 72's admin_my_permissions): the role as stored
+ * (campus_admin included), whether it is platform-wide, a campus admin's universities, the permissions (the portal's
+ * names, decided in SQL) and whether this session passed the second factor.
+ */
+export type StaffPermissions = { role: string; platform: boolean; universities: { id: string; name: string }[]; permissions: string[]; mfaVerified: boolean };
 export type AuditEntry = { id: number; actorId: string | null; actorEmail: string | null; actorName: string | null; action: string; targetType: string | null; targetId: string | null; details: Record<string, unknown>; createdAt: string };
 export type MfaFactorSummary = { id: string; friendlyName: string | null; status: "verified" | "unverified"; createdAt: string };
 /** enrolled = a verified authenticator exists; verified = this session passed it (aal2) and it still exists, the rule staff_mfa_verified() applies in SQL. */

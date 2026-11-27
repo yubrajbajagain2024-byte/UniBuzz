@@ -55,7 +55,11 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
   1. **Name, audit view, CSP, permissions: done.** Migration 71 live since 2026-11-26 21:16 UTC, the portal's code since
      PR #127's merge (21:21 UTC): the name UniBuzz Master Admin Portal, one audit log with where staff actions came from,
      a nonce Content-Security-Policy, one permission table ([history.md](history.md), 2026-11-26).
-  2. Campus scopes and the Campus Admin role, `staff_can()`, every staff function scoped in SQL (before any campus staff).
+  2. **Campus scopes** (`admin-portal-phase-2`; [branches/admin-portal-phase-2.md](branches/admin-portal-phase-2.md)): in
+     layers, default deny until scoped. **2a** (migration 72: the Campus Admin role with no permissions, `staff_campuses`,
+     the role resolvers default-deny, the permission table in SQL, the portal reading it) live on production since
+     2026-11-27 00:15 UTC (PR #129). Next: 2b to 2d scope moderation, users, events and organizations, then the screens
+     to appoint campus admins.
   3. Universities: campus details, sign-up domains opened by owners only, calendar feeds moved from the website.
   4. One moderation model: the website console's queue in the portal, one sanction system, safety metrics.
   5. Organizations and departments: directory, editing, members and ownership, official departments.
