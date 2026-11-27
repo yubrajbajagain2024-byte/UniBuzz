@@ -344,3 +344,16 @@ its file in `branches/`.
   `verify.mjs --live` with no difference (77 migrations). Campus admins (none exist yet) may use reports, flagged items
   and the content behind them for their own students only; nothing changed for students, businesses or the current
   staff.
+- **2026-11-27 01:00 UTC:** PR #130 (`admin-portal-phase-2b`, Phase 2b of the Master Admin Portal) merged, deploying the
+  website and the portal (both production builds of `18d3061` completed and serving their addresses at 01:04 UTC). It
+  brought migration 73 (live since 00:52 UTC): reports, flagged items and the content behind them answering a campus
+  admin for their own students only (content placed by its author's verified campus, never the row's or the profile's
+  `university_id`), `campus-moderation.test.mjs` (58) and `tests/staging/campus-moderation.mjs` (15/15). Phases 2c and
+  2d (74, 75) continue on `admin-portal-phase-2c` (PR #132) and `admin-portal-phase-2d` (PR #133). The branch was
+  deleted.
+- **2026-11-27 01:33 UTC (2026-11-26 19:33 CST):** migration 74 (`admin-portal-phase-2c`, Phase 2c: users, suspensions
+  and appeals scoped by campus) went live alone with the owner's approval, after staging (14/14) and a full verified
+  backup (`before-migration-74`); the owner's users, search, student page, restriction and appeals answers identical
+  before and after (hashed), read-only checks and `verify.mjs --live` with no difference (78 migrations). Staff accounts
+  belong to no campus; only owners and admins may suspend a campus admin; nothing changed for students, businesses or
+  the current staff.
