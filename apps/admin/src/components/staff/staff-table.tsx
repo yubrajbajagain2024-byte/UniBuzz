@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, ShieldOff } from "lucide-react";
-import { assignableStaffRoles, canChangeMember, STAFF_ROLE_VALUES, type StaffAccess, type StaffMember, type AdminStaffRole } from "@apartment-book/shared";
+import { assignableStaffRoles, canChangeMember, STAFF_ROLE_VALUES, type StaffAccess, type StaffMember, type AdminStaffRole, type StaffListRole } from "@apartment-book/shared";
 import { removeStaffAction, sendPasswordResetAction, setStaffRoleAction } from "@/lib/actions/admin";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -13,10 +13,27 @@ import { FormMessage } from "@/components/ui/field";
 import { Select } from "@/components/ui/input";
 import { ConfirmButton } from "@/components/common/confirm-button";
 import { Time } from "@/components/common/time";
+import { CampusEditor } from "./campus-editor";
 import { RoleBadge, roleLabel } from "./role-badge";
 
 /** Everyone on the team. Controls only appear where the caller may act (never on their own row); the database re-checks every change anyway. */
-export function StaffTable({ members, me, emailsEnabled = false }: { members: StaffMember[]; me: StaffAccess; emailsEnabled?: boolean }) {
+type Campus = { id: string; name: string };
+
+export function StaffTable({
+  members,
+  me,
+  emailsEnabled = false,
+  campusesByUser = {},
+  universities = [],
+}: {
+  members: StaffMember[];
+  me: StaffAccess;
+  emailsEnabled?: boolean;
+  /** Each campus admin's campuses (getStaffCampuses, migration 76); empty where it is missing. */
+  campusesByUser?: Readonly<Record<string, readonly Campus[]>>;
+  /** Every university, for an owner changing a campus admin's campuses. */
+  universities?: readonly Campus[];
+}) {
   const router = useRouter();
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [notices, setNotices] = useState<Record<string, string | undefined>>({});
@@ -42,6 +59,8 @@ export function StaffTable({ members, me, emailsEnabled = false }: { members: St
               error={errors[member.userId]}
               notice={notices[member.userId]}
               emailsEnabled={emailsEnabled}
+              campuses={campusesByUser[member.userId] ?? []}
+              universities={universities}
               onNotice={(text) => setNotices((cur) => ({ ...cur, [member.userId]: text }))}
               onError={(error) => setError(member.userId, error)}
               onChanged={() => {
@@ -62,11 +81,15 @@ function StaffRow({
   error,
   notice,
   emailsEnabled,
+  campuses,
+  universities,
   onNotice,
   onError,
   onChanged,
 }: {
   member: StaffMember;
+  campuses: readonly Campus[];
+  universities: readonly Campus[];
   me: StaffAccess;
   error?: string;
   notice?: string;
@@ -78,12 +101,15 @@ function StaffRow({
   const isMe = member.userId === me.userId;
   const editable = canChangeMember(me, member);
   const allowed = assignableStaffRoles(me.role);
-  const options = STAFF_ROLE_VALUES.filter((role) => allowed.includes(role) || role === member.role);
+  // The platform's roles this caller may give, and the member's own role (a campus admin's is shown, never offered:
+  // owners appoint campus admins with their campuses).
+  const options: StaffListRole[] = [...STAFF_ROLE_VALUES.filter((role) => allowed.includes(role) || role === member.role), ...(member.role === "campus_admin" ? (["campus_admin"] as const) : [])];
   const [pending, start] = useTransition();
   const name = member.fullName || member.email || "Unnamed";
 
   function changeRole(role: AdminStaffRole) {
     if (role === member.role) return;
+    if (member.role === "campus_admin" && !window.confirm(`${name} acts for their campuses only. As ${roleLabel(role)} they would act for every campus. Continue?`)) return;
     if (!window.confirm(`Change ${name}'s role from ${roleLabel(member.role)} to ${roleLabel(role)}?`)) return;
     start(async () => {
       const result = await setStaffRoleAction(member.userId, role);
@@ -133,13 +159,14 @@ function StaffRow({
               added <Time iso={member.createdAt} />
               {member.grantedByName ? ` by ${member.grantedByName}` : ""}
             </p>
+            {member.role === "campus_admin" ? <CampusEditor userId={member.userId} name={name} campuses={campuses} universities={universities} canEdit={me.role === "owner" && !isMe} /> : null}
           </div>
         </div>
         {editable ? (
           <div className="flex shrink-0 items-center gap-2 pl-13 sm:pl-0">
             <Select aria-label={`Role for ${name}`} value={member.role} disabled={pending} onChange={(e) => changeRole(e.target.value as AdminStaffRole)} className="h-8 w-36 py-1">
               {options.map((role) => (
-                <option key={role} value={role} disabled={!allowed.includes(role)}>
+                <option key={role} value={role} disabled={role === "campus_admin" || !(allowed as readonly string[]).includes(role)}>
                   {roleLabel(role)}
                 </option>
               ))}

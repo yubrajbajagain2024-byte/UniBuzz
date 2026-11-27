@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { KeyRound } from "lucide-react";
-import { getMfaStatus, STAFF_ROLES } from "@apartment-book/shared";
+import { getMfaStatus, STAFF_ROLE_LABELS } from "@apartment-book/shared";
 import { getStaffAccess } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { ADMIN_APP_NAME } from "@/lib/brand";
@@ -22,7 +22,7 @@ export default async function PasswordPage() {
   if (!access) redirect("/no-access");
   const status = await getMfaStatus(await createClient());
   if (status.enrolled && !status.verified) redirect("/security?next=/password");
-  const role = STAFF_ROLES.find((r) => r.value === access.role)?.label ?? access.role;
+  const role = STAFF_ROLE_LABELS[access.role] ?? access.role;
   const firstTime = !status.enrolled;
 
   return (

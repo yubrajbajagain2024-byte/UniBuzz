@@ -40,3 +40,5 @@ supabase/tests/staging/.rehearsal.json
 supabase/tests/staging/.ad-delivery.json
 # CampConnect Admin's staging test accounts, their passwords and authenticator keys (supabase/tests/staging/admin-e2e-accounts.mjs)
 supabase/tests/staging/.admin-e2e.json
+# The staging campus admin for the portal's campus-admin browser check (supabase/tests/staging/campus-e2e-account.mjs)
+supabase/tests/staging/.campus-e2e.json

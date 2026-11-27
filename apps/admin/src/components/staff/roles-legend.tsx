@@ -1,4 +1,4 @@
-import { STAFF_ROLES } from "@apartment-book/shared";
+import { CAMPUS_ADMIN_ROLE, STAFF_ROLES } from "@apartment-book/shared";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { RoleBadge } from "./role-badge";
 
@@ -11,14 +11,14 @@ export function RolesLegend() {
       </CardHeader>
       <CardBody>
         <ul className="flex flex-col gap-3">
-          {STAFF_ROLES.map((role) => (
+          {[...STAFF_ROLES, CAMPUS_ADMIN_ROLE].map((role) => (
             <li key={role.value} className="flex flex-col gap-1">
               <RoleBadge role={role.value} className="self-start" />
               <p className="text-sm text-gray-600">{role.description}</p>
             </li>
           ))}
         </ul>
-        <p className="mt-4 text-xs text-gray-500">Nobody can change their own role or remove themselves, and the last owner cannot be removed. Only admins and owners delete content permanently.</p>
+        <p className="mt-4 text-xs text-gray-500">Nobody can change their own role or remove themselves, and the last owner cannot be removed. Only admins and owners delete content permanently. A campus admin has no rank: they are given their campuses&apos; moderation, students and calendar, and admins may remove them or change their role.</p>
       </CardBody>
     </Card>
   );

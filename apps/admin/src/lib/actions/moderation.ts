@@ -85,7 +85,7 @@ function revalidateContent(type: ModerationTargetType, id: string): void {
 // ---------------------------------------------------------------------------
 
 export async function suspendUserAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const gate = await requireStaffAction();
+  const gate = await requireStaffAction({ permission: "users.view" });
   if (gate.error) return { error: gate.error, values: formValues(formData) };
   const userId = uuid.safeParse(formData.get("userId"));
   if (!userId.success) return { error: "Unknown user.", values: formValues(formData) };
@@ -110,7 +110,7 @@ export async function suspendUserAction(_prev: FormState, formData: FormData): P
 }
 
 export async function unsuspendUserAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const gate = await requireStaffAction();
+  const gate = await requireStaffAction({ permission: "users.view" });
   if (gate.error) return { error: gate.error, values: formValues(formData) };
   const userId = uuid.safeParse(formData.get("userId"));
   if (!userId.success) return { error: "Unknown user.", values: formValues(formData) };
@@ -131,7 +131,7 @@ export async function unsuspendUserAction(_prev: FormState, formData: FormData):
 // ---------------------------------------------------------------------------
 
 export async function hideContentAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const gate = await requireStaffAction();
+  const gate = await requireStaffAction({ permission: "moderation.view" });
   if (gate.error) return { error: gate.error, values: formValues(formData) };
   const t = target(formData);
   if (!t) return { error: "Unknown content.", values: formValues(formData) };
@@ -151,7 +151,7 @@ export async function hideContentAction(_prev: FormState, formData: FormData): P
 }
 
 export async function restoreContentAction(type: string, id: string): Promise<{ error?: string }> {
-  const gate = await requireStaffAction();
+  const gate = await requireStaffAction({ permission: "moderation.view" });
   if (gate.error) return { error: gate.error };
   const t = targetType.safeParse(type);
   const i = uuid.safeParse(id);
@@ -197,7 +197,7 @@ export async function deleteContentAction(_prev: FormState, formData: FormData):
  * the database settles the flag, closes its reports and tells the owner for all three.
  */
 export async function upholdAutoHideAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const gate = await requireStaffAction();
+  const gate = await requireStaffAction({ permission: "moderation.view" });
   if (gate.error) return { error: gate.error, values: formValues(formData) };
   const flagId = uuid.safeParse(formData.get("flagId"));
   const t = target(formData);
@@ -220,7 +220,7 @@ export async function upholdAutoHideAction(_prev: FormState, formData: FormData)
 // ---------------------------------------------------------------------------
 
 export async function resolveReportAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const gate = await requireStaffAction();
+  const gate = await requireStaffAction({ permission: "moderation.view" });
   if (gate.error) return { error: gate.error, values: formValues(formData) };
   const id = uuid.safeParse(formData.get("reportId"));
   if (!id.success) return { error: "Unknown report.", values: formValues(formData) };
@@ -240,7 +240,7 @@ export async function resolveReportAction(_prev: FormState, formData: FormData):
 }
 
 export async function reopenReportAction(id: string): Promise<{ error?: string }> {
-  const gate = await requireStaffAction();
+  const gate = await requireStaffAction({ permission: "moderation.view" });
   if (gate.error) return { error: gate.error };
   const parsed = uuid.safeParse(id);
   if (!parsed.success) return { error: "Unknown report." };

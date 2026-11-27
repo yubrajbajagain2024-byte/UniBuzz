@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
   addStaff,
+  appointCampusAdmin,
   canChangeMember,
   flattenZodError,
   formatDate,
@@ -12,11 +13,13 @@ import {
   removeStaff,
   resendStaffInvite,
   revokeStaffInvite,
+  setCampusAdminCampuses,
   setStaffRole,
   staffAddSchema,
-  STAFF_ROLES,
+  STAFF_ROLE_LABELS,
   STAFF_ROLE_VALUES,
   type AdminStaffRole,
+  type StaffListRole,
 } from "@apartment-book/shared";
 import { adminErrorMessage, requireStaffAction } from "@/lib/admin";
 import { sendInvitationEmail, sendPasswordResetEmail } from "@/lib/invitations";
@@ -37,12 +40,12 @@ const roleSchema = z.enum(STAFF_ROLE_VALUES);
 const emailSchema = staffAddSchema.shape.email;
 const INVITE_DAYS = 7;
 
-const label = (role: AdminStaffRole) => STAFF_ROLES.find((r) => r.value === role)?.label ?? role;
+const label = (role: StaffListRole) => STAFF_ROLE_LABELS[role] ?? role;
 
 type Delivery = { kind: "sent" } | { kind: "failed"; error: string } | { kind: "not_configured" } | { kind: "unrecorded"; error: string };
 
 /** Send the invitation email and record the outcome in the database (as the calling admin). */
-async function deliverInvitation(email: string, role: AdminStaffRole): Promise<Delivery> {
+async function deliverInvitation(email: string, role: StaffListRole): Promise<Delivery> {
   const supabase = await createClient();
   const result = await sendInvitationEmail(email, role);
   if (result.status === "not_configured") return { kind: "not_configured" };
@@ -54,7 +57,7 @@ async function deliverInvitation(email: string, role: AdminStaffRole): Promise<D
   return result.status === "sent" ? { kind: "sent" } : { kind: "failed", error: result.error };
 }
 
-function deliveryMessage(email: string, role: AdminStaffRole, delivery: Delivery): FormState {
+function deliveryMessage(email: string, role: StaffListRole, delivery: Delivery): FormState {
   const until = formatDate(new Date(Date.now() + INVITE_DAYS * 86_400_000).toISOString());
   switch (delivery.kind) {
     case "sent":
@@ -97,13 +100,69 @@ export async function addStaffAction(_prev: FormState, formData: FormData): Prom
   return deliveryMessage(email, role, delivery);
 }
 
+/** A campus admin's campuses: 1 to 20 universities (migration 76 checks them again in SQL). */
+const campusIdsSchema = z.array(z.uuid()).min(1, "Pick at least one campus.").max(20, "Pick at most 20 campuses.");
+
+/**
+ * Appoint a campus admin with their campuses (owners only, with a verified second factor; migration 76 checks the same
+ * in SQL). An existing confirmed account joins at once; anyone else is sent the usual invitation email, which carries
+ * the campuses when it is claimed.
+ */
+export async function appointCampusAdminAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const gate = await requireStaffAction({ minRole: "owner" });
+  if (gate.error) return { error: gate.error, values: formValues(formData) };
+  const parsedEmail = emailSchema.safeParse(formData.get("email"));
+  const parsedIds = campusIdsSchema.safeParse(formData.getAll("universityIds").map(String));
+  if (!parsedEmail.success || !parsedIds.success) {
+    return {
+      error: "Please fix the highlighted fields.",
+      fieldErrors: {
+        ...(parsedEmail.success ? {} : { email: ["Enter a valid email address."] }),
+        ...(parsedIds.success ? {} : { universityIds: [parsedIds.error.issues[0]?.message ?? "Pick at least one campus."] }),
+      },
+      values: formValues(formData),
+    };
+  }
+  const email = parsedEmail.data;
+  let result: "added" | "invited";
+  try {
+    result = await appointCampusAdmin(await createClient(), { email, universityIds: parsedIds.data });
+  } catch (error) {
+    return { error: adminErrorMessage(error), values: formValues(formData) };
+  }
+  revalidatePath("/", "layout");
+  if (result === "added") {
+    return {
+      success: `${email} already had a confirmed account and is now a campus admin for the campuses you picked. No email is needed: they sign in to this app with their usual password and set up two-factor authentication before they can do anything.`,
+    };
+  }
+  return deliveryMessage(email, "campus_admin", await deliverInvitation(email, "campus_admin"));
+}
+
+/** Replace a campus admin's campuses (owners only; audited in SQL with before and after). */
+export async function setCampusAdminCampusesAction(userId: string, universityIds: string[]): Promise<{ error?: string }> {
+  const gate = await requireStaffAction({ minRole: "owner" });
+  if (gate.error) return { error: gate.error };
+  const parsedId = userIdSchema.safeParse(userId);
+  if (!parsedId.success) return { error: "Not a campus admin" };
+  const parsedIds = campusIdsSchema.safeParse(universityIds);
+  if (!parsedIds.success) return { error: parsedIds.error.issues[0]?.message ?? "Pick at least one campus." };
+  try {
+    await setCampusAdminCampuses(await createClient(), parsedId.data, parsedIds.data);
+  } catch (error) {
+    return { error: adminErrorMessage(error) };
+  }
+  revalidatePath("/", "layout");
+  return {};
+}
+
 /** Renew a pending invitation for 7 more days and send its email again. */
 export async function resendInviteAction(email: string): Promise<{ error?: string; success?: string }> {
   const gate = await requireStaffAction({ minRole: "admin" });
   if (gate.error) return { error: gate.error };
   const parsedEmail = emailSchema.safeParse(email);
   if (!parsedEmail.success) return { error: "No invitation for that address" };
-  let role: AdminStaffRole;
+  let role: StaffListRole;
   try {
     role = await resendStaffInvite(await createClient(), parsedEmail.data);
   } catch (error) {

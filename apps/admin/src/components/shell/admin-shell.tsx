@@ -23,6 +23,7 @@ import { PermissionsProvider } from "./permissions-context";
 export function AdminShell({
   access,
   permissions,
+  campuses = [],
   name,
   email,
   avatarUrl,
@@ -31,6 +32,8 @@ export function AdminShell({
   access: StaffAccess;
   /** From the database (lib/admin.ts getStaffPermissions): what the sidebar and the section tabs may show. */
   permissions: readonly Permission[];
+  /** A campus admin's campuses (lib/admin.ts getMyCampuses), shown beside their role; empty for everyone else. */
+  campuses?: readonly { id: string; name: string }[];
   name: string;
   email: string | null;
   avatarUrl: string | null;
@@ -61,6 +64,11 @@ export function AdminShell({
 
             <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
               <RoleBadge role={access.role} />
+              {campuses.length ? (
+                <span className="hidden max-w-48 truncate text-xs font-medium text-gray-600 md:inline" title={campuses.map((c) => c.name).join(", ")}>
+                  {campuses.map((c) => c.name).join(", ")}
+                </span>
+              ) : null}
               <a
                 href={getMainSiteUrl()}
                 target="_blank"
