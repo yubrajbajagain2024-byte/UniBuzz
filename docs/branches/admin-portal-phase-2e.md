@@ -67,8 +67,12 @@
   no console error or CSP violation. `apps/admin/e2e/admin.mjs` passes as the staging admin and as the moderator
   (every section, the audit log's rules, owner and admin sections, no browser errors): the platform's staff unchanged.
 
-## Rollout (after 75; each step waits on the owner)
+## Rollout
 
 1. Staging: done (above).
-2. Backup, apply 76 alone with its `_migrations` row, read-only checks, `verify.mjs --live`.
-3. Merge after 2d's PR (the portal's campus-admin view needs 73 to 76 live).
+2. Backup `before-migration-76` (full, 220 files, checksums verified, row counts matching the live project).
+3. **Applied 2026-11-27 07:11:03 UTC** with the owner's approval, alone, in one transaction with its `_migrations` row.
+4. Verified (read-only): the owner's answers identical before and after; details in [../migrations.md](../migrations.md);
+   `verify.mjs --live` the same schema.
+5. Merge PR #135 (`main` merged into the branch first): the portal's campus-admin view and the appointing screens go
+   live with it.
