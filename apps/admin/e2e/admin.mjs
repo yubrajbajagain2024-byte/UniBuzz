@@ -45,7 +45,7 @@ async function newPage() { const ctx = await browser.newContext({ viewport: { wi
 try {
   const D = await newPage();
   await step("signed out: every page goes to /login with next= pointing back", async () => {
-    for (const path of ["/", "/users", "/reports", "/appeals", "/flagged", "/content", "/events", "/media", "/operations/health", "/operations/email", "/support", "/support/issues", "/universities", "/staff", "/audit", "/security", "/settings"]) { await D.goto(BASE + path); await D.waitForURL((u) => u.pathname === "/login"); expectLogin(D, path); }
+    for (const path of ["/", "/users", "/queue", "/reports", "/appeals", "/flagged", "/content", "/events", "/media", "/operations/health", "/operations/email", "/support", "/support/issues", "/universities", "/staff", "/audit", "/security", "/settings"]) { await D.goto(BASE + path); await D.waitForURL((u) => u.pathname === "/login"); expectLogin(D, path); }
     await D.waitForLoadState("networkidle"); await D.getByRole("heading", { name: "UniBuzz Master Admin Portal" }).waitFor();
     if (!/UniBuzz Master Admin Portal/.test(await D.title())) throw new Error(`title "${await D.title()}"`);
     if (await D.getByText(/create an account/i).count()) throw new Error("a sign-up link is offered");
@@ -106,8 +106,30 @@ try {
         await code.fill(totp(process.env.ADMIN_E2E_TOTP_SECRET)); await code.press("Enter");
         // The code's verification sets the aal2 session cookie and the action redirects to the page asked for: wait for that page.
         await D.getByRole("heading", { name: "Reports", exact: true }).first().waitFor(); await D.screenshot({ caret: "initial", path: SHOTS + "admin-04-reports.png" });
-        const pages = [["/", "Dashboard"], ["/users", "Users"], ["/users?filter=unverified", "Users"], ["/appeals", "Appeals"], ["/flagged", "Flagged"], ["/content", "Content"], ["/events", "Events"], ["/media", "Media"], ["/operations/health", "System health"], ["/operations/email", "Email"], ["/support", "Support"], ["/support/issues", "Issues"], ["/staff", "Staff"], ["/audit", "Audit log"]];
+        const pages = [["/", "Dashboard"], ["/users", "Users"], ["/users?filter=unverified", "Users"], ["/queue", "Queue"], ["/appeals", "Appeals"], ["/flagged", "Flagged"], ["/content", "Content"], ["/events", "Events"], ["/media", "Media"], ["/operations/health", "System health"], ["/operations/email", "Email"], ["/support", "Support"], ["/support/issues", "Issues"], ["/staff", "Staff"], ["/audit", "Audit log"]];
         for (const [path, heading] of pages) { await D.goto(BASE + path); await D.getByRole("heading", { name: heading, exact: true }).first().waitFor(); await D.screenshot({ caret: "initial", path: SHOTS + `admin-05${path.replace(/[\/?=]/g, "-") || "-dashboard"}.png` }); }
+      });
+      await step("the review queue (Phase 4b): its tab, the views (Escalated for owners and admins only), filters; an item opens with its actions and no author on Buzz", async () => {
+        await D.goto(BASE + "/queue"); await D.getByRole("heading", { name: "Queue", exact: true }).first().waitFor();
+        const main = D.locator("main"); const text = await main.innerText();
+        if (/needs migration 20261103000000/.test(text)) { note("queue: Trust & Safety (migration 41) is not on this database"); return; }
+        const tabs = await D.getByRole("navigation", { name: /Moderation pages/ }).innerText();
+        if (!/Queue/.test(tabs)) throw new Error("no Queue tab in Moderation");
+        const views = await D.getByRole("navigation", { name: "Queue view" }).innerText();
+        for (const v of ["Priority", "Wellbeing", "Held", "Auto-hidden", "Reports", "Appeals", "Mine", "Closed"]) if (!views.includes(v)) throw new Error(`no ${v} view`);
+        const moderator = /moderator/.test((await D.locator("header").innerText()).toLowerCase());
+        if (moderator === /Escalated/.test(views)) throw new Error(moderator ? "a moderator sees the Escalated view" : "an admin does not see the Escalated view");
+        await D.screenshot({ caret: "initial", path: SHOTS + "admin-05-queue.png" });
+        const card = D.locator("[data-testid='queue-card']").first();
+        if (!(await card.count())) { note("queue: no open item on this database to open"); return; }
+        // Opening an item claims it for 10 minutes; the claim is released at the end.
+        await card.click(); await D.locator("[data-testid='queue-item']").waitFor();
+        await D.getByRole("heading", { name: "Author", exact: true }).waitFor();
+        const item = await D.locator("[data-testid='queue-item']").innerText();
+        if (/Anonymous surface/.test(item) && !/Blind standing/.test(item)) throw new Error("a Buzz item shows an author panel that is not blind");
+        await D.screenshot({ caret: "initial", path: SHOTS + "admin-05-queue-item.png" });
+        const release = D.getByRole("button", { name: "Release my claim" });
+        if (await release.count()) { await release.click(); await D.getByText("Claim released.").waitFor(); }
       });
       await step("the audit log: every log for owners and admins with where staff actions came from; moderators never business entries or request details", async () => {
         await D.goto(BASE + "/audit"); await D.waitForLoadState("networkidle");
