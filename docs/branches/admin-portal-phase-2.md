@@ -56,12 +56,11 @@ asks for a profile with its university as the apps do. Production never had it. 
 `staff_can` and the first name of `admin_my_permissions` (`staff_permissions`) were also API-callable at first, against
 CampConnect Admin's rule that `staff_*` helpers are internal; `permissions-audit` caught it.
 
-## Rollout (waits on the owner)
+## Rollout
 
 1. Staging: done (above).
-2. Backup: `node scripts/backup.mjs before-migration-72 --full`.
-3. Apply 72 alone in one transaction with its `_migrations` row, then `notify pgrst, 'reload schema'` (owner's approval).
-4. Verify (read-only): the role checks, the table closed, the grants, the resolvers (a test row is not needed: no
-   campus admin exists), a profile's university still embeddable through the REST API, `verify.mjs --live`.
-5. Merge the PR (the portal then reads its permissions from SQL).
+2. Backup: `before-migration-72` (full, 222 files, checksums verified, row counts matching the live project).
+3. **Applied 2026-11-27 00:15:41 UTC** with the owner's approval, alone, in one transaction with its `_migrations` row.
+4. Verified (read-only): details in [../migrations.md](../migrations.md); `verify.mjs --live` the same schema.
+5. Merge PR #129 (the portal then reads its permissions from SQL).
 - **Rollback:** the rollback file with its `_migrations` delete (refused while any campus admin or campus exists).
