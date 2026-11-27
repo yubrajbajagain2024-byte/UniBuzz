@@ -91,7 +91,10 @@ Supabase's `auth` and `storage` schemas.
   owners appointing and inviting campus admins with their campuses, admins refused (`--restore`);
   `campus-e2e-account.mjs`, the staging campus admin for the portal's `apps/admin/e2e/campus-admin.mjs` (`create`, `env`,
   `delete`); `university-console.mjs`, migration 77 the same way (needs 72): campus details changed and put back,
-  an owner opening and closing a throwaway domain, the rules refusing the rest (`--restore`); `admin-e2e-accounts.mjs`, the staging staff
+  an owner opening and closing a throwaway domain, the rules refusing the rest (`--restore`);
+  `staff-standing.mjs`, migration 78 the same way (needs 72): a staff admin under an account-wide
+  Trust & Safety suspension refused everywhere, a Buzz-only ban and a mute ignored, powers back on lifting (`--restore`);
+  `admin-e2e-accounts.mjs`, the staging staff
   admin, staff moderator and student for CampConnect Admin's browser check (`create`, `env`, `qr`, `delete`);
   `admin-authority.mjs`, migration 67 applied, checked through Auth and the REST API, rolled back and applied again
   (`--restore` leaves it rolled back); `event-engagement.mjs`, events' likes, comments and who is going (migration 69,

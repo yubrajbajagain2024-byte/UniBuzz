@@ -383,4 +383,23 @@ its file in `branches/`.
   difference (80 migrations). Owners may now appoint campus admins with their campuses.
 - **2026-11-27 07:11 UTC:** PR #139 (npm overrides: `node-forge` 1.4.4, `typescript-eslint` 8.74.0; advisories 20 to 13,
   the rest inside Expo SDK 58's tooling, left for a mobile release with a native build) merged with the owner's
-  approval.
+  approval; both production builds of `8160524` completed. PR #140 (docs: PR #133's merge and 76 on production) merged
+  at 07:12 UTC.
+- **2026-11-27 07:15 UTC:** PR #135 (`admin-portal-phase-2e`, Phase 2e of the Master Admin Portal) merged, deploying the
+  website and the portal (both production builds of `ba60b7b` completed and serving their addresses, the portal's script nonce intact), and **Phase 2 is complete**. It brought
+  migration 76 (live since 07:11 UTC) and the portal's side: a campus admin let in by permission alone, never by rank
+  (default deny for any page or action naming no permission; a refused page sends them to their first section), the
+  Campus Admin dashboard at `/` (reports, flags, appeals, organizations to verify, events, suspended students, all from
+  scoped functions), their campuses in the header, owners appointing campus admins and changing their campuses on the
+  Staff page; `StaffListRole`, `isPlatformRole` and `appointCampusAdmin` in `packages/shared`. Tests:
+  `campus-appointments.test.mjs` (41, mutation-checked), `staff-roles.test.mjs` (5), staging
+  `campus-appointments.mjs` 12/12, the browser check `apps/admin/e2e/campus-admin.mjs` 8/8 as staging's campus admin
+  and `apps/admin/e2e/admin.mjs` as its admin and moderator. The branch and its file were deleted.
+- **2026-11-27 07:45 UTC:** PR #141 (docs: Phase 2 complete) merged with the owner's approval.
+- **2026-11-27 07:48 UTC (01:48 CST):** migration 78 (`admin-portal-phase-4`, Phase 4a: one standing for the staff
+  across both sanction systems) went live alone with the owner's approval, ahead of 77. Until then only CampConnect
+  Admin's own suspension ended staff powers; an account-wide Trust & Safety suspension or ban now does too
+  (`staff_role_of()`, `admin_standing()`, `staff_require()`), and the portal sends such an account to `/no-access`.
+  The branch was kept local and unpushed until then. Before it: staging 7/7, the portal's browser checks on staging, a
+  full verified backup (`before-migration-78`); after it: the owner's answers identical (hashed), read-only checks and
+  `verify.mjs --live` with no difference (81 migrations). Nobody's access changed (no staff member was sanctioned).

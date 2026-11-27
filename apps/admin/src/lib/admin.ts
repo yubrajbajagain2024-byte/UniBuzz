@@ -15,6 +15,16 @@ import { errorMessage } from "@/lib/utils";
  * first, cheap gate in front of everything: no session, no page; no aal2, /security.
  */
 
+/** The signed-in staff member's row from admin_my_permissions() (migration 72), null when the database gives them none, or "missing" where that function does not exist. Cached per request. */
+const getPermissionsRow = cache(async (): Promise<StaffPermissions | null | "missing"> => {
+  try {
+    return await getMyStaffPermissions(await createClient());
+  } catch (error) {
+    if (/admin_my_permissions|PGRST202|Could not find the function/i.test(errorMessage(error, ""))) return "missing";
+    throw error;
+  }
+});
+
 /** Staff row of the signed-in user, or null (not signed in / not staff / suspended). Cached per request. Errors propagate. */
 export const getStaffAccess = cache(async (): Promise<StaffAccess | null> => {
   const user = await getCurrentUser();
@@ -23,20 +33,14 @@ export const getStaffAccess = cache(async (): Promise<StaffAccess | null> => {
   const [access, restriction] = await Promise.all([getMyStaffAccess(supabase), getMyRestriction(supabase).catch(() => null)]);
   // A suspended staff member has no admin powers (every RPC refuses them).
   if (!access || restriction) return null;
+  // Nor one under an account-wide sanction in Trust & Safety (migration 78): the database answers
+  // admin_my_permissions() with nothing for them, so the portal goes no further than /no-access. Where migration 72 is
+  // missing the function is too, and nothing changes.
+  if ((await getPermissionsRow()) === null) return null;
   // Default deny: only the roles the portal knows are let in: the platform's three, and campus admins (Phase 2), who
   // pass a page or an action by permission alone (requireStaff), never by a rank they do not have.
   if (!isPlatformRole(access.role) && access.role !== "campus_admin") return null;
   return access;
-});
-
-/** The signed-in staff member's row from admin_my_permissions() (migration 72), or null where it is missing. Cached per request. */
-const getPermissionsRow = cache(async (): Promise<StaffPermissions | null | "missing"> => {
-  try {
-    return await getMyStaffPermissions(await createClient());
-  } catch (error) {
-    if (/admin_my_permissions|PGRST202|Could not find the function/i.test(errorMessage(error, ""))) return "missing";
-    throw error;
-  }
 });
 
 /**
