@@ -329,3 +329,12 @@ its file in `branches/`.
   (`before-migration-72`); read-only checks and `verify.mjs --live` after it found no difference (76 migrations). The
   Campus Admin role exists with no permissions and nobody holds it; the role resolvers refuse roles they do not know;
   nothing changed for students, businesses or the current staff.
+- **2026-11-27 00:21 UTC:** PR #129 (`admin-portal-phase-2`, Phase 2a of the Master Admin Portal) merged, deploying the
+  website and the portal (both production builds of `3aa39ad` completed and serving their addresses at 00:24 UTC: the
+  website's login page, the portal's under its name with a fresh script nonce, signed-out visitors sent to log in). It
+  brought migration 72 (live since 00:15 UTC): the Campus Admin role with no permissions, `staff_campuses` (its people
+  as `auth.users`, after staging found that a `profiles` key made every profile-to-university embed ambiguous), the
+  role resolvers default-deny, the permission table in SQL (`staff_role_permissions`, `staff_can`,
+  `staff_require_can`, `admin_my_permissions`), the portal reading it, `staff-scopes.test.mjs` (80) and
+  `tests/staging/staff-scopes.mjs` (17/17). Phase 2b (migration 73) continues on `admin-portal-phase-2b` (PR #130). The
+  branch was deleted.
