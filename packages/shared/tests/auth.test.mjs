@@ -58,7 +58,13 @@ test("authErrorMessage: Supabase's answers in the person's words, never telling 
   assert.doesNotMatch(wrong, /no account|not found|exist/i);
   assert.match(A.authErrorMessage("Email not confirmed"), /Confirm your email/);
   assert.match(A.authErrorMessage("For security purposes, you can only request this after 56 seconds."), /Too many tries/);
-  assert.match(A.authErrorMessage("email rate limit exceeded"), /Too many tries/);
+  // The project's hourly email limit is not the person's doing, and says so.
+  assert.equal(A.authErrorMessage("email rate limit exceeded"), A.EMAIL_LIMIT_REACHED);
+  // Delivery failures (2026-11-27: "Error sending confirmation email" reached students as is): the project's, in words.
+  for (const raw of ["Error sending confirmation email", "Error sending recovery email", "Error sending magic link email", 'Email address "a@txstate.edu" cannot be used as it is not authorized']) {
+    assert.equal(A.authErrorMessage(raw), A.EMAIL_NOT_SENT, raw);
+  }
+  assert.equal(A.authErrorMessage("Email not confirmed"), A.EMAIL_NOT_CONFIRMED);
   assert.match(A.authErrorMessage("New password should be different from the old password."), /haven't used before/);
   assert.equal(A.authErrorMessage("Auth session missing!"), A.RESET_LINK_EXPIRED);
   assert.equal(A.authErrorMessage("Network request failed"), "Network request failed", "anything else is passed on");
@@ -69,6 +75,10 @@ test("resetPasswordUrl and the shared texts", () => {
   assert.equal(A.resetPasswordUrl("http://localhost:3061"), "http://localhost:3061/reset-password");
   assert.match(A.RESET_REQUESTED, /^If there's an account/);
   assert.doesNotMatch(A.RESET_REQUESTED, /no account/i);
+  // A new confirmation link: the same answer whether or not an unconfirmed account exists.
+  assert.match(A.CONFIRMATION_RESENT, /^If that email has an account/);
+  assert.doesNotMatch(A.CONFIRMATION_RESENT, /no account|not found|already/i);
+  assert.doesNotMatch(A.EMAIL_NOT_SENT, /Error sending/);
 });
 
 test("newPasswordSchema: at least 8 characters, typed twice the same; resetRequestSchema tidies the email", () => {

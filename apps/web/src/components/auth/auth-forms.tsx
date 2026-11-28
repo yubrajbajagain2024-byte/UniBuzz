@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { requestPasswordResetAction, signInAction, signInWithGoogleAction, signUpAction } from "@/lib/actions/auth";
+import { EMAIL_NOT_CONFIRMED } from "@apartment-book/shared";
+import { requestPasswordResetAction, resendConfirmationAction, signInAction, signInWithGoogleAction, signUpAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,27 @@ function Divider() {
     <div className="flex items-center gap-3 text-xs uppercase text-gray-500">
       <span className="h-px flex-1 bg-gray-200" /> or <span className="h-px flex-1 bg-gray-200" />
     </div>
+  );
+}
+
+/**
+ * "Didn't get the email?": sends a new confirmation link (resendConfirmationAction). Shown after signing up and when
+ * logging in is refused until the email is confirmed. The answer never says whether an account is waiting.
+ */
+function ResendConfirmation({ email, next }: { email?: string; next: string }) {
+  const [state, action, pending] = useActionState(resendConfirmationAction, null);
+  return (
+    <form action={action} className="flex flex-col gap-3 rounded-xl bg-gray-50 p-4 ring-1 ring-gray-200" data-testid="resend-confirmation">
+      <input type="hidden" name="next" value={next} />
+      <p className="text-sm text-gray-700">Didn&apos;t get the email? Check the spam folder, or send a new link.</p>
+      <FormMessage error={state?.error} success={state?.success} />
+      <Field label="Email" htmlFor="resend-email" error={state?.fieldErrors?.email}>
+        <Input id="resend-email" name="email" type="email" autoComplete="email" required defaultValue={state?.values?.email ?? email} />
+      </Field>
+      <Button type="submit" variant="outline" loading={pending}>
+        Send a new link
+      </Button>
+    </form>
   );
 }
 
@@ -64,6 +86,7 @@ export function LoginForm({ next, initialError, domains = [] }: { next: string; 
           Log in
         </Button>
       </form>
+      {(state?.error ?? initialError) === EMAIL_NOT_CONFIRMED ? <ResendConfirmation email={state?.values?.email} next={next} /> : null}
       <Divider />
       <GoogleButton next={next} />
       <p className="text-center text-sm text-gray-600">
@@ -83,6 +106,7 @@ export function SignupForm({ next, domains = [] }: { next: string; domains?: str
     return (
       <div className="flex flex-col gap-4">
         <FormMessage success={state.success} />
+        <ResendConfirmation email={state.values?.email} next={state.values?.next ?? next} />
         <p className="text-center text-sm text-gray-600">
           Already confirmed?{" "}
           <Link href="/login" className="font-semibold text-brand-600 hover:underline">

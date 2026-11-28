@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { authErrorMessage, createSignUpSchema, flattenZodError, getAllowedEmailDomains, newPasswordSchema, PASSWORD_CHANGED, requestPasswordReset, RESET_REQUESTED, resetPasswordUrl, resetRequestSchema, setNewPassword, signInSchema, type FieldErrors } from "@apartment-book/shared";
+import { authErrorMessage, CONFIRMATION_RESENT, createSignUpSchema, flattenZodError, getAllowedEmailDomains, newPasswordSchema, PASSWORD_CHANGED, requestPasswordReset, resendSignupConfirmation, RESET_REQUESTED, resetPasswordUrl, resetRequestSchema, setNewPassword, signInSchema, type FieldErrors } from "@apartment-book/shared";
 import { getSiteUrl } from "@/lib/env";
 import { createRecoveryClient } from "@/lib/supabase/recovery";
 import { createClient } from "@/lib/supabase/server";
@@ -45,7 +45,7 @@ export async function signUpAction(_prev: AuthState, formData: FormData): Promis
     password: parsed.data.password,
     options: {
       data: { full_name: parsed.data.fullName },
-      emailRedirectTo: `${getSiteUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
+      emailRedirectTo: confirmRedirect(next),
     },
   });
 
@@ -61,7 +61,33 @@ export async function signUpAction(_prev: AuthState, formData: FormData): Promis
 
   return {
     success: `We sent a confirmation link to ${parsed.data.email}. Open it to activate your account.`,
+    values: { email: parsed.data.email, next },
   };
+}
+
+/** Where a confirmation link lands: the callback sign-up uses, then `next`. */
+function confirmRedirect(next: string): string {
+  return `${getSiteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
+}
+
+/**
+ * "Send a new link": a new sign-up confirmation email, from the same client and to the same callback as sign-up, so
+ * the new link behaves exactly as the first. It creates nothing (only sign-up creates an account, through the
+ * university email-domain trigger) and the answer never says whether an unconfirmed account exists.
+ */
+export async function resendConfirmationAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const values = stringValues(formData, ["email"]);
+  const parsed = resetRequestSchema.safeParse(formToObject(formData));
+  if (!parsed.success) {
+    return { error: "Please fix the highlighted fields.", fieldErrors: flattenZodError(parsed.error).fieldErrors, values };
+  }
+  const next = safeNextPath(String(formData.get("next") ?? ""), "/settings/profile?welcome=1");
+  try {
+    await resendSignupConfirmation(await createClient(), parsed.data.email, confirmRedirect(next));
+  } catch (error) {
+    return { error: errorMessage(error), values };
+  }
+  return { success: CONFIRMATION_RESENT, values };
 }
 
 export async function signInAction(_prev: AuthState, formData: FormData): Promise<AuthState> {

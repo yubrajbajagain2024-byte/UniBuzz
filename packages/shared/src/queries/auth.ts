@@ -16,6 +16,18 @@ export async function requestPasswordReset(supabase: Client, email: string, redi
   if (error) throw new Error(authErrorMessage(error.message));
 }
 
+/**
+ * Asks Supabase to send a new sign-up confirmation link to `email`, landing on `redirectTo` (the same callback sign-up
+ * uses). Supabase answers alike whether or not an unconfirmed account exists for it, so the apps always say
+ * CONFIRMATION_RESENT and never learn which; it sends nothing for an unknown or already-confirmed address and refuses a
+ * repeat within a minute ("For security purposes…", in the person's words). No account is created here: only sign-up
+ * creates one, through the university email-domain trigger.
+ */
+export async function resendSignupConfirmation(supabase: Client, email: string, redirectTo: string): Promise<void> {
+  const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: redirectTo } });
+  if (error) throw new Error(authErrorMessage(error.message));
+}
+
 /** Enters the session a recovery link carried, so the new password can be set. A refused session means the link is stale. */
 export async function enterRecoverySession(supabase: Client, landing: Extract<RecoveryLanding, { kind: "session" }>): Promise<void> {
   const { error } = await supabase.auth.setSession({ access_token: landing.accessToken, refresh_token: landing.refreshToken });

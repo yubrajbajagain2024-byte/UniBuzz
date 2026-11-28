@@ -28,13 +28,29 @@ export const RESET_REQUESTED = "If there's an account for that email, we've sent
 export const RESET_LINK_EXPIRED = "This link has expired or was already used. Request a new one and open it within an hour.";
 export const PASSWORD_CHANGED = "Your password is changed.";
 
+/** Sign-in refused until the email is confirmed (Supabase's "Email not confirmed"). Both apps offer a new link with it. */
+export const EMAIL_NOT_CONFIRMED = "Confirm your email first: open the link we sent when you signed up, then log in.";
+/**
+ * Supabase Auth could not hand an email to its sender ("Error sending confirmation email", "… recovery email", an
+ * address the built-in sender will not deliver to): the project's email delivery failed, not anything the student did.
+ */
+export const EMAIL_NOT_SENT = "We couldn't send the email just now. Please try again in a few minutes; if it keeps happening, contact support.";
+/** The project's hourly email limit (Supabase's "email rate limit exceeded"), as opposed to one person trying too often. */
+export const EMAIL_LIMIT_REACHED = "We're sending a lot of emails right now. Please try again in a few minutes.";
+/** Said after a new confirmation link is asked for, whether or not such an account exists: the email never gives that away. */
+export const CONFIRMATION_RESENT = "If that email has an account waiting to be confirmed, we've sent it a new link. Check your inbox, and the spam folder.";
+
 /**
  * Supabase Auth's answers in the person's words. Never says whether an account exists: "Invalid login credentials" is
  * what Supabase answers for a wrong password and for an unknown email alike, and the words here keep it that way.
  */
 export function authErrorMessage(message: string): string {
   if (/invalid login credentials/i.test(message)) return "That email and password don't match. Check them, or reset your password.";
-  if (/email not confirmed/i.test(message)) return "Confirm your email first: open the link we sent when you signed up, then log in.";
+  if (/email not confirmed/i.test(message)) return EMAIL_NOT_CONFIRMED;
+  // Delivery failures are the project's, never the student's: Supabase's raw "Error sending confirmation email" said
+  // nothing a student could act on (2026-11-27).
+  if (/error sending .*email|sending .*email failed|email address .*not authorized|cannot be used as it is not authorized/i.test(message)) return EMAIL_NOT_SENT;
+  if (/email rate limit exceeded|over_email_send_rate_limit/i.test(message)) return EMAIL_LIMIT_REACHED;
   if (/rate limit|too many requests|security purposes/i.test(message)) return "Too many tries in a row. Wait a few minutes, then try again.";
   // A suspension from CampConnect Admin sets auth.users.banned_until (its migration 15, live), and Supabase Auth refuses
   // the sign-in with "User is banned": say what it means instead of echoing that.
