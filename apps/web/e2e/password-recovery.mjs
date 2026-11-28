@@ -25,8 +25,8 @@ const project = await mgmt(`/v1/projects/${REF}`);
 if (!/staging/i.test(project.name)) throw new Error(`Refusing: project "${project.name}" is not named as a staging project.`);
 const keys = await mgmt(`/v1/projects/${REF}/api-keys?reveal=true`);
 const admin = createClient(`https://${REF}.supabase.co`, keys.find((k) => k.name === "service_role").api_key, { auth: { persistSession: false, autoRefreshToken: false } });
-const link = async (type, email, redirectTo) => {
-  const { data, error } = await admin.auth.admin.generateLink({ type, email, options: { redirectTo } });
+const link = async (type, email, redirectTo, password) => {
+  const { data, error } = await admin.auth.admin.generateLink({ type, email, ...(password ? { password } : {}), options: { redirectTo } });
   if (error) throw new Error(error.message);
   return data.properties;
 };
@@ -62,7 +62,9 @@ await check("/signup makes the account and says a confirmation link was sent (or
   await first.page.locator("button[type=submit]").first().click();
   await first.page.waitForTimeout(3000);
   const body = await text(first.page);
-  if (/Too many tries/.test(body)) {
+  // Staging's built-in sender allows two emails an hour: its limit reads "We're sending a lot of emails" (EMAIL_LIMIT_REACHED;
+  // "Too many tries" before 2026-11-27).
+  if (/Too many tries|sending a lot of emails/.test(body)) {
     console.log("    (the confirmation email hit staging's mail limit; the account is made with the admin API instead)");
     const made = await admin.auth.admin.createUser({ email, password, email_confirm: false, user_metadata: { full_name: `Web ${run}` } });
     if (made.error) throw new Error(made.error.message);
@@ -84,8 +86,11 @@ await check("/login before confirming says to confirm the email", async () => {
   expect(/Confirm your email/.test(await text(first.page)), (await text(first.page)).slice(0, 300));
 });
 await check("the confirmation link, through the callback route, confirms the email and signs in", async () => {
-  const { hashed_token } = await link("magiclink", email, `${BASE}/auth/callback?next=/`);
-  await first.page.goto(`${BASE}/auth/callback?token_hash=${hashed_token}&type=magiclink&next=/profile/me`, { waitUntil: "load" });
+  // A sign-up link, as the confirmation email carries: Supabase discards the sign-up password of an unconfirmed account
+  // confirmed through a magic link instead (its guard against someone pre-registering another person's address), so a
+  // magic link here would break the password login below (seen 2026-11-27).
+  const { hashed_token } = await link("signup", email, `${BASE}/auth/callback?next=/`, password);
+  await first.page.goto(`${BASE}/auth/callback?token_hash=${hashed_token}&type=signup&next=/profile/me`, { waitUntil: "load" });
   await first.page.waitForURL((u) => u.pathname === "/profile/me", { timeout: 30000 });
   expect(!/error=/.test(first.page.url()), first.page.url());
 });
@@ -101,7 +106,9 @@ await check("/login with the password signs in; a wrong password says they don't
   expect(/don't match/.test(await text(page)), (await text(page)).slice(0, 300));
   await page.fill("#password", password);
   await page.locator("button[type=submit]").first().click();
-  await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 30000 });
+  await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 30000 }).catch(async (e) => {
+    throw new Error(`${e.message.split("\n")[0]}; the page says: ${(await text(page)).slice(0, 200)}`);
+  });
   await ctx.close();
 });
 await check("/forgot-password, linked from /login, answers the same whether or not the account exists", async () => {

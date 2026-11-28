@@ -96,12 +96,17 @@ Supabase's `auth` and `storage` schemas.
   Trust & Safety suspension refused everywhere, a Buzz-only ban and a mute ignored, powers back on lifting (`--restore`);
   `admin-e2e-accounts.mjs`, the staging staff
   admin, staff moderator and student for CampConnect Admin's browser check (`create`, `env`, `qr`, `delete`);
+  `auth-email.mjs`, sign-up email delivery with real emails: it points staging's Auth SMTP at a throwaway Ethereal
+  mailbox (`mailbox.mjs`) for the run and puts the built-in sender back (it refuses a project with its own SMTP);
   `admin-authority.mjs`, migration 67 applied, checked through Auth and the REST API, rolled back and applied again
   (`--restore` leaves it rolled back); `event-engagement.mjs`, events' likes, comments and who is going (migration 69,
   applied when missing) through the app's own code (`--restore` rolls it back); and
   `release-rehearsal.mjs`, which rehearses a release step by step (see its header) and expects every
   migration that went live ahead of the release (58 to 61) to be applied on staging first.
   Staging's `media_jobs` grows on its own: leave it out of row-count comparisons.
+  Confirm a test account there with a **sign-up** link (`generateLink({ type: "signup", email, password })`), as the
+  email does: Supabase discards the sign-up password of an unconfirmed account confirmed through a magic link (its guard
+  against pre-registered addresses, seen 2026-11-27), so a password login afterwards fails.
 
 ## Production
 

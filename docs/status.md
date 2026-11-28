@@ -46,6 +46,13 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 
 ## Open work, in priority order
 
+- **Sign-up confirmation emails (urgent, 2026-11-27):** from 18:51 UTC every sign-up failed with "Error sending
+  confirmation email": Gmail refuses production's SMTP login (`535 BadCredentials`; the Gmail app password no longer
+  works). No incomplete or duplicate accounts were left (Supabase rolls the sign-up back). Fixed in code and tested on
+  staging on `fix/signup-confirmation-email` ([branches/fix/signup-confirmation-email.md](branches/fix/signup-confirmation-email.md)):
+  plain words for email failures, "Send a new link" on the website and in the app, confirmation links that work in any
+  browser (`/email-confirmed`). **Waiting on the owner:** a new Google app password in Supabase's SMTP settings to
+  restore email, then a transactional provider on a UniBuzz domain (Resend recommended); merging the PR; an EAS update.
 - **UniBuzz Master Admin Portal** (the owner's approval of 2026-11-25): CampConnect Admin (`apps/admin`) grows into the
   one staff portal, in phases, each its own branch and PR, each migration rehearsed offline and on staging and applied
   to production only with the owner's approval and a backup; the decisions are in [decisions.md](decisions.md).
@@ -407,6 +414,7 @@ details in [branches/](branches/README.md). Refer to an item below by its title.
 | A Buzz photo can be dated by Storage's `Last-Modified` despite the publication delay | same |
 | Supabase CDN may serve a just-deleted Snap to the same viewer for ~1 minute | README §"Snaps" |
 | Supabase free projects pause after a week idle (Pro, USD 25/mo, before real users); built-in auth email is rate-limited (custom SMTP needed) | README §"Production checklist" |
+| Production's auth email goes through a personal Gmail account's SMTP: about 500 emails a day, and it stops whenever Google revokes the app password (it did on 2026-11-27); a transactional provider on a UniBuzz domain is recommended | [branches/fix/signup-confirmation-email.md](branches/fix/signup-confirmation-email.md) |
 | Vercel Hobby optimizes 5,000 source images a month | README §"Photos" |
 | Testers' app: EAS updates reach only builds with the same native fingerprint (since `828b9d3`); today that is Android build `0493abcf` alone (update of 2026-11-05 03:13 UTC), whose install link stops working on 2026-11-17 (installed apps keep working); the old Android build gets no more updates; the iPhone build is `preview` build `d30b8306` (2026-11-21, from `828e0a4`, internal distribution to the four iPhones registered so far: the owner's and three testers', team `H7F8K4XUB4`, install link valid until 2026-12-05; it has expo-gl for the beauty filters, so updates from `main` since then reach it alone, and the older iPhone builds `8f77d85f` (2026-11-11) and `b2aaee9d` (2026-11-10) get no more); more testers' iPhones need `eas device:create` and a new build and no store build (the last Play Store build is on SDK 57) | "Ads refresh with the feed" above |
 | Production has no listings and no For You or Reels campaigns (read-only, 2026-11-05): Housing is empty everywhere and no student sees an ad until listings and campaigns exist | "Production's one live campaign is not visible yet" above |

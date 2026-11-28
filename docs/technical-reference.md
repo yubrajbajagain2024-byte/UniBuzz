@@ -411,7 +411,7 @@ The business portal on its own subdomain (`business.yourbrand.com`): add that do
 ### Production checklist
 
 - Supabase free projects pause after a week of inactivity; upgrade to the Pro plan (USD 25/month) before real users arrive, which also adds daily backups.
-- Supabase's built-in email sender is rate-limited (a few emails per hour). For real sign-ups configure **custom SMTP** (Resend, Postmark, Brevo, SendGrid all have free tiers) under Authentication → Emails → SMTP Settings.
+- Supabase's built-in email sender is rate-limited (a few emails per hour). For real sign-ups configure **custom SMTP** (Resend, Postmark, Brevo, SendGrid all have free tiers) under Authentication → Emails → SMTP Settings. Prefer a transactional provider on a domain you own (SPF and DKIM set) over a personal Gmail account: Gmail's SMTP needs an app password that Google revokes on a password change or a security event, which stops every sign-up (it happened on 2026-11-27). `supabase/tests/staging/auth-email.mjs` checks sign-up, a new link and recovery with real emails on staging.
 - Keep "Confirm email" enabled so only real mailboxes can sign up. Sign-ups are already limited to the university domains stored on the `universities` table.
 - Map tiles come from OpenStreetMap, which is fine for a student site. If traffic grows, set `NEXT_PUBLIC_MAP_TILE_URL` to a MapTiler or Stadia tile URL with your key (both have free tiers).
 - Turn on **Vercel Analytics** (free) in the Vercel dashboard for traffic numbers.
