@@ -10,6 +10,8 @@ import { friendlyAuthError } from "@/lib/actions/auth";
  *  - OAuth (Google) and PKCE email links send `?code=...`
  *  - Email confirmation / magic links can send `?token_hash=...&type=...`
  *  - A link Supabase refused (expired, or used already) sends `?error=...&error_code=...&error_description=...`
+ *  - A confirmation link of the implicit flow (sign-up, a new link: both apps ask for it) brings its session, or its
+ *    refusal, in the fragment, which only the browser sees: it goes on to /email-confirmed, which reads it
  * A recovery link lands on /reset-password with its tokens in the fragment and never comes here (packages/shared/src/
  * auth.ts); a recovery `token_hash` (an email template written that way) is taken to that page once verified.
  */
@@ -42,5 +44,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(await friendlyAuthError(error.message))}`);
   }
 
-  return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("Invalid sign-in link")}`);
+  // Nothing the server can read: a confirmation link of the implicit flow (both apps ask for it, so the link works in
+  // any browser) carries its session, or Supabase's refusal, in the URL fragment, which never reaches the server. The
+  // browser keeps the fragment through this redirect, and /email-confirmed reads it.
+  return NextResponse.redirect(`${origin}/email-confirmed?next=${encodeURIComponent(next)}`);
 }

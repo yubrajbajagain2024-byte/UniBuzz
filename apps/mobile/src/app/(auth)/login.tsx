@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { authErrorMessage, signInSchema } from "@apartment-book/shared";
+import { authErrorMessage, CONFIRMATION_RESENT, EMAIL_NOT_CONFIRMED, resendSignupConfirmation, signInSchema } from "@apartment-book/shared";
 import { Button, Field, Screen } from "@/components/ui";
-import { supabase } from "@/lib/supabase";
+import { SITE_URL, supabase } from "@/lib/supabase";
 import { textStyle } from "@/lib/theme";
 import { useColors } from "@/lib/theme-provider";
 
@@ -14,6 +14,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [resend, setResend] = useState<{ busy: boolean; text: string | null; error: boolean }>({ busy: false, text: null, error: false });
 
   async function submit() {
     const parsed = signInSchema.safeParse({ email, password });
@@ -28,6 +29,18 @@ export default function LoginScreen() {
     else router.replace("/(tabs)");
   }
 
+  // Logging in is refused until the email is confirmed: offer a new link (the callback sign-up uses). The answer never
+  // says whether an account is waiting.
+  async function resendLink() {
+    setResend({ busy: true, text: null, error: false });
+    try {
+      await resendSignupConfirmation(supabase, email.trim().toLowerCase(), `${SITE_URL}/auth/callback?next=/`);
+      setResend({ busy: false, text: CONFIRMATION_RESENT, error: false });
+    } catch (e) {
+      setResend({ busy: false, text: e instanceof Error ? e.message : String(e), error: true });
+    }
+  }
+
   return (
     <Screen scroll>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ gap: 16, paddingTop: 12 }}>
@@ -36,6 +49,12 @@ export default function LoginScreen() {
         <Field label="University email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" textContentType="emailAddress" placeholder="you@txstate.edu" />
         <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" textContentType="password" placeholder="••••••••" onSubmitEditing={submit} />
         {error ? <Text style={{ color: colors.red }}>{error}</Text> : null}
+        {error === EMAIL_NOT_CONFIRMED ? (
+          <View style={{ gap: 8 }}>
+            {resend.text ? <Text style={{ color: resend.error ? colors.red : colors.muted }}>{resend.text}</Text> : null}
+            <Button title="Send a new confirmation link" variant="secondary" onPress={resendLink} loading={resend.busy} />
+          </View>
+        ) : null}
         <Button title="Log in" size="large" onPress={submit} loading={busy} />
         <Pressable onPress={() => router.replace("/(auth)/signup")}>
           <Text style={{ textAlign: "center", color: colors.brand, fontWeight: "600" }}>New here? Create an account</Text>

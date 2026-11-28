@@ -64,7 +64,8 @@ const ok = (n) => { passes++; console.log(`  ✓ ${n}`); };
 const fail = (n, e) => { failures++; console.log(`  ✗ ${n}: ${String(e?.message ?? e).split("\n")[0].slice(0, 500)}`); };
 async function check(name, fn) { try { await fn(); ok(name); } catch (e) { fail(name, e); } }
 const expect = (cond, message) => { if (!cond) throw new Error(message); };
-const rateLimited = (e) => /rate limit|security purposes|too many/i.test(String(e?.message ?? e));
+// Supabase's words for a limit, or the apps' (EMAIL_LIMIT_REACHED for the project's hourly email limit since 2026-11-27).
+const rateLimited = (e) => /rate limit|security purposes|too many|sending a lot of emails/i.test(String(e?.message ?? e));
 /** Where a Supabase link sends the browser: the Location of its redirect, without following it. */
 async function landing(actionLink) {
   const r = await fetch(actionLink, { redirect: "manual" });
@@ -72,8 +73,8 @@ async function landing(actionLink) {
   expect(r.status >= 300 && r.status < 400 && location, `the link answered ${r.status} without a redirect`);
   return location;
 }
-const makeLink = async (type, email, options = {}) => {
-  const { data, error } = await admin.auth.admin.generateLink({ type, email, options });
+const makeLink = async (type, email, options = {}, password) => {
+  const { data, error } = await admin.auth.admin.generateLink({ type, email, ...(password ? { password } : {}), options });
   if (error) throw new Error(error.message);
   return data.properties.action_link;
 };
@@ -114,7 +115,9 @@ await check("before confirming, login is refused in words that say to confirm, n
   expect(/Confirm your email/.test(authErrorMessage(error.message)), `${error.message} → ${authErrorMessage(error.message)}`);
 });
 await check("the confirmation link confirms the email and lands with a session, as the website's callback would make one", async () => {
-  const where = await landing(await makeLink("magiclink", email, { redirectTo: `${SITE}/auth/callback?next=/` }));
+  // A sign-up link, as the confirmation email carries: Supabase discards the sign-up password of an unconfirmed account
+  // confirmed through a magic link instead (its guard against pre-registered addresses; seen 2026-11-27).
+  const where = await landing(await makeLink("signup", email, { redirectTo: `${SITE}/auth/callback?next=/` }, password));
   const found = recoveryFromUrl(where);
   expect(found.kind === "session", `landed on ${where.replace(/#.*/, "#…")}`);
   const confirmed = await val(`select email_confirmed_at is not null from auth.users where id = ${lit(userId)}`);
@@ -141,7 +144,7 @@ await check("Forgot password: the app's own request goes through (or hits stagin
     await requestPasswordReset(student(), resetRequestSchema.parse({ email }).email, resetPasswordUrl(SITE));
   } catch (e) {
     if (!rateLimited(e)) throw e;
-    expect(/Too many tries/.test(e.message), e.message);
+    expect(/Too many tries|sending a lot of emails/.test(e.message), e.message);
     console.log(`    (rate-limited by staging's mailer, said as: "${e.message}")`);
   }
 });

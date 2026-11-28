@@ -1,9 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { authErrorMessage, createSignUpSchema, flattenZodError, getAllowedEmailDomains, newPasswordSchema, PASSWORD_CHANGED, requestPasswordReset, RESET_REQUESTED, resetPasswordUrl, resetRequestSchema, setNewPassword, signInSchema, type FieldErrors } from "@apartment-book/shared";
+import { authErrorMessage, CONFIRMATION_RESENT, createSignUpSchema, flattenZodError, getAllowedEmailDomains, newPasswordSchema, PASSWORD_CHANGED, requestPasswordReset, resendSignupConfirmation, RESET_REQUESTED, resetPasswordUrl, resetRequestSchema, setNewPassword, signInSchema, type FieldErrors } from "@apartment-book/shared";
 import { getSiteUrl } from "@/lib/env";
-import { createRecoveryClient } from "@/lib/supabase/recovery";
+import { createEmailLinkClient } from "@/lib/supabase/recovery";
 import { createClient } from "@/lib/supabase/server";
 import { errorMessage, formToObject, safeNextPath } from "@/lib/utils";
 
@@ -40,12 +40,13 @@ export async function signUpAction(_prev: AuthState, formData: FormData): Promis
     return { error: "Please fix the highlighted fields.", fieldErrors: flattenZodError(parsed.error).fieldErrors, values };
   }
   const next = safeNextPath(String(formData.get("next") ?? ""), "/settings/profile?welcome=1");
-  const { data, error } = await supabase.auth.signUp({
+  // The implicit flow, so the confirmation link works in any browser, not only this one (lib/supabase/recovery.ts).
+  const { data, error } = await createEmailLinkClient().auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
       data: { full_name: parsed.data.fullName },
-      emailRedirectTo: `${getSiteUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
+      emailRedirectTo: confirmRedirect(next),
     },
   });
 
@@ -57,11 +58,41 @@ export async function signUpAction(_prev: AuthState, formData: FormData): Promis
     return { error: "An account with this email already exists. Try logging in instead.", values };
   }
 
-  if (data.session) redirect(next);
+  // A project without email confirmation signs the student in at once: keep that session in this browser's cookies.
+  if (data.session) {
+    await supabase.auth.setSession({ access_token: data.session.access_token, refresh_token: data.session.refresh_token });
+    redirect(next);
+  }
 
   return {
     success: `We sent a confirmation link to ${parsed.data.email}. Open it to activate your account.`,
+    values: { email: parsed.data.email, next },
   };
+}
+
+/** Where a confirmation link lands: the callback sign-up uses, then `next`. */
+function confirmRedirect(next: string): string {
+  return `${getSiteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
+}
+
+/**
+ * "Send a new link": a new sign-up confirmation email, from the same kind of client and to the same callback as sign-up, so
+ * the new link behaves exactly as the first. It creates nothing (only sign-up creates an account, through the
+ * university email-domain trigger) and the answer never says whether an unconfirmed account exists.
+ */
+export async function resendConfirmationAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const values = stringValues(formData, ["email"]);
+  const parsed = resetRequestSchema.safeParse(formToObject(formData));
+  if (!parsed.success) {
+    return { error: "Please fix the highlighted fields.", fieldErrors: flattenZodError(parsed.error).fieldErrors, values };
+  }
+  const next = safeNextPath(String(formData.get("next") ?? ""), "/settings/profile?welcome=1");
+  try {
+    await resendSignupConfirmation(createEmailLinkClient(), parsed.data.email, confirmRedirect(next));
+  } catch (error) {
+    return { error: errorMessage(error), values };
+  }
+  return { success: CONFIRMATION_RESENT, values };
 }
 
 export async function signInAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
@@ -92,7 +123,7 @@ export async function requestPasswordResetAction(_prev: AuthState, formData: For
     return { error: "Please fix the highlighted fields.", fieldErrors: flattenZodError(parsed.error).fieldErrors, values };
   }
   try {
-    await requestPasswordReset(createRecoveryClient(), parsed.data.email, resetPasswordUrl(getSiteUrl()));
+    await requestPasswordReset(createEmailLinkClient(), parsed.data.email, resetPasswordUrl(getSiteUrl()));
   } catch (error) {
     return { error: errorMessage(error), values };
   }

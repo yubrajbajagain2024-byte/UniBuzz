@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Linking, Platform, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { createSignUpSchema, getAllowedEmailDomains } from "@apartment-book/shared";
+import { authErrorMessage, CONFIRMATION_RESENT, createSignUpSchema, getAllowedEmailDomains, resendSignupConfirmation } from "@apartment-book/shared";
 import { Button, Field, Screen } from "@/components/ui";
 import { useQuery } from "@/lib/hooks";
 import { SITE_URL, supabase } from "@/lib/supabase";
 import { textStyle } from "@/lib/theme";
 import { useColors } from "@/lib/theme-provider";
+
+/** Where a confirmation link lands (the website's callback), for sign-up and a new link alike. */
+const CONFIRM_REDIRECT = `${SITE_URL}/auth/callback?next=/`;
 
 export default function SignupScreen() {
   const colors = useColors();
@@ -18,6 +21,7 @@ export default function SignupScreen() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [resend, setResend] = useState<{ busy: boolean; text: string | null; error: boolean }>({ busy: false, text: null, error: false });
 
   async function submit() {
     const parsed = createSignUpSchema(domains ?? []).safeParse({ fullName, email, password });
@@ -27,14 +31,27 @@ export default function SignupScreen() {
     const { data, error: err } = await supabase.auth.signUp({
       email: parsed.data.email,
       password: parsed.data.password,
-      options: { data: { full_name: parsed.data.fullName }, emailRedirectTo: `${SITE_URL}/auth/callback?next=/` },
+      options: { data: { full_name: parsed.data.fullName }, emailRedirectTo: CONFIRM_REDIRECT },
     });
     setBusy(false);
-    if (err) return setError(/database error saving new user/i.test(err.message) ? "Only verified university email addresses can join. Use your @txstate.edu email." : err.message);
+    // The email-domain trigger refuses other addresses ("Database error saving new user"); the rest in plain words
+    // (a failed confirmation email included: authErrorMessage).
+    if (err) return setError(/database error saving new user/i.test(err.message) ? "Only verified university email addresses can join. Use your @txstate.edu email." : authErrorMessage(err.message));
     if (data.user && data.user.identities?.length === 0) return setError("An account with this email already exists. Try logging in.");
     // Close only this modal: the screen underneath re-renders signed in.
     if (data.session) return router.canGoBack() ? router.back() : router.replace("/(tabs)");
     setDone(true);
+  }
+
+  // "Send a new link": the same callback as sign-up; the answer never says whether an account is waiting.
+  async function resendLink() {
+    setResend({ busy: true, text: null, error: false });
+    try {
+      await resendSignupConfirmation(supabase, email.trim().toLowerCase(), CONFIRM_REDIRECT);
+      setResend({ busy: false, text: CONFIRMATION_RESENT, error: false });
+    } catch (e) {
+      setResend({ busy: false, text: e instanceof Error ? e.message : String(e), error: true });
+    }
   }
 
   if (done) {
@@ -44,6 +61,9 @@ export default function SignupScreen() {
           <Text style={{ ...textStyle.title2, color: colors.text }}>Check your email</Text>
           <Text style={{ color: colors.muted, fontSize: 16 }}>We sent a confirmation link to {email}. Open it, then come back and log in.</Text>
           <Button title="Go to log in" size="large" onPress={() => router.replace("/(auth)/login")} />
+          <Text style={{ color: colors.muted, fontSize: 14, marginTop: 8 }}>{"Didn't get it? Check the spam folder, or send a new link."}</Text>
+          {resend.text ? <Text style={{ color: resend.error ? colors.red : colors.muted }}>{resend.text}</Text> : null}
+          <Button title="Send a new link" variant="secondary" onPress={resendLink} loading={resend.busy} />
         </View>
       </Screen>
     );
